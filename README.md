@@ -1,25 +1,10 @@
 # GANce - gance 
 
+![Sample network output](./gance_sample.png)
+
 Maps music and video into the latent space of StyleGAN models.
 
-## Usage
-
-####  Environment variables
-
-Add if needed
-
-#### Correct usage
-
-With the virtual env activated, run: 
-
-```
-python gance.py --fill-me-in
-```
-
-#### Incorrect usage
-
-Add if needed
-
+See [esologic.com/gance](https://www.esologic.com/gance) for more information.
 
 ## Getting Started
 
