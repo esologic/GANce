@@ -45,7 +45,33 @@ There's also a bin script to do this:
 ## Developer Guide
 
 The following is documentation for developers that would like to contribute
-to GANce.
+to GANCe.
+
+### Type System Limitations
+
+A common idiom found in this application is the following:
+
+```python
+# Shape (1, Any, Any)
+CompleteLatentsType = NewType("CompleteLatentsType", "np.ndarray[np.float32]")  # type: ignore
+```
+
+Where a `NewType` is created based on an `np.ndarray`. This doesn't really do anything outside
+of making the programs a bit more simple to understand to the reader. The following would pass
+`mypy`:
+
+```python
+CompleteLatentsType("oh no!")
+```
+
+This is because:
+* We're stuck on `numpy==1.16.4` because of the `tensorflow` dependency of `stylegan2`.
+* `np.ndarray` types are `Any` as far as `mypy` is concerned in this version.
+* When you `NewType("MyType", Any)`, it stops `mypy` from being able to identify type mismatches.
+
+Read more here: https://github.com/python/mypy/issues/6701
+
+We could resolve this if we take the time to verify that it's okay to upgrade the `numpy` version.
 
 ### Pycharm Note
 

@@ -9,4 +9,4 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd ${DIR}/..
 source ./venv/bin/activate
 
-LC_ALL=C.UTF-8 LANG=C.UTF-8 black . main.py gance/ test/ -l 100 --diff --check --exclude=venv
+LC_ALL=C.UTF-8 LANG=C.UTF-8 black . main.py gance/ test/ -l 100 --diff --check --exclude=venv --exclude=gance/stylegan2
