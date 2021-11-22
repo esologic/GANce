@@ -31,8 +31,54 @@ from gance.vector_sources.vector_types import (
 )
 
 
+def _create_spectrogram(
+    time_series_audio_vectors: ConcatenatedVectors,
+    vector_length: int,
+    fft_amplitude_range: Tuple[int, int],
+    fft_roll_enabled: bool,
+) -> ConcatenatedVectors:
+    """
+    Creates spectrogram based on user config.
+    :param time_series_audio_vectors: See docs in the protocol.
+    :param vector_length: Canonical def.
+    :param fft_amplitude_range: Values in FFT are scaled to this range.
+    :param fft_roll_enabled: If true, the FFT vectors move over time.
+    :return: FFT spectrogram as vectors.
+    """
+
+    spectrogram = compute_spectrogram_smooth_scale(
+        data=time_series_audio_vectors,
+        vector_length=vector_length,
+        amplitude_range=fft_amplitude_range,
+    )
+
+    if fft_roll_enabled:
+        roll_values: ResultLayers = model_index_selector(
+            time_series_audio_vectors=time_series_audio_vectors,
+            vector_length=vector_length,
+            reducer=reduce_vector_rms_rolling_average,
+            model_indices=list(np.arange(0, 3)),
+        )
+
+        spectrogram = vector_sources_common.smooth_each_vector(
+            data=vector_sources_common.rotate_vectors_over_time(
+                data=spectrogram,
+                vector_length=vector_length,
+                roll_values=roll_values.result.data,
+            ),
+            vector_length=vector_length,
+        )
+
+    return spectrogram
+
+
 def alpha_blend_vectors_max_rms_power_audio(
-    time_series_audio_vectors: np.ndarray, vector_length: int, model_indices: List[int]
+    alpha: float,
+    fft_roll_enabled: bool,
+    fft_amplitude_range: Tuple[int, int],
+    time_series_audio_vectors: np.ndarray,
+    vector_length: int,
+    model_indices: List[int],
 ) -> VisualizationInput:
     """
     For vectors:
@@ -46,16 +92,23 @@ def alpha_blend_vectors_max_rms_power_audio(
         * This value is scaled to the range of model indices and quantized to actually select
         the models.
 
+    :param alpha: 0 means no music will be visible in combined signal, 1 means combined signal
+    will be entirely music.
+    :param fft_roll_enabled: If true, the FFT vectors move over time.
+    :param fft_amplitude_range: Values in FFT are scaled to this range.
+    :param fft_depth: Number of vectors within the final latents matrices that receive the
+    FFT during alpha blending.
     :param time_series_audio_vectors: See docs in the protocol.
     :param vector_length: See docs in the protocol.
     :param model_indices: See docs in the protocol.
     :return: The vector sources to be passed to the visualization functions.
     """
 
-    spectrogram = compute_spectrogram_smooth_scale(
-        data=time_series_audio_vectors,
+    spectrogram = _create_spectrogram(
+        time_series_audio_vectors=time_series_audio_vectors,
         vector_length=vector_length,
-        amplitude_range=(-4, 4),
+        fft_amplitude_range=fft_amplitude_range,
+        fft_roll_enabled=fft_roll_enabled,
     )
 
     num_vectors = int(spectrogram.shape[0] / vector_length)
@@ -69,13 +122,12 @@ def alpha_blend_vectors_max_rms_power_audio(
         feature_range=(-4, 4),
     )
 
-    alpha = 0.25
     combined = noise * (1.0 - alpha) + spectrogram * alpha
 
     indices_layers: ResultLayers = model_index_selector(
         time_series_audio_vectors=time_series_audio_vectors,
         vector_length=vector_length,
-        reducer=reduce_vector_gzip_compression_rolling_average,
+        reducer=reduce_vector_rms_rolling_average,
         model_indices=model_indices,
     )
 
@@ -101,7 +153,7 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
     alpha: float,
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
-    fft_depth: int,
+    blend_depth: int,
     time_series_audio_vectors: ConcatenatedVectors,
     vector_length: int,
     model_indices: List[int],
@@ -130,7 +182,7 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
     will be entirely music.
     :param fft_roll_enabled: If true, the FFT vectors move over time.
     :param fft_amplitude_range: Values in FFT are scaled to this range.
-    :param fft_depth: Number of vectors within the final latents matrices that receive the
+    :param blend_depth: Number of vectors within the final latents matrices that receive the
     FFT during alpha blending.
     :param time_series_audio_vectors: See docs in the protocol.
     :param vector_length: See docs in the protocol.
@@ -141,29 +193,12 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
 
     final_latents = load_final_latents_matrices_label(projection_file_path=projection_file_path)
 
-    spectrogram = compute_spectrogram_smooth_scale(
-        data=time_series_audio_vectors,
+    spectrogram = _create_spectrogram(
+        time_series_audio_vectors=time_series_audio_vectors,
         vector_length=vector_length,
-        amplitude_range=fft_amplitude_range,
+        fft_amplitude_range=fft_amplitude_range,
+        fft_roll_enabled=fft_roll_enabled,
     )
-
-    if fft_roll_enabled:
-
-        roll_values: ResultLayers = model_index_selector(
-            time_series_audio_vectors=time_series_audio_vectors,
-            vector_length=vector_length,
-            reducer=reduce_vector_rms_rolling_average,
-            model_indices=list(np.arange(0, 3)),
-        )
-
-        spectrogram = vector_sources_common.smooth_each_vector(
-            data=vector_sources_common.rotate_vectors_over_time(
-                data=spectrogram,
-                vector_length=vector_length,
-                roll_values=roll_values.result.data,
-            ),
-            vector_length=vector_length,
-        )
 
     num_vectors = int(spectrogram.shape[0] / vector_length)
 
@@ -181,11 +216,11 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
             vector_sources_common.demote_to_vector_select(projected_vectors, 0) * (1.0 - alpha)
             + spectrogram * alpha
         ),
-        fft_depth,
+        blend_depth,
     )
 
     combined = np.concatenate(
-        (alpha_blended, projected_vectors[fft_depth:18])  # pylint: disable=unsubscriptable-object
+        (alpha_blended, projected_vectors[blend_depth:18])  # pylint: disable=unsubscriptable-object
     )
 
     indices_layers: ResultLayers = model_index_selector(

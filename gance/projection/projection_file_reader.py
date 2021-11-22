@@ -314,6 +314,19 @@ def load_final_latents_matrices_label(projection_file_path: Path) -> MatricesLab
         return final_latents_matrices_label(reader)
 
 
+def final_latents_at_frame(projection_file_path: Path, frame_number: int) -> SingleMatrix:
+    """
+    Simple wrapper, loads the final latents for processing.
+    Note: This is a one-shot helper function. If you need to do more operations on the file,
+    it's faster to use the `ProjectionFileReader` interface.
+    :param projection_file_path: See call docs.
+    :return: See call docs.
+    """
+
+    with load_projection_file(projection_file_path) as reader:
+        return next(itertools.islice(reader.final_latents, frame_number, frame_number + 1))
+
+
 def model_outputs_at_final_latents(
     projection_file_path: Path, model_interface: ModelInterface
 ) -> Iterator[RGBInt8ImageType]:

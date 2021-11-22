@@ -106,3 +106,5 @@ ENV/
 
 # Ignore picked networks by default
 *.pkl
+
+./gance/assets/

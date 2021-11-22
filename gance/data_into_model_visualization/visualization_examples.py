@@ -1,6 +1,8 @@
 """
 Known, working usages some of the visualization functions.
 """
+import tempfile
+from pathlib import Path
 from time import time
 
 import numpy as np
@@ -14,11 +16,13 @@ from gance.apply_spectrogram import (
     reshape_spectrogram_to_vectors,
 )
 from gance.assets import WAV_CLAPS_PATH
+from gance.data_into_model_visualization import model_visualization
 from gance.data_into_model_visualization.model_visualization import (
     _configure_axes,
     _frame_inputs,
     _write_data_to_axes,
 )
+from gance.projection.projection_visualization import visualize_projection_history
 from gance.data_into_model_visualization.vectors_to_image import (
     multi_plot_vectors,
     vectors_to_video,
@@ -33,12 +37,16 @@ from gance.data_into_model_visualization.visualization_inputs import (
 )
 from gance.data_into_model_visualization.visualize_audio_reducer import visualize_reducer_output
 from gance.dynamic_model_switching import reduce_vector_gzip_compression_rolling_average
+from gance.model_interface.model_functions import create_model_interface
+from gance.projection import projection_file_reader
+from gance.vector_sources import music, primatives, vector_sources_common
 from gance.vector_sources.music import read_wav_scale_for_video
 from gance.vector_sources.vector_sources_common import (
     rotate_vectors_over_time,
     smooth_across_vectors,
 )
 from gance.vector_sources.vector_types import ConcatenatedVectors, VectorsLabel
+from gance.video_common import add_wav_to_video
 
 
 def demo_smoothing() -> None:
@@ -167,5 +175,177 @@ def demo_rotation() -> None:
     )
 
 
+def blog_post_media() -> None:
+    """
+
+    :return: None
+    """
+
+    output_dir = assets.OUTPUT_DIRECTORY.joinpath("final_blog_post_images")
+    output_dir.mkdir(exist_ok=True)
+
+    y_range = (-20, 20)
+
+    model_interface = create_model_interface(
+        model_path=assets.PRODUCTION_MODEL_PATH, call_init_function=True
+    )
+
+    projection_file_latents = projection_file_reader.final_latents_at_frame(
+        projection_file_path=assets.PROJECTION_FILE_PATH,
+        frame_number=561,
+    )
+
+    model_visualization.single_vector_single_model_visualization(
+        vector=projection_file_latents,
+        title="Projection File Original Final Latents",
+        output_image_path=output_dir.joinpath("projection_final_original.png"),
+        model=model_interface,
+        y_range=(-20, 20),
+    )
+
+    model_visualization.single_vector_single_model_visualization(
+        vector=projection_file_latents * 0.9,
+        title="Projection File Original Final Latents",
+        output_image_path=output_dir.joinpath("projection_final_small.png"),
+        model=model_interface,
+        y_range=(-20, 20),
+    )
+
+    model_visualization.single_vector_single_model_visualization(
+        vector=projection_file_latents * 1.1,
+        title="Projection File Original Final Latents",
+        output_image_path=output_dir.joinpath("projection_final_large.png"),
+        model=model_interface,
+        y_range=(-20, 20),
+    )
+
+    model_visualization.single_vector_single_model_visualization(
+        vector=np.full(shape=(model_interface.expected_vector_length,), fill_value=10),
+        title="Line",
+        output_image_path=output_dir.joinpath("line_to_image.png"),
+        model=model_interface,
+        y_range=y_range,
+    )
+
+    sin_vector = np.sin(np.arange(0, model_interface.expected_vector_length / 10, 0.1)) * 10
+
+    model_visualization.single_vector_single_model_visualization(
+        vector=sin_vector,
+        title="Sine Wave",
+        output_image_path=output_dir.joinpath("sine_wav_to_image.png"),
+        model=model_interface,
+        y_range=y_range,
+    )
+
+    random_noise = np.random.rand(model_interface.expected_vector_length) * 10
+
+    model_visualization.single_vector_single_model_visualization(
+        vector=random_noise,
+        title="Noise",
+        output_image_path=output_dir.joinpath("noise_image.png"),
+        model=model_interface,
+        y_range=y_range,
+    )
+
+    model_visualization.single_vector_single_model_visualization(
+        vector=primatives.single_square_wave_vector(
+            rising_edge_x=150,
+            falling_edge_x=500,
+            y_offset=0,
+            y_amplitude=10,
+            vector_length=model_interface.expected_vector_length,
+        ),
+        title="Square Wave",
+        output_image_path=output_dir.joinpath("original_step.png"),
+        model=model_interface,
+        y_range=y_range,
+    )
+
+    square_vector = primatives.single_square_wave_vector(
+        rising_edge_x=160,
+        falling_edge_x=500,
+        y_offset=0,
+        y_amplitude=10,
+        vector_length=model_interface.expected_vector_length,
+    )
+
+    model_visualization.single_vector_single_model_visualization(
+        vector=square_vector,
+        title="Tweaked Square",
+        output_image_path=output_dir.joinpath("modified_step.png"),
+        model=model_interface,
+        y_range=(-20, 20),
+    )
+
+    model_visualization.single_vector_single_model_visualization(
+        vector=random_noise,
+        title="Early training network",
+        output_image_path=output_dir.joinpath("early_network_noise_image.png"),
+        model=create_model_interface(
+            model_path=assets.EARLY_TRAINING_MODEL_PATH, call_init_function=True
+        ),
+        y_range=y_range,
+    )
+
+    model_visualization.single_vector_single_model_visualization(
+        vector=random_noise,
+        title="Middle training network",
+        output_image_path=output_dir.joinpath("middle_network_noise_image.png"),
+        model=create_model_interface(
+            model_path=assets.MID_TRAINING_MODEL_PATH, call_init_function=True
+        ),
+        y_range=y_range,
+    )
+
+    model_visualization.vectors_single_model_visualization(
+        vectors_label=VectorsLabel(
+            data=vector_sources_common.interpolate_between_vectors(
+                start=sin_vector, end=square_vector, count=1000
+            ),
+            vector_length=model_interface.expected_vector_length,
+            label="Interpolation between Sine vector and Square Wave",
+        ),
+        output_video_path=output_dir.joinpath("sin_square_interp.mp4"),
+        model=model_interface,
+        y_range=(-20, 20),
+    )
+
+    with tempfile.NamedTemporaryFile(suffix=".mp4") as f:
+
+        tmp_video_path = Path(f.name)
+
+        model_visualization.vectors_single_model_visualization(
+            vectors_label=VectorsLabel(
+                data=music.read_wav_scale_for_video(
+                    wav_path=assets.NOVA_SNIPPET_PATH,
+                    vector_length=model_interface.expected_vector_length,
+                    frames_per_second=60.0,
+                ).wav_data,
+                vector_length=model_interface.expected_vector_length,
+                label="Audio Directly Into Network",
+            ),
+            output_video_path=tmp_video_path,
+            model=model_interface,
+        )
+
+        while not tmp_video_path.exists():
+            pass
+
+        add_wav_to_video(
+            video_path=tmp_video_path,
+            audio_path=Path(assets.NOVA_SNIPPET_PATH),
+            output_path=output_dir.joinpath("direct_audio.mp4"),
+        )
+
+    visualize_projection_history(
+        projection_file_path=assets.PROJECTION_FILE_PATH,
+        output_video_path=output_dir.joinpath("projection_history.mp4"),
+        projection_model_path=assets.PRODUCTION_MODEL_PATH,
+        model_not_matching_ok=False,
+        start_frame_index=561,
+        end_frame_index=562,
+    )
+
+
 if __name__ == "__main__":
-    demo_rotation()
+    blog_post_media()

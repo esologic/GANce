@@ -391,3 +391,32 @@ def rotate_vectors_over_time(
         for sub_vector, roll_value in zip(split, roll_per_vector)
     ]
     return np.concatenate(rolled)
+
+
+def interpolate_between_vectors(
+    start: SingleVector, end: SingleVector, count: int
+) -> ConcatenatedVectors:
+    """
+    Create linear interpolation between two vectors.
+    :param start: Starting vector.
+    :param end: Ending vector.
+    :param count: Number of vectors to spend transitioning between the two.
+    :return: A vector array containing the transition.
+    """
+
+    output_x_values = np.linspace(start=0, stop=1, num=count, endpoint=True)
+
+    def points_over_time(a: float, b: float) -> SingleVector:
+        """
+        Creates the points across the two vectors that will compose a single point in the
+        transition.
+        :param a: Point in the start vector.
+        :param b: Point in the end vector.
+        :return: List of points that span between the two of them.
+        """
+        interp_function = interpolate.interp1d([0, 1], [a, b])
+        return SingleVector(interp_function(output_x_values))
+
+    return ConcatenatedVectors(
+        np.array([points_over_time(a, b) for a, b in zip(start, end)]).transpose().flatten()
+    )

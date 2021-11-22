@@ -6,6 +6,7 @@ Also tools to visualize these vectors against the model outputs.
 import datetime
 import inspect
 import logging
+import tempfile
 from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
@@ -17,7 +18,10 @@ from gance.assets import OUTPUT_DIRECTORY
 from gance.cli_common import EXTENSION_MP4
 from gance.data_into_model_visualization.model_visualization import viz_model_ins_outs
 from gance.data_into_model_visualization.visualization_common import CreateVisualizationInput
-from gance.data_into_model_visualization.visualization_inputs import alpha_blend_projection_file
+from gance.data_into_model_visualization.visualization_inputs import (
+    alpha_blend_projection_file,
+    alpha_blend_vectors_max_rms_power_audio,
+)
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import MultiModel, sorted_models_in_directory
 from gance.vector_sources.music import read_wav_scale_for_video
@@ -33,7 +37,7 @@ def _create_visualization(
     vector_function: CreateVisualizationInput,
     vector_length: int,
     video_fps: float,
-    output_directory: Path,
+    output_path: Path,
     enable_3d: bool,
     enable_2d: bool,
     frames_to_visualize: Optional[int] = None,
@@ -54,7 +58,7 @@ def _create_visualization(
     model. Think an spectrogram conversion or a smoothing function.
     :param vector_length: The side length of the model shape, the number of points per vector.
     :param video_fps: The FPS of the output video.
-    :param output_directory: The directory to write the output video.
+    :param output_path: The path to write the output video.
     :param enable_3d: If True, a 3d visualization of the input vectors will be created alongside
     the output of the model (if the `models` is not None).
     :param enable_2d: If True, a 2d visualization of the combination of the input vectors
@@ -64,43 +68,85 @@ def _create_visualization(
     :return: The path to the output video.
     """
 
-    video_path = output_directory.joinpath(f"./model_vis_output_{audio_path.name}.{EXTENSION_MP4}")
-
-    LOGGER.info(f"Writing video: {video_path}")
+    LOGGER.info(f"Writing video: {output_path}")
 
     time_series_audio_vectors = read_wav_scale_for_video(
         audio_path, vector_length, video_fps
     ).wav_data
 
-    video_path = viz_model_ins_outs(
-        models=models,
-        data=vector_function(
-            time_series_audio_vectors=time_series_audio_vectors,
-            vector_length=vector_length,
-            model_indices=models.model_indices if models is not None else [0, 1, 2],  # TODO
-        ),
-        output_video_path=video_path,
-        default_vector_length=vector_length,
-        video_fps=video_fps,
-        enable_3d=enable_3d,
-        enable_2d=enable_2d,
-        frames_to_visualize=frames_to_visualize,
-    )
+    with tempfile.NamedTemporaryFile(suffix=".mp4") as f:
 
-    video_with_audio_path = output_directory.joinpath(
-        f"{video_path.with_suffix('').name}_with_audio{video_path.suffix}"
-    )
+        tmp_video_path = Path(f.name)
 
-    while not video_path.exists():
-        pass
+        viz_model_ins_outs(
+            models=models,
+            data=vector_function(
+                time_series_audio_vectors=time_series_audio_vectors,
+                vector_length=vector_length,
+                model_indices=models.model_indices if models is not None else [0, 1, 2],  # TODO
+            ),
+            output_video_path=tmp_video_path,
+            default_vector_length=vector_length,
+            video_fps=video_fps,
+            enable_3d=enable_3d,
+            enable_2d=enable_2d,
+            frames_to_visualize=frames_to_visualize,
+        )
 
-    add_wav_to_video(
-        video_path=video_path,
-        audio_path=audio_path,
-        output_path=video_with_audio_path,
-    )
+        while not tmp_video_path.exists():
+            pass
 
-    return video_with_audio_path
+        add_wav_to_video(
+            video_path=tmp_video_path,
+            audio_path=audio_path,
+            output_path=output_path,
+        )
+
+    return output_path
+
+
+def _configure_run(
+    wav: str,
+    output_path: str,
+    models_directory: Optional[str],
+    vector_length: Optional[int],
+    index: Optional[Tuple[int, ...]],
+    frames_to_visualize: Optional[int],
+    output_fps: float,
+    debug_2d: bool,
+    vector_function,
+):
+    # Get the paths to the models to be used.
+    if models_directory is not None:
+        models_directory_path = Path(models_directory)
+        all_models = sorted_models_in_directory(models_directory=models_directory_path)
+        if not all_models:
+            raise ValueError(f"No models found in directory {models_directory_path}")
+        model_paths = (
+            [all_models[model_index] for model_index in sorted(index)] if index else all_models
+        )
+    else:
+        model_paths = []
+
+    with MultiModel(model_paths=model_paths) as multi_models:
+
+        if multi_models is None:
+            input_vector_length = vector_length
+        else:
+            input_vector_length = multi_models.expected_vector_length
+
+        # Throw away the output here, don't need to persist.
+        _create_visualization(
+            audio_path=Path(wav),
+            models=multi_models,
+            vector_function=vector_function,
+            vector_length=input_vector_length,
+            video_fps=output_fps,
+            output_path=Path(output_path),
+            enable_3d=False,  # TODO: Make this a CLI argument
+            enable_2d=debug_2d,
+            frames_to_visualize=frames_to_visualize,
+        )
 
 
 def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -121,23 +167,16 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 required=True,
             ),
             click.option(
-                "--output_directory",
-                help="Output files (videos, images etc) will be written to this directory.",
+                "--output_path",
+                help="Output video will be written to this path",
                 type=click.Path(
                     exists=False,
-                    file_okay=False,
-                    readable=True,
+                    file_okay=True,
                     writable=True,
-                    dir_okay=True,
+                    dir_okay=False,
                     resolve_path=True,
                 ),
-                default=str(
-                    Path(
-                        OUTPUT_DIRECTORY.joinpath(
-                            f'output_{datetime.datetime.now().strftime("%m-%d-%Y-%H_%M_%S")}'
-                        )
-                    )
-                ),
+                default=str(Path(OUTPUT_DIRECTORY.joinpath("output.mp4"))),
                 show_default=True,
             ),
             optgroup.group(
@@ -208,6 +247,30 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 default=False,
                 show_default=True,
             ),
+            click.option(
+                "--alpha",
+                help="Alpha blending coefficient.",
+                type=click.FloatRange(min=0),
+                required=False,
+                default=0.5,
+                show_default=True,
+            ),
+            click.option(
+                "--fft_roll_enabled",
+                help="If true, the FFT vectors move over time.",
+                is_flag=True,
+                required=False,
+                default=False,
+                show_default=True,
+            ),
+            click.option(
+                "--fft_amplitude_range",
+                help="Values in FFT are scaled to this range.",
+                type=click.Tuple(types=(float, float)),
+                required=False,
+                default=(-4, 4),
+                show_default=True,
+            ),
         ]
     ):
         func = option(func)
@@ -229,49 +292,18 @@ def cli() -> None:
 
 @cli.command()  # type: ignore
 @common_command_options
-@click.option(
-    "--projection_file_path",
-    help="Path to the projection file.",
-    type=click.Path(exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True),
-    required=True,
-)
-@click.option(
-    "--alpha",
-    help="Alpha blending coefficient.",
-    type=click.FloatRange(min=0),
-    required=False,
-    default=0.5,
-    show_default=True,
-)
-def bb(
+def noise_blend(
     wav: str,
-    output_directory: str,
-    models_directory: Optional[str],
-    vector_length: Optional[int],
-    index: Optional[Tuple[int, ...]],
-    frames_to_visualize: Optional[int],
-    output_fps: float,
-    projection_file_path: str,
-    alpha: float,
-) -> None:
-    pass
-
-
-def projection_file(
-    wav: str,
-    output_directory: str,
+    output_path: str,
     models_directory: Optional[str],
     vector_length: Optional[int],
     index: Optional[Tuple[int, ...]],
     frames_to_visualize: Optional[int],
     output_fps: float,
     debug_2d: bool,
-    note: Optional[str],
-    projection_file_path: str,
     alpha: float,
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
-    fft_depth: int,
 ) -> None:
     """
     Visualize one or more wav files using StyleGAN2 models, save the visualizations as videos.
@@ -291,54 +323,94 @@ def projection_file(
     :return: None
     """
 
-    # Get the paths to the models to be used.
-    if models_directory is not None:
-        models_directory_path = Path(models_directory)
-        all_models = sorted_models_in_directory(models_directory=models_directory_path)
-        if not all_models:
-            raise ValueError(f"No models found in directory {models_directory_path}")
-        model_paths = (
-            [all_models[model_index] for model_index in sorted(index)] if index else all_models
-        )
-    else:
-        model_paths = []
-
-    # Set up the output directory, multiple files could get written here.
-    output_directory_path = Path(output_directory)
-    output_directory_path.mkdir(exist_ok=True)
-
-    with open(output_directory_path.joinpath("visualization_input_function.txt"), "w") as f:
-        f.writelines(inspect.getsource(alpha_blend_projection_file))
-        f.writelines([f"Alpha: {alpha}", note])
-
-    vector_function = partial(
-        alpha_blend_projection_file,
-        Path(projection_file_path),
-        alpha,
-        fft_roll_enabled,
-        fft_amplitude_range,
-        fft_depth,
+    _configure_run(
+        wav=wav,
+        output_path=output_path,
+        models_directory=models_directory,
+        vector_length=vector_length,
+        index=index,
+        frames_to_visualize=frames_to_visualize,
+        output_fps=output_fps,
+        debug_2d=debug_2d,
+        vector_function=partial(
+            alpha_blend_vectors_max_rms_power_audio,
+            alpha,
+            fft_roll_enabled,
+            fft_amplitude_range,
+        ),
     )
 
-    with MultiModel(model_paths=model_paths) as multi_models:
 
-        if multi_models is None:
-            input_vector_length = vector_length
-        else:
-            input_vector_length = multi_models.expected_vector_length
+@cli.command()  # type: ignore
+@common_command_options
+@click.option(
+    "--projection_file_path",
+    help="Path to the projection file.",
+    type=click.Path(exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True),
+    required=True,
+)
+@click.option(
+    "--blend_depth",
+    help=(
+        "Number of vectors within the final latents matrices that receive the FFT during "
+        "alpha blending."
+    ),
+    type=click.FloatRange(min=0),
+    required=False,
+    default=0.5,
+    show_default=True,
+)
+def projection_file_blend(
+    wav: str,
+    output_path: str,
+    models_directory: Optional[str],
+    vector_length: Optional[int],
+    index: Optional[Tuple[int, ...]],
+    frames_to_visualize: Optional[int],
+    output_fps: float,
+    debug_2d: bool,
+    alpha: float,
+    fft_roll_enabled: bool,
+    fft_amplitude_range: Tuple[int, int],
+    projection_file_path: str,
+    blend_depth: int,
+) -> None:
+    """
+    Visualize one or more wav files using StyleGAN2 models, save the visualizations as videos.
 
-        # Throw away the output here, don't need to persist.
-        _create_visualization(
-            audio_path=Path(wav),
-            models=multi_models,
-            vector_function=vector_function,
-            vector_length=input_vector_length,
-            video_fps=output_fps,
-            output_directory=output_directory_path,
-            enable_3d=False,  # TODO: Make this a CLI argument
-            enable_2d=debug_2d,  # TODO: Make this a CLI argument
-            frames_to_visualize=frames_to_visualize,
-        )
+    \f
+    :param wav: Path to the wav file to input to the model(s).
+    :param output_path: "Output files (videos, images etc) will be written to this directory.
+    :param models_directory: Model `.pkl` files will be read from this directory.
+    :param index: If given, only models from these indices (locations in the sorted list of
+    models in the input dir) will be used.
+    :param frames_to_visualize: The number of frames in the input to visualize. Starts from the
+    first index, goes to this value. Ex. 10 is given, the first 10 frames will be visualized.
+    :param output_fps: Frames per second of output video. Input sources will be upscaled to
+    satisfy this requirement.
+    :param projection_file_path: See click help.
+    :param alpha: See click help.
+    :return: None
+    """
+
+    _configure_run(
+        wav=wav,
+        output_path=output_path,
+        models_directory=models_directory,
+        vector_length=vector_length,
+        index=index,
+        frames_to_visualize=frames_to_visualize,
+        output_fps=output_fps,
+        debug_2d=debug_2d,
+        vector_function=partial(
+            alpha_blend_projection_file,
+            Path(projection_file_path),
+            alpha,
+            fft_roll_enabled,
+            fft_amplitude_range,
+            blend_depth,
+        ),
+    )
 
 
 if __name__ == "__main__":

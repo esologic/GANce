@@ -618,11 +618,27 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
     return output_video_path
 
 
+def _y_bounds(data: np.ndarray, y_range: Optional[Tuple[int, int]] = None) -> Tuple[int, int]:
+    """
+
+    :param data:
+    :param y_range:
+    :return:
+    """
+
+    if y_range is not None:
+        return y_range
+    else:
+        return data.min(), data.max()
+
+
 def vectors_single_model_visualization(  # pylint: disable=too-many-locals
     vectors_label: VectorsLabel,
     output_video_path: Path,
     model: ModelInterface,
     video_height: Optional[int] = 1024,
+    y_range: Optional[Tuple[int, int]] = None,
+    video_fps: float = 60.0,
 ) -> None:
     """
     Creates a very simple video:
@@ -634,12 +650,16 @@ def vectors_single_model_visualization(  # pylint: disable=too-many-locals
     :param output_video_path: The path to write the resulting video to.
     :param model: The model to use for synthesis.
     :param video_height: The height of the output video in pixels, the width will be 2x the height.
+    :param y_range: If given, the y range will be clamped to this min max pair.
+    :param video_fps: FPS of output video.
     :return: None
     """
 
+    y_min, y_max = _y_bounds(data=vectors_label.data, y_range=y_range)
+
     make_visualization = vector_visualizer(
-        y_min=vectors_label.data.min(),
-        y_max=vectors_label.data.max(),
+        y_min=y_min,
+        y_max=y_max,
         title=vectors_label.label,
         output_width=video_height,
         output_height=video_height,
@@ -648,7 +668,7 @@ def vectors_single_model_visualization(  # pylint: disable=too-many-locals
     video = create_video_writer(
         video_path=output_video_path,
         num_squares=2,
-        video_fps=60.0,
+        video_fps=video_fps,
         video_height=video_height,
     )
 
@@ -675,6 +695,7 @@ def single_vector_single_model_visualization(
     output_image_path: Path,
     model: ModelInterface,
     image_height: Optional[int] = 1024,
+    y_range: Optional[Tuple[int, int]] = None,
 ) -> None:
     """
     Creates a very simple image:
@@ -686,12 +707,15 @@ def single_vector_single_model_visualization(
     :param output_image_path: The path to write the resulting image to.
     :param model: The model to use for synthesis.
     :param image_height: The height of the output video in pixels, the width will be 2x the height.
+    :param y_range: If given, the y range will be clamped to this min max pair.
     :return: None
     """
 
+    y_min, y_max = _y_bounds(data=vector, y_range=y_range)
+
     make_visualization = vector_visualizer(
-        y_min=vector.min(),
-        y_max=vector.max(),
+        y_min=y_min,
+        y_max=y_max,
         title=title,
         output_width=image_height,
         output_height=image_height,
@@ -701,7 +725,7 @@ def single_vector_single_model_visualization(
 
     with make_visualization(x_values=x_values, y_values=vector) as visualization:
         # Puts the data visualization to the left of the synthesis.
-        frame = cv2.hconcat([visualization, model.create_image_vector(vector)])
+        frame = cv2.hconcat([visualization, model.create_image_generic(vector)])
 
     i = PIL.Image.fromarray(frame.astype(np.uint8))
     i.save(str(output_image_path))

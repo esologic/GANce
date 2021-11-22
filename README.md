@@ -2,7 +2,7 @@
 
 ![Sample network output](./gance_sample.png)
 
-Maps music and video into the latent space of StyleGAN models.
+Maps music and video into the latent space of StyleGAN networks.
 
 See [esologic.com/gance](https://www.esologic.com/gance) for more information.
 

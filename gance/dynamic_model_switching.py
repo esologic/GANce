@@ -63,8 +63,8 @@ def reduce_vector_rms_rolling_max(
 
 def _smoothed_rolling_average(
     input_values: DataLabel,
-    rolling_average_window: int = 30,
-    savgol_window_length: int = 11,
+    rolling_average_window: int = 3,
+    savgol_window_length: int = 7,
     savgol_polyorder: int = 3,
 ) -> ResultLayers:
     """

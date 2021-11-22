@@ -7,6 +7,23 @@ _ASSETS_DIRECTORY = Path(os.path.dirname(os.path.abspath(__file__)))
 
 ASSETS_DIRECTORY_PATH = str(_ASSETS_DIRECTORY)
 
-WAV_CLAPS_PATH = _ASSETS_DIRECTORY.joinpath("claps.wav")
+_AUDIO_DIRECTORY = _ASSETS_DIRECTORY.joinpath("audio")
+
+WAV_CLAPS_PATH = _AUDIO_DIRECTORY.joinpath("claps.wav")
+
+NOVA_SNIPPET_PATH = _AUDIO_DIRECTORY.joinpath("nova_prod_snippet.wav")
 
 OUTPUT_DIRECTORY = _ASSETS_DIRECTORY.joinpath("output")
+
+_MODELS_DIRECTORY = _ASSETS_DIRECTORY.joinpath("models")
+
+PRODUCTION_MODEL_PATH = _MODELS_DIRECTORY.joinpath("production_model.pkl")
+
+_TRAINING_SAMPLE_MODELS_DIRECTORY = _MODELS_DIRECTORY.joinpath("training_sample")
+
+_TRAINING_SAMPLE_MODELS_DIRECTORY.joinpath("1.pkl")
+
+EARLY_TRAINING_MODEL_PATH = _TRAINING_SAMPLE_MODELS_DIRECTORY.joinpath("1.pkl")
+MID_TRAINING_MODEL_PATH = _TRAINING_SAMPLE_MODELS_DIRECTORY.joinpath("3.pkl")
+
+PROJECTION_FILE_PATH = _ASSETS_DIRECTORY.joinpath("projection_files/resumed_prod_nova_3-1.hdf5")

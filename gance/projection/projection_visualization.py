@@ -315,6 +315,8 @@ def visualize_projection_history(  # pylint: disable=too-many-locals
     projection_model_path: Path,
     model_not_matching_ok: bool,
     video_height: Optional[int] = 1024,
+    start_frame_index: Optional[int] = None,
+    end_frame_index: Optional[int] = None,
 ) -> None:
     """
     Shows each projection history latent over time as it approaches the target.
@@ -328,6 +330,7 @@ def visualize_projection_history(  # pylint: disable=too-many-locals
     :param model_not_matching_ok: If the input model given by `projection_model_path` doesn't
     match the model that was used in the projection file, raise a ValueError if given.
     :param video_height: The height of the output video in pixels, the width will be 3x the height.
+    :param end_frame_index: Only get the history of the given index if desired.
     :return: None
     """
 
@@ -349,8 +352,10 @@ def visualize_projection_history(  # pylint: disable=too-many-locals
 
         x_values = np.arange(matrices_label.vector_length)
 
-        for projection_frame_index, (latent_history, target) in enumerate(
-            zip(reader.latents_histories, reader.target_images)
+        for projection_frame_index, (latent_history, target) in itertools.islice(
+            enumerate(zip(reader.latents_histories, reader.target_images)),
+            start_frame_index,
+            end_frame_index,
         ):
 
             for latent_index, latents in enumerate(latent_history):

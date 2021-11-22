@@ -74,7 +74,7 @@ def gaussian_data(
     return ConcatenatedVectors(all_latents.reshape(vector_length * num_vectors))
 
 
-def _single_square_wave_vector(
+def single_square_wave_vector(
     rising_edge_x: int, falling_edge_x: int, y_offset: float, y_amplitude: float, vector_length: int
 ) -> SingleVector:
     """
@@ -113,7 +113,7 @@ def square_wave_sweep_horizontal(
     return ConcatenatedVectors(
         np.concatenate(
             [
-                _single_square_wave_vector(
+                single_square_wave_vector(
                     rising_edge_x=value,
                     falling_edge_x=value + pulse_width,
                     y_amplitude=y_amplitude,
@@ -149,7 +149,7 @@ def square_wave_sweep_vertical(
     return ConcatenatedVectors(
         np.concatenate(
             [
-                _single_square_wave_vector(
+                single_square_wave_vector(
                     y_offset=y_offset,
                     y_amplitude=value,
                     vector_length=vector_length,
