@@ -22,7 +22,6 @@ from gance.data_into_model_visualization.model_visualization import (
     _frame_inputs,
     _write_data_to_axes,
 )
-from gance.projection.projection_visualization import visualize_projection_history
 from gance.data_into_model_visualization.vectors_to_image import (
     multi_plot_vectors,
     vectors_to_video,
@@ -39,13 +38,14 @@ from gance.data_into_model_visualization.visualize_audio_reducer import visualiz
 from gance.dynamic_model_switching import reduce_vector_gzip_compression_rolling_average
 from gance.model_interface.model_functions import create_model_interface
 from gance.projection import projection_file_reader
+from gance.projection.projection_visualization import visualize_projection_history
 from gance.vector_sources import music, primatives, vector_sources_common
 from gance.vector_sources.music import read_wav_scale_for_video
 from gance.vector_sources.vector_sources_common import (
     rotate_vectors_over_time,
     smooth_across_vectors,
 )
-from gance.vector_sources.vector_types import ConcatenatedVectors, VectorsLabel
+from gance.vector_sources.vector_types import ConcatenatedVectors, SingleVector, VectorsLabel
 from gance.video_common import add_wav_to_video
 
 
@@ -111,6 +111,9 @@ def data_visualizations_single_frame() -> None:
         ).wav_data,
         vector_length=vector_length,
         model_indices=list(np.arange(20)),
+        alpha=0.5,
+        fft_roll_enabled=False,
+        fft_amplitude_range=(-4, 4),
     )
 
     configured_axes = _configure_axes(
@@ -196,7 +199,7 @@ def blog_post_media() -> None:
     )
 
     model_visualization.single_vector_single_model_visualization(
-        vector=projection_file_latents,
+        vector=SingleVector(projection_file_latents),
         title="Projection File Original Final Latents",
         output_image_path=output_dir.joinpath("projection_final_original.png"),
         model=model_interface,
@@ -204,7 +207,7 @@ def blog_post_media() -> None:
     )
 
     model_visualization.single_vector_single_model_visualization(
-        vector=projection_file_latents * 0.9,
+        vector=SingleVector(projection_file_latents * 0.9),
         title="Projection File Original Final Latents",
         output_image_path=output_dir.joinpath("projection_final_small.png"),
         model=model_interface,
@@ -212,7 +215,7 @@ def blog_post_media() -> None:
     )
 
     model_visualization.single_vector_single_model_visualization(
-        vector=projection_file_latents * 1.1,
+        vector=SingleVector(projection_file_latents * 1.1),
         title="Projection File Original Final Latents",
         output_image_path=output_dir.joinpath("projection_final_large.png"),
         model=model_interface,
@@ -220,7 +223,9 @@ def blog_post_media() -> None:
     )
 
     model_visualization.single_vector_single_model_visualization(
-        vector=np.full(shape=(model_interface.expected_vector_length,), fill_value=10),
+        vector=SingleVector(
+            np.full(shape=(model_interface.expected_vector_length,), fill_value=10)
+        ),
         title="Line",
         output_image_path=output_dir.joinpath("line_to_image.png"),
         model=model_interface,

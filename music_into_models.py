@@ -355,7 +355,7 @@ def noise_blend(
         "Number of vectors within the final latents matrices that receive the FFT during "
         "alpha blending."
     ),
-    type=click.FloatRange(min=0),
+    type=click.IntRange(min=0, max=18),
     required=False,
     default=0.5,
     show_default=True,

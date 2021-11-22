@@ -15,11 +15,7 @@ from gance.data_into_model_visualization.visualization_common import (
     ResultLayers,
     VisualizationInput,
 )
-from gance.dynamic_model_switching import (
-    model_index_selector,
-    reduce_vector_gzip_compression_rolling_average,
-    reduce_vector_rms_rolling_average,
-)
+from gance.dynamic_model_switching import model_index_selector, reduce_vector_rms_rolling_average
 from gance.projection.projection_file_reader import load_final_latents_matrices_label
 from gance.vector_sources import vector_sources_common
 from gance.vector_sources.primatives import Sigmas, gaussian_data
