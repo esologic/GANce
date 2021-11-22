@@ -103,3 +103,8 @@ ENV/
 
 # pycharm
 .idea/
+
+# Ignore picked networks by default
+*.pkl
+*.wav
+*.hdf5

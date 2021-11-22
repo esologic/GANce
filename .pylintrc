@@ -7,7 +7,7 @@ extension-pkg-whitelist=cv2
 
 # Add files or directories to the blacklist. They should be base names, not
 # paths.
-ignore=CVS,venv
+ignore=CVS,venv,stylegan2
 
 # Add files or directories matching the regex patterns to the blacklist. The
 # regex matches against base names, not paths.
@@ -132,7 +132,10 @@ disable=invalid-name,
         bad-continuation, # ignore multiline def reflow
         ungrouped-imports, # handled by isort
         logging-fstring-interpolation,
-        no-else-return
+        no-else-return,
+        duplicate-code,
+        too-few-public-methods, # conflicts with good practice of using NTs, Protocols etc
+        unspecified-encoding
 
 
 # Enable the message, report, category or checker with the given id(s). You can
@@ -302,7 +305,15 @@ ignore-on-opaque-inference=yes
 # List of class names for which member attributes should not be checked (useful
 # for classes with dynamically set attributes). This supports the use of
 # qualified names.
-ignored-classes=optparse.Values,thread._local,_thread._local,Observable
+ignored-classes=thread._local,
+                _thread._local,
+                SingleVector,
+                ConcatenatedVectors,
+                DividedVectors,
+                SingleMatrix,
+                ConcatenatedMatrices,
+                DividedMatrices,
+                RGBInt8ImageType
 
 # List of module names for which member attributes should not be checked
 # (useful for modules/projects where namespaces are manipulated during runtime

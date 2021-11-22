@@ -1,0 +1,3 @@
+[submodule "gance/stylegan2"]
+	path = gance/stylegan2
+	url = https://github.com/esologic/stylegan2_gance

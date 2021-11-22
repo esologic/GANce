@@ -1,0 +1,25 @@
+services:
+  gance-develop:
+    container_name: gance-develop
+    build:
+      context: .
+      dockerfile: develop.Dockerfile
+    ports:
+      - "2222:22"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+    volumes:
+      - type: bind
+        source: ./gance/assets/models
+        target: /home/gpu/gance/gance/assets/models
+        read_only: true
+      - type: bind
+        source: /home/devon/development_share/yac_output
+        target: /home/gpu/gance/gance/assets/output
+        read_only: false
+

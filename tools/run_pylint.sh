@@ -12,4 +12,4 @@ source ./venv/bin/activate
 
 export PYTHONPATH="./gance:./test${PYTHONPATH+:}${PYTHONPATH:-}"
 
-pylint main.py gance test
+pylint ./*.py gance test --rcfile=.pylintrc
