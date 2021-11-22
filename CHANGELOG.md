@@ -1,9 +1,10 @@
 # Changelog
 
-0.17.0 - (2021-11-21)
+0.17.0 - (2021-11-22)
 ------------------
 
 * Breaking up project and renaming it `GANce` for publication on GitHub.
+* Added a number of examples for a blog post explaining this project [here](https://www.esologic.com/gance/).
 
 
 0.16.1 - (2021-10-28)

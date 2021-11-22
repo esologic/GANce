@@ -7,7 +7,7 @@ from functools import partial
 from pathlib import Path
 
 import click
-import cv2
+from cv2 import cv2
 
 DEFAULT_IMAGE_WIDTH = 1024
 DEFAULT_IMAGE_HEIGHT = 1024

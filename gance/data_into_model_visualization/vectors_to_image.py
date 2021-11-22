@@ -236,12 +236,12 @@ def vectors_to_video(
     video_fps: float,
 ) -> Path:
     """
-
-    :param labeled_data:
-    :param output_path:
-    :param video_height:
-    :param video_fps:
-    :return:
+    Create a canonical video visualization of some vectors/matrices.
+    :param labeled_data: To plot.
+    :param output_path: Path to video on disk.
+    :param video_height: Output height.
+    :param video_fps: Output FPS, will effect playback speed.
+    :return: The output path once the video has been written.
     """
 
     make_visualization = vector_visualizer(

@@ -24,7 +24,7 @@ def cli() -> None:
     """
 
 
-@cli.command()  # type: ignore
+@cli.command()
 @click.option(
     "--projection_file",
     type=click.Path(exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True),
@@ -96,7 +96,7 @@ def visualize_final_latents(  # pylint: disable=too-many-arguments,too-many-loca
             shutil.move(src=str(tmp_video_path), dst=str(output_video_path))
 
 
-@cli.command()  # type: ignore
+@cli.command()
 @click.option(
     "--projection_file",
     type=click.Path(exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True),

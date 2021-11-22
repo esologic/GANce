@@ -112,10 +112,7 @@ def underlying_vector_length(data: Union[SingleVector, SingleMatrix]) -> int:
     :return: Length of vector, or the length of the vectors within the matrix.
     """
 
-    if is_vector(data):
-        return int(data.shape[0])
-    else:
-        return int(data.shape[1])
+    return int(data.shape[0] if is_vector(data) else data.shape[1])
 
 
 def smooth_across_vectors(
@@ -377,11 +374,12 @@ def rotate_vectors_over_time(
     roll_values: np.ndarray,
 ) -> np.ndarray:
     """
-
-    :param data:
-    :param vector_length:
-    :param roll_values:
-    :return:
+    Spin vectors along their x axis.
+    Note: There's a demo function for this, makes understanding it much easier.
+    :param data: To rotate.
+    :param vector_length: Length of sub vectors.
+    :param roll_values: Amount to rotate per vector.
+    :return: Rotated vectors.
     """
 
     split = sub_vectors(data, vector_length)

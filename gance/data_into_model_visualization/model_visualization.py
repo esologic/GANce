@@ -620,16 +620,13 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
 
 def _y_bounds(data: np.ndarray, y_range: Optional[Tuple[int, int]] = None) -> Tuple[int, int]:
     """
-
-    :param data:
-    :param y_range:
-    :return:
+    Process UI input into the set of Y bounds that should be used.
+    :param data: Will be considered if no range is given.
+    :param y_range: Explicit y range
+    :return: Range to be used
     """
 
-    if y_range is not None:
-        return y_range
-    else:
-        return data.min(), data.max()
+    return y_range if y_range is not None else data.min(), data.max()
 
 
 def vectors_single_model_visualization(  # pylint: disable=too-many-locals

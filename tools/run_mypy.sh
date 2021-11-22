@@ -11,6 +11,6 @@ source ./venv/bin/activate
 
 export PYTHONPATH="./gance:./test${PYTHONPATH+:}${PYTHONPATH:-}"
 
-mypy --show-error-codes main.py  # Run on loose files within this project
+mypy --show-error-codes ./*.py  # Run on loose files within this project
 mypy --show-error-codes -p gance -p test  # Run on sub-packages within this project
 

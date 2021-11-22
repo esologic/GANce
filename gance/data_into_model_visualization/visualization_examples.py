@@ -140,8 +140,8 @@ def data_visualizations_single_frame() -> None:
 
 def demo_rotation() -> None:
     """
-
-    :return:
+    Shows the effects of rotating a concatenated.
+    :return: None
     """
 
     vector_length = 512
@@ -180,7 +180,7 @@ def demo_rotation() -> None:
 
 def blog_post_media() -> None:
     """
-
+    Shows the creation of example images on the blog: https://www.esologic.com/gance/
     :return: None
     """
 

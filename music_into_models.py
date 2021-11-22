@@ -3,8 +3,6 @@ Functions to feed vectors into a model and record the output.
 Also tools to visualize these vectors against the model outputs.
 """
 
-import datetime
-import inspect
 import logging
 import tempfile
 from functools import partial
@@ -15,7 +13,6 @@ import click
 from click_option_group import RequiredMutuallyExclusiveOptionGroup, optgroup
 
 from gance.assets import OUTPUT_DIRECTORY
-from gance.cli_common import EXTENSION_MP4
 from gance.data_into_model_visualization.model_visualization import viz_model_ins_outs
 from gance.data_into_model_visualization.visualization_common import CreateVisualizationInput
 from gance.data_into_model_visualization.visualization_inputs import (
@@ -114,8 +111,22 @@ def _configure_run(
     frames_to_visualize: Optional[int],
     output_fps: float,
     debug_2d: bool,
-    vector_function,
-):
+    vector_function: CreateVisualizationInput,
+) -> None:
+    """
+    Coerce UI Input
+    :param wav: See click docs.
+    :param output_path: See click docs.
+    :param models_directory: See click docs.
+    :param vector_length: See click docs.
+    :param index: See click docs.
+    :param frames_to_visualize: See click docs.
+    :param output_fps: See click docs.
+    :param debug_2d: See click docs.
+    :param vector_function: Actual function to run.
+    :return: None
+    """
+
     # Get the paths to the models to be used.
     if models_directory is not None:
         models_directory_path = Path(models_directory)
@@ -278,7 +289,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
     return func
 
 
-@click.group()
+@click.group()  # pylint: disable=too-many-arguments
 def cli() -> None:
     """
     Use one of the commands below to project either a list of individual videos, or a directory
@@ -292,7 +303,7 @@ def cli() -> None:
 
 @cli.command()  # type: ignore
 @common_command_options
-def noise_blend(
+def noise_blend(  # pylint: disable=too-many-arguments
     wav: str,
     output_path: str,
     models_directory: Optional[str],
@@ -341,7 +352,7 @@ def noise_blend(
     )
 
 
-@cli.command()  # type: ignore
+@cli.command()  # type: ignore   # pylint: disable=too-many-arguments
 @common_command_options
 @click.option(
     "--projection_file_path",
@@ -360,7 +371,7 @@ def noise_blend(
     default=0.5,
     show_default=True,
 )
-def projection_file_blend(
+def projection_file_blend(  # pylint: disable=too-many-arguments
     wav: str,
     output_path: str,
     models_directory: Optional[str],
