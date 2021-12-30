@@ -2,16 +2,19 @@
 Test of critical functions of video reader using known files.
 """
 
+from pathlib import Path
 from test.assets import (
     BATCH_2_IMAGE_1_PATH,
     SAMPLE_FACE_VIDEO_EXPECTED_FPS,
     SAMPLE_FACE_VIDEO_EXPECTED_FRAMES_COUNT,
     SAMPLE_FACE_VIDEO_PATH,
+    WAV_CLAPS_PATH,
 )
 from typing import Optional
 
 import numpy as np
 import pytest
+from py._path.local import LocalPath  # pylint: disable=protected-access
 
 from gance import video_common
 
@@ -63,3 +66,26 @@ def test_read_image() -> None:
     # Verified these magic numbers experimentally
     assert image.sum() == 299876727  # whole image
     assert image[0].sum() == 250099  # red channel
+
+
+def test_add_wav_to_video(tmpdir: LocalPath) -> None:
+    """
+    Test to make sure these functions work.
+    Manually verified that, at one point in time, these both worked as expected.
+    :param tmpdir: Test fixture
+    :return: None
+    """
+
+    temp_dir = Path(tmpdir)
+
+    video_common.add_wav_to_video(
+        video_path=SAMPLE_FACE_VIDEO_PATH,
+        audio_path=WAV_CLAPS_PATH,
+        output_path=temp_dir.joinpath("output_single.mp4"),
+    )
+
+    video_common.add_wavs_to_video(
+        video_path=SAMPLE_FACE_VIDEO_PATH,
+        audio_paths=[WAV_CLAPS_PATH, WAV_CLAPS_PATH, WAV_CLAPS_PATH],
+        output_path=temp_dir.joinpath("output_double.mp4"),
+    )
