@@ -1,5 +1,12 @@
 # Changelog
 
+0.XX.0 - (202X-XX-XX)
+------------------
+
+* The `visualize_final_latents` command in `read_projection_file.py` can now accept multiple input audio 
+files that will be appended to each other and then added to the resulting video.
+
+
 0.17.0 - (2021-11-22)
 ------------------
 

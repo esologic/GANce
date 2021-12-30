@@ -5,17 +5,49 @@ Common functionality for dealing with video files
 import itertools
 import math
 from pathlib import Path
-from typing import Iterator, NamedTuple, Optional, Tuple
+from typing import Iterator, List, NamedTuple, Optional, Tuple
 
 import ffmpeg
 import numpy as np
 from cv2 import cv2
+from ffmpeg.nodes import FilterableStream
 from PIL import Image
 
 from gance.gance_types import RGBInt8ImageType
 from gance.logger_common import LOGGER
 
 PNG = "png"
+
+
+def _write_video(video_path: Path, audio: FilterableStream, output_path: Path) -> None:
+    """
+    Adds an audio file to a video file. Copied from: https://stackoverflow.com/a/65547166
+    :param video_path: Path to the video file.
+    :param audio: The ffmpeg representation of the audio.
+    :param output_path: The path to write the new file to.
+    :return: None
+    """
+    ffmpeg.run(
+        ffmpeg.output(
+            ffmpeg.input(str(video_path)).video,  # get only video channel
+            audio,  # get only audio channel
+            str(output_path),
+            vcodec="copy",
+            acodec="aac",
+            strict="experimental",
+        ),
+        quiet=True,
+        overwrite_output=True,
+    )
+
+
+def _read_wav(audio_path: Path) -> FilterableStream:
+    """
+    Read an audio file as an ffmpeg stream.
+    :param audio_path: Path to the audio file.
+    :return: The ffmpeg stream of the audio.
+    """
+    return ffmpeg.input(str(audio_path)).audio
 
 
 def add_wav_to_video(video_path: Path, audio_path: Path, output_path: Path) -> None:
@@ -26,17 +58,21 @@ def add_wav_to_video(video_path: Path, audio_path: Path, output_path: Path) -> N
     :param output_path: The path to write the new file to.
     :return: None
     """
-    ffmpeg.run(
-        ffmpeg.output(
-            ffmpeg.input(str(video_path)).video,  # get only video channel
-            ffmpeg.input(str(audio_path)).audio,  # get only audio channel
-            str(output_path),
-            vcodec="copy",
-            acodec="aac",
-            strict="experimental",
-        ),
-        quiet=True,
-        overwrite_output=True,
+    _write_video(video_path=video_path, audio=_read_wav(audio_path), output_path=output_path)
+
+
+def add_wavs_to_video(video_path: Path, audio_paths: List[Path], output_path: Path) -> None:
+    """
+    Adds an audio file to a video file. Copied from: https://stackoverflow.com/a/65547166
+    :param video_path: Path to the video file.
+    :param audio_paths: Paths to multiple audio files.
+    :param output_path: The path to write the new file to.
+    :return: None
+    """
+    _write_video(
+        video_path=video_path,
+        audio=ffmpeg.concat(*[_read_wav(audio_path) for audio_path in audio_paths], v=0, a=1),
+        output_path=output_path,
     )
 
 

@@ -5,12 +5,12 @@ CLI to do common things with a projection file.
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import click
 
 from gance.projection import projection_visualization
-from gance.video_common import add_wav_to_video
+from gance.video_common import add_wav_to_video, add_wavs_to_video
 
 
 @click.group()
@@ -39,7 +39,10 @@ def cli() -> None:
     "--audio_path",
     type=click.Path(file_okay=True, writable=True, dir_okay=False, resolve_path=True),
     default=None,
-    help="If given, this audio file will be added to the resulting video.",
+    help="If given, this audio file will be added to the resulting video. "
+    "If multiple audio files are given they will be added to the video file "
+    "in the order they're given, one after another.",
+    multiple=True,
 )
 @click.option(
     "--video_height",
@@ -51,7 +54,7 @@ def cli() -> None:
 def visualize_final_latents(  # pylint: disable=too-many-arguments,too-many-locals
     projection_file: str,
     video_path: str,
-    audio_path: Optional[str],
+    audio_path: Optional[List[str]],
     video_height: Optional[int],
 ) -> None:
     """
@@ -82,14 +85,13 @@ def visualize_final_latents(  # pylint: disable=too-many-arguments,too-many-loca
             video_height=video_height,
         )
 
-        if audio_path is not None:
-
+        if audio_path:
             while not tmp_video_path.exists():
                 pass
 
-            add_wav_to_video(
+            add_wavs_to_video(
                 video_path=tmp_video_path,
-                audio_path=Path(audio_path),
+                audio_paths=[Path(path) for path in audio_path],
                 output_path=output_video_path,
             )
         else:
