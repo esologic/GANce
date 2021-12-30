@@ -30,4 +30,4 @@ repos:
       language: python
       stages: [push]
       pass_filenames: false
-      entry: ./tools/run_tests.sh
+      entry: ./tools/run_tests.sh 'not gpu'
