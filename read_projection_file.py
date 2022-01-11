@@ -5,12 +5,34 @@ CLI to do common things with a projection file.
 import shutil
 import tempfile
 from pathlib import Path
+import face_detection
 from typing import List, Optional
 
-import click
 
+import itertools
+import click
+from skimage import data
+from skimage.feature import Cascade
+from gance import cli_common
 from gance.projection import projection_visualization
-from gance.video_common import add_wav_to_video, add_wavs_to_video
+from gance.video_common import add_wavs_to_video
+from pathlib import Path
+from typing import List, Optional
+from PIL import Image
+
+import numpy as np
+from cv2 import cv2
+
+from gance.data_into_model_visualization.vectors_to_image import vector_visualizer
+
+from gance.logger_common import LOGGER
+from gance.projection.projection_file_reader import (
+    final_latents_matrices_label,
+    load_projection_file,
+)
+from gance.vector_sources.vector_sources_common import sub_vectors
+from gance.vector_sources.vector_types import SingleMatrix
+from gance.video_common import create_video_writer
 
 
 @click.group()
@@ -25,32 +47,10 @@ def cli() -> None:
 
 
 @cli.command()
-@click.option(
-    "--projection_file",
-    type=click.Path(exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True),
-    help="A Tuple (Path to the video to project, Path to destination of projection file)",
-)
-@click.option(
-    "--video_path",
-    type=click.Path(file_okay=True, writable=True, dir_okay=False, resolve_path=True),
-    help="Destination path for the resulting visualization",
-)
-@click.option(
-    "--audio_path",
-    type=click.Path(file_okay=True, writable=True, dir_okay=False, resolve_path=True),
-    default=None,
-    help="If given, this audio file will be added to the resulting video. "
-    "If multiple audio files are given they will be added to the video file "
-    "in the order they're given, one after another.",
-    multiple=True,
-)
-@click.option(
-    "--video_height",
-    type=click.IntRange(min=1),
-    help="A Tuple (Path to the video to project, Path to destination of projection file)",
-    default=1024,
-    show_default=True,
-)
+@cli_common.single_projection_file_path
+@cli_common.video_path
+@cli_common.audio_paths
+@cli_common.video_height
 def visualize_final_latents(  # pylint: disable=too-many-arguments,too-many-locals
     projection_file: str,
     video_path: str,
@@ -99,75 +99,72 @@ def visualize_final_latents(  # pylint: disable=too-many-arguments,too-many-loca
 
 
 @cli.command()
-@click.option(
-    "--projection_file",
-    type=click.Path(exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True),
-    help="A Tuple (Path to the video to project, Path to destination of projection file)",
-)
-@click.option(
-    "--video_path",
-    type=click.Path(file_okay=True, writable=True, dir_okay=False, resolve_path=True),
-    help="Destination path for the resulting visualization",
-)
-@click.option(
-    "--audio_path",
-    type=click.Path(file_okay=True, writable=True, dir_okay=False, resolve_path=True),
-    default=None,
-    help="If given, this audio file will be added to the resulting video.",
-)
-@click.option(
-    "--video_height",
-    type=click.IntRange(min=1),
-    help="A Tuple (Path to the video to project, Path to destination of projection file)",
-    default=1024,
-    show_default=True,
-)
-def visualize_projection_of_frame(  # pylint: disable=too-many-arguments,too-many-locals
+@cli_common.single_projection_file_path
+@cli_common.video_path
+@cli_common.audio_paths
+@cli_common.video_height
+def overlay(  # pylint: disable=too-many-arguments,too-many-locals
     projection_file: str,
     video_path: str,
-    audio_path: Optional[str],
+    audio_path: Optional[List[str]],
     video_height: Optional[int],
 ) -> None:
     """
-    Create a video that, side by side, displays:
 
-    * Final Latents as a graph.
-    * Target image.
-    * Final latents image.
-
-    \f
-
-    :param projection_file: See click help or called function docs.
-    :param video_path: See click help or called function docs.
-    :param audio_path: Optional path to audio file.
-    :param video_height: See click help or called function docs.
-    :return: None
+    :param projection_file:
+    :param video_path:
+    :param audio_path:
+    :param video_height:
+    :return:
     """
 
     output_video_path = Path(video_path)
 
-    with tempfile.NamedTemporaryFile(suffix=output_video_path.suffix) as f:
+    face_detector = Cascade(data.lbp_frontal_face_cascade_filename())
 
-        tmp_video_path = Path(f.name)
+    with load_projection_file(Path(projection_file)) as reader:
 
-        projection_visualization.visualize_final_latents(
-            projection_file_path=Path(projection_file),
-            output_video_path=tmp_video_path,
+        matrices_label = final_latents_matrices_label(reader)
+
+        video = create_video_writer(
+            video_path=output_video_path,
+            num_squares=3,
+            video_fps=reader.projection_attributes.projection_fps,
             video_height=video_height,
         )
 
-        if audio_path is not None:
+        num_matrices = len(sub_vectors(
+            data=matrices_label.data, vector_length=matrices_label.vector_length
+        ))
 
-            while not tmp_video_path.exists():
-                pass
+        for index, (target, final_image) in itertools.islice(enumerate(
+            zip(reader.target_images, reader.final_images)
+        ), 200):
 
-            add_wav_to_video(
-                video_path=tmp_video_path,
-                audio_path=Path(audio_path),
-                output_path=output_video_path,
-            )
-        else:
-            shutil.move(src=str(tmp_video_path), dst=str(output_video_path))
+            new_image = Image.fromarray(np.array(final_image))
+            target_image = Image.fromarray(target)
+
+            boxes = face_detector.detect_multi_scale(
+                    img=target,
+                    scale_factor=1.2,
+                    step_ratio=1,
+                    min_size=(100, 100),
+                    max_size=(1000, 1000),
+                )
+
+            for box in boxes:
+                x, y, w, h = (box['r'],  box['c'],  box['width'], box['height'])
+                crop = (x, y, x + w, y + h)
+                cropped_box = target_image.crop(crop)
+                new_image.paste(cropped_box, crop)
+
+            frame = cv2.hconcat([np.asarray(new_image), target, final_image])
+
+            video.write(cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB))
+
+            LOGGER.info(f"Wrote frame: {output_video_path}, frame: {index + 1}/{num_matrices}")
+
+        video.release()
 
 
 if __name__ == "__main__":

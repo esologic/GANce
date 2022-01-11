@@ -3,6 +3,7 @@ click==7.1.2
 dataclasses
 dataclasses-json==0.5.5
 face-recognition
+face-detection
 ffmpeg-python
 h5py==2.10.0
 inquirer==2.7.0
