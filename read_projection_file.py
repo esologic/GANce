@@ -7,8 +7,9 @@ import tempfile
 from pathlib import Path
 import face_detection
 from typing import List, Optional
+import face_recognition
 
-
+from gance.assets import PROJECTION_FILE_PATH
 import itertools
 import click
 from skimage import data
@@ -18,7 +19,7 @@ from gance.projection import projection_visualization
 from gance.video_common import add_wavs_to_video
 from pathlib import Path
 from typing import List, Optional
-from PIL import Image
+from PIL import Image, ImageDraw
 
 import numpy as np
 from cv2 import cv2
@@ -103,6 +104,9 @@ def visualize_final_latents(  # pylint: disable=too-many-arguments,too-many-loca
 @cli_common.video_path
 @cli_common.audio_paths
 @cli_common.video_height
+def fuck():
+    pass
+
 def overlay(  # pylint: disable=too-many-arguments,too-many-locals
     projection_file: str,
     video_path: str,
@@ -120,8 +124,6 @@ def overlay(  # pylint: disable=too-many-arguments,too-many-locals
 
     output_video_path = Path(video_path)
 
-    face_detector = Cascade(data.lbp_frontal_face_cascade_filename())
-
     with load_projection_file(Path(projection_file)) as reader:
 
         matrices_label = final_latents_matrices_label(reader)
@@ -137,28 +139,25 @@ def overlay(  # pylint: disable=too-many-arguments,too-many-locals
             data=matrices_label.data, vector_length=matrices_label.vector_length
         ))
 
-        for index, (target, final_image) in itertools.islice(enumerate(
+        for index, (target, final) in itertools.islice(enumerate(
             zip(reader.target_images, reader.final_images)
         ), 200):
 
-            new_image = Image.fromarray(np.array(final_image))
             target_image = Image.fromarray(target)
+            final_image = Image.fromarray(final)
 
-            boxes = face_detector.detect_multi_scale(
-                    img=target,
-                    scale_factor=1.2,
-                    step_ratio=1,
-                    min_size=(100, 100),
-                    max_size=(1000, 1000),
-                )
+            landmarks = face_recognition.face_landmarks(face_image=target)
 
-            for box in boxes:
-                x, y, w, h = (box['r'],  box['c'],  box['width'], box['height'])
-                crop = (x, y, x + w, y + h)
-                cropped_box = target_image.crop(crop)
-                new_image.paste(cropped_box, crop)
+            mask = Image.new('L', (target_image.size[1], target_image.size[0]), 0)
 
-            frame = cv2.hconcat([np.asarray(new_image), target, final_image])
+            for landmark in landmarks:
+                draw = ImageDraw.Draw(mask)
+                draw.polygon(landmark["left_eye"], outline=255, fill=255)
+                draw.polygon(landmark["right_eye"], outline=255, fill=255)
+
+            new_image = Image.composite(target_image, final_image, mask)
+
+            frame = cv2.hconcat([np.asarray(new_image), target, final])
 
             video.write(cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB))
 
@@ -168,4 +167,12 @@ def overlay(  # pylint: disable=too-many-arguments,too-many-locals
 
 
 if __name__ == "__main__":
-    cli()
+
+    overlay(
+        projection_file=PROJECTION_FILE_PATH,
+        video_path="./output.mp4",
+        video_height=1024,
+        audio_path=None,
+    )
+
+    # cli()
