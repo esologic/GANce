@@ -255,7 +255,7 @@ def vectors_to_video(
 
     video = create_video_writer(
         video_path=output_path,
-        num_squares=1,
+        num_squares_width=1,
         video_fps=video_fps,
         video_height=video_height,
     )

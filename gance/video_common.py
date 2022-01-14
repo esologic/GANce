@@ -77,16 +77,20 @@ def add_wavs_to_video(video_path: Path, audio_paths: List[Path], output_path: Pa
 
 
 def create_video_writer(
-    video_path: Path, video_fps: float, video_height: int, num_squares: int
+    video_path: Path,
+    video_fps: float,
+    video_height: int,
+    num_squares_width: int,
+    num_squares_height: int = 1,
 ) -> cv2.VideoWriter:
     """
     Helper function to configure the VideoWriter which writes frames to a video file.
     :param video_path: Path to the file on disk.
     :param video_fps: Desired FPS of the video.
     :param video_height: Height of the video in pixels.
-    :param num_squares: Since each section of the video is a `video_height` x `video_height` square
-    this parameter sets the width for the video in pixels, with the number of these squares that
-    will be written in each frame.
+    :param num_squares_width: Since each section of the video is a `video_height` x `video_height`
+    square this parameter sets the width for the video in pixels, with the number of these squares
+    that will be written in each frame.
     :return: The openCV `VideoWriter` object.
     """
 
@@ -94,7 +98,7 @@ def create_video_writer(
         str(video_path),
         cv2.VideoWriter_fourcc(*"mp4v"),
         video_fps,
-        (video_height * num_squares, video_height),
+        (video_height * num_squares_width, video_height * num_squares_height),
     )
 
 

@@ -7,7 +7,9 @@ EXTENSION_HDF5 = "hdf5"
 EXTENSION_MP4 = "mp4"
 DEFAULT_TWO_TUPLE = (None, None)
 
-CLICK_OUTPUT_PATH = click.Path(exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True)
+CLICK_OUTPUT_PATH = click.Path(
+    exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True
+)
 CLICK_INPUT_PATH = click.Path(exists=False, file_okay=True, dir_okay=False, resolve_path=True)
 
 single_projection_file_path = click.option(

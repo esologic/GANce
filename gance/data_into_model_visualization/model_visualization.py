@@ -578,7 +578,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
 
         video = create_video_writer(
             video_path=output_video_path,
-            num_squares=sum(
+            num_squares_width=sum(
                 [0 if models is None else 1, 1 if enable_3d else 0, 1 if enable_2d else 0]
             ),
             video_fps=video_fps,
@@ -664,7 +664,7 @@ def vectors_single_model_visualization(  # pylint: disable=too-many-locals
 
     video = create_video_writer(
         video_path=output_video_path,
-        num_squares=2,
+        num_squares_width=2,
         video_fps=video_fps,
         video_height=video_height,
     )

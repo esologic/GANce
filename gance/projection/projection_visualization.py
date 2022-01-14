@@ -243,7 +243,7 @@ def visualize_final_latents(
 
         video = create_video_writer(
             video_path=output_video_path,
-            num_squares=3,
+            num_squares_width=3,
             video_fps=reader.projection_attributes.projection_fps,
             video_height=video_height,
         )
@@ -345,7 +345,7 @@ def visualize_projection_history(  # pylint: disable=too-many-locals
 
         video = create_video_writer(
             video_path=output_video_path,
-            num_squares=3,
+            num_squares_width=3,
             video_fps=reader.projection_attributes.projection_fps,
             video_height=video_height,
         )
@@ -423,7 +423,7 @@ def visualize_partial_projection_history(  # pylint: disable=too-many-locals
 
         video = create_video_writer(
             video_path=output_video_path,
-            num_squares=4,
+            num_squares_width=4,
             video_fps=1,
             video_height=video_height,
         )

@@ -7,6 +7,7 @@ face-detection
 ffmpeg-python
 h5py==2.10.0
 inquirer==2.7.0
+ImageHash==4.2.1
 librosa==0.8.1
 matplotlib
 more-itertools==8.7.0
