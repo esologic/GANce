@@ -9,6 +9,7 @@ from typing import Dict, Iterator, List, NamedTuple, Optional, Tuple, cast
 
 import face_recognition
 import imagehash
+import more_itertools
 import numpy as np
 from cv2 import cv2
 from matplotlib import pyplot as plt
@@ -117,7 +118,7 @@ def draw_mask(destination: "Image", bounding_boxes: List[BoundingBoxType]) -> Im
     return destination
 
 
-def compute_eye_tracking_overlay(
+def compute_eye_tracking_overlay(  # pylint: disable=too-many-locals
     foreground_images: Iterator[RGBInt8ImageType], background_images: Iterator[RGBInt8ImageType]
 ) -> Iterator[FrameOverlayResult]:
     """
@@ -130,7 +131,11 @@ def compute_eye_tracking_overlay(
     :return: Series of NTs describing the operation, as well as containing the result.
     """
 
-    for foreground_image, background_image in zip(foreground_images, background_images):
+    for index, (foreground_image, background_image) in enumerate(
+        zip(foreground_images, background_images)
+    ):
+
+        LOGGER.info(f"Creating frame #{index}")
 
         fore_pil_image = Image.fromarray(foreground_image)
         back_pil_image = Image.fromarray(background_image)
@@ -185,6 +190,7 @@ def compute_eye_tracking_overlay(
 def render_overlay(  # pylint: disable=too-many-locals
     overlay: Iterator[FrameOverlayResult],
     video_path: Path,
+    frames_per_context: int,
     video_square_side_length: Optional[int],
 ) -> None:
     """
@@ -204,15 +210,6 @@ def render_overlay(  # pylint: disable=too-many-locals
         video_height=video_square_side_length,
     )
 
-    (
-        frames,
-        perceptual_hash_distances,
-        average_hash_distances,
-        difference_hash_distances,
-        wavelet_hash_distance,
-        _,
-    ) = zip(*overlay)
-
     fig = plt.figure(
         figsize=(
             4 * 3,
@@ -222,46 +219,58 @@ def render_overlay(  # pylint: disable=too-many-locals
         constrained_layout=False,  # Lets us use `.tight_layout()` later.
     )
 
-    axis = fig.add_subplot(1, 1, 1)
+    for group_of_frames in more_itertools.grouper(overlay, frames_per_context):
 
-    num_frames = len(frames)
-    x_axis = np.arange(num_frames)
+        current = filter(None, group_of_frames)
 
-    axis.scatter(x_axis, perceptual_hash_distances, color="red", label="P Hash Distance")
-    axis.scatter(x_axis, average_hash_distances, color="purple", label="A Hash Distance")
-    axis.scatter(x_axis, difference_hash_distances, color="blue", label="D Hash Distance")
-    axis.scatter(x_axis, wavelet_hash_distance, color="brown", label="W Hash Distance")
+        (
+            frames,
+            perceptual_hash_distances,
+            average_hash_distances,
+            difference_hash_distances,
+            wavelet_hash_distance,
+            _,
+        ) = zip(*current)
 
-    axis.set_title("Overlay Discriminator")
-    axis.set_ylabel("Values")
-    axis.set_xlabel("Frame #")
-    axis.grid()
-    axis.legend(loc="upper right")
+        axis = fig.add_subplot(1, 1, 1)
 
-    all_y_values = [value for value in perceptual_hash_distances if value is not None]
-    vline_min = min(all_y_values)
-    vline_max = max(all_y_values)
+        num_frames = len(frames)
+        x_axis = np.arange(num_frames)
 
-    for index, video_frame in enumerate(frames):
+        axis.scatter(x_axis, perceptual_hash_distances, color="red", label="P Hash Distance")
+        axis.scatter(x_axis, average_hash_distances, color="purple", label="A Hash Distance")
+        axis.scatter(x_axis, difference_hash_distances, color="blue", label="D Hash Distance")
+        axis.scatter(x_axis, wavelet_hash_distance, color="brown", label="W Hash Distance")
 
-        line = axis.vlines(x=index, ymin=vline_min - 100, ymax=vline_max + 100)
+        axis.set_title("Overlay Discriminator")
+        axis.set_ylabel("Values")
+        axis.set_xlabel("Frame #")
+        axis.grid()
+        axis.legend(loc="upper right")
 
-        graph = render_current_matplotlib_frame(
-            fig=fig, resolution=(3 * video_square_side_length, video_square_side_length)
-        )
+        all_y_values = [value for value in perceptual_hash_distances if value is not None]
+        axis_min = min(all_y_values) - 5
+        axis_max = max(all_y_values) + 5
 
-        line.remove()
+        axis.set_ylim(axis_min, axis_max)
 
-        frame = cv2.vconcat([video_frame, graph]).astype(np.uint8)
+        for index, video_frame in enumerate(frames):
 
-        video.write(
-            cv2.cvtColor(
-                frame,
-                cv2.COLOR_BGR2RGB,
+            line = axis.vlines(x=index, ymin=axis_min, ymax=axis_max)
+
+            graph = render_current_matplotlib_frame(
+                fig=fig, resolution=(3 * video_square_side_length, video_square_side_length)
             )
-        )
 
-        LOGGER.info(f"Wrote frame: {index + 1}/{num_frames}")
+            line.remove()
+
+            video.write(
+                cv2.cvtColor(cv2.vconcat([video_frame, graph]).astype(np.uint8), cv2.COLOR_BGR2RGB)
+            )
+
+            LOGGER.info(f"Wrote frame: {index + 1}/{num_frames}")
+
+        axis.remove()
 
     video.release()
 
@@ -273,10 +282,12 @@ if __name__ == "__main__":
         render_overlay(
             overlay=itertools.islice(
                 compute_eye_tracking_overlay(
-                    foreground_images=reader.target_images, background_images=reader.final_images
+                    foreground_images=reader.target_images,
+                    background_images=reader.final_images,
                 ),
-                500,
+                None,
             ),
             video_path=OUTPUT_DIRECTORY.joinpath("sample.mp4"),
             video_square_side_length=1024,
+            frames_per_context=100,
         )
