@@ -4,6 +4,8 @@ Do things like track eyes to interesting effect.
 """
 
 import itertools
+import statistics
+import time
 from pathlib import Path
 from typing import Dict, Iterator, List, NamedTuple, Optional, Tuple, cast
 
@@ -26,7 +28,16 @@ from gance.logger_common import LOGGER
 from gance.projection.projection_file_reader import load_projection_file
 from gance.video_common import create_video_writer
 
-BoundingBoxType = Tuple[int, int, int, int]
+
+class BoundingBoxType(NamedTuple):
+    """
+    Describes a bounding box rectangle as output by opencv.
+    """
+
+    x: int
+    y: int
+    width: int
+    height: int
 
 
 class FrameOverlayResult(NamedTuple):
@@ -43,8 +54,11 @@ class FrameOverlayResult(NamedTuple):
     average_hash_distance: float
     difference_hash_distance: float
     wavelet_hash_distance: float
+    hashes_average_distance: float
 
     bbox_distance: float
+
+    overlay_written: bool
 
 
 def landmarks_to_bounding_boxes(
@@ -58,9 +72,19 @@ def landmarks_to_bounding_boxes(
     """
 
     return [
-        cv2.boundingRect(np.array(landmark["left_eye"] + landmark["right_eye"]))
+        BoundingBoxType(*cv2.boundingRect(np.array(landmark["left_eye"] + landmark["right_eye"])))
         for landmark in landmarks
     ]
+
+
+def bounding_box_center(bounding_box: BoundingBoxType) -> Tuple[float, float]:
+    """
+    Finds the center x,y coordinate of a given bounding box.
+    :param bounding_box: Box to analyze.
+    :return: (x,y) of center.
+    """
+
+    return (bounding_box.x + bounding_box.width / 2), (bounding_box.y + bounding_box.height / 2)
 
 
 def bounding_box_distance(
@@ -75,8 +99,8 @@ def bounding_box_distance(
 
     if a_boxes and b_boxes:
         # Only take the X,Y points here
-        a_origin = [(box[0], box[1]) for box in a_boxes]
-        b_origin = [(box[0], box[1]) for box in b_boxes]
+        a_origin = [bounding_box_center(box) for box in a_boxes]
+        b_origin = [bounding_box_center(box) for box in b_boxes]
 
         return min(
             [
@@ -158,7 +182,9 @@ def compute_eye_tracking_overlay(  # pylint: disable=too-many-locals
         dhash_dist = abs(imagehash.dhash(fore_pil_image) - imagehash.dhash(back_pil_image))
         whash_dist = abs(imagehash.whash(fore_pil_image) - imagehash.whash(back_pil_image))
 
-        overlay_flag = whash_dist < 35
+        hashes_averages = statistics.mean([phash_dist, ahash_dist, whash_dist])
+
+        overlay_flag = phash_dist <= 30 and (bbox_dist < 50 if bbox_dist else False)
 
         blank_mask = Image.new("L", foreground_image.shape[0:2], 0)
 
@@ -183,7 +209,9 @@ def compute_eye_tracking_overlay(  # pylint: disable=too-many-locals
             average_hash_distance=ahash_dist,
             difference_hash_distance=dhash_dist,
             wavelet_hash_distance=whash_dist,
+            hashes_average_distance=hashes_averages,
             bbox_distance=bbox_dist,
+            overlay_written=overlay_flag,
         )
 
 
@@ -202,6 +230,8 @@ def render_overlay(  # pylint: disable=too-many-locals
     :return: None
     """
 
+    LOGGER.info(f"Writing Output Video: {video_path}")
+
     video = create_video_writer(
         video_path=video_path,
         num_squares_width=3,
@@ -219,6 +249,8 @@ def render_overlay(  # pylint: disable=too-many-locals
         constrained_layout=False,  # Lets us use `.tight_layout()` later.
     )
 
+    hash_axis, bbox_distance_axis = fig.subplots(nrows=2, ncols=1)
+
     for group_of_frames in more_itertools.grouper(overlay, frames_per_context):
 
         current = filter(None, group_of_frames)
@@ -229,48 +261,115 @@ def render_overlay(  # pylint: disable=too-many-locals
             average_hash_distances,
             difference_hash_distances,
             wavelet_hash_distance,
-            _,
+            hashes_average_distance,
+            bounding_box_distances,
+            flags,
         ) = zip(*current)
-
-        axis = fig.add_subplot(1, 1, 1)
 
         num_frames = len(frames)
         x_axis = np.arange(num_frames)
 
-        axis.scatter(x_axis, perceptual_hash_distances, color="red", label="P Hash Distance")
-        axis.scatter(x_axis, average_hash_distances, color="purple", label="A Hash Distance")
-        axis.scatter(x_axis, difference_hash_distances, color="blue", label="D Hash Distance")
-        axis.scatter(x_axis, wavelet_hash_distance, color="brown", label="W Hash Distance")
+        hash_axis.scatter(
+            x_axis,
+            perceptual_hash_distances,
+            color="red",
+            label="P Hash Distance",
+            marker="x",
+            alpha=0.5,
+        )
 
-        axis.set_title("Overlay Discriminator")
-        axis.set_ylabel("Values")
-        axis.set_xlabel("Frame #")
-        axis.grid()
-        axis.legend(loc="upper right")
+        hash_axis.scatter(
+            x_axis,
+            average_hash_distances,
+            color="purple",
+            label="A Hash Distance",
+            marker="x",
+            alpha=0.5,
+        )
 
-        all_y_values = [value for value in perceptual_hash_distances if value is not None]
-        axis_min = min(all_y_values) - 5
-        axis_max = max(all_y_values) + 5
+        hash_axis.scatter(
+            x_axis,
+            difference_hash_distances,
+            color="blue",
+            label="D Hash Distance",
+            marker="x",
+            alpha=0.5,
+        )
 
-        axis.set_ylim(axis_min, axis_max)
+        hash_axis.scatter(
+            x_axis,
+            wavelet_hash_distance,
+            color="brown",
+            label="W Hash Distance",
+            marker="x",
+            alpha=0.5,
+        )
 
-        for index, video_frame in enumerate(frames):
+        hash_axis.scatter(
+            x_axis, hashes_average_distance, color="green", label="Hashes Average Distance"
+        )
 
-            line = axis.vlines(x=index, ymin=axis_min, ymax=axis_max)
+        hash_axis.set_title("Overlay Discriminator (Image Hashing)")
+        hash_axis.set_ylabel("Values")
+        hash_axis.set_xlabel("Frame #")
+        hash_axis.grid()
+        hash_axis.legend(loc="upper right")
 
-            graph = render_current_matplotlib_frame(
-                fig=fig, resolution=(3 * video_square_side_length, video_square_side_length)
+        hash_all_y_values = [value for value in perceptual_hash_distances if value is not None]
+        hash_axis_min = min(hash_all_y_values) - 5
+        hash_axis_max = max(hash_all_y_values) + 5
+
+        hash_axis.set_ylim(hash_axis_min, hash_axis_max)
+
+        bbox_distance_axis.scatter(
+            x_axis, bounding_box_distances, color="green", label="Bounding Box Distance"
+        )
+
+        bbox_distance_axis.set_title("Overlay Discriminator (Face Tracking)")
+        bbox_distance_axis.set_ylabel("Distance (Pixels)")
+        bbox_distance_axis.set_xlabel("Frame #")
+        bbox_distance_axis.grid()
+        bbox_distance_axis.legend(loc="upper right")
+
+        bbox_all_y_values = [value for value in bounding_box_distances if value is not None]
+        bbox_axis_min = min(bbox_all_y_values) - 5
+        bbox_axis_max = max(bbox_all_y_values) + 5
+
+        bbox_distance_axis.set_ylim(bbox_axis_min, bbox_axis_max)
+
+        plt.tight_layout()
+
+        video_half_resolution = (3 * video_square_side_length, video_square_side_length)
+
+        for index, (video_frame, flag) in enumerate(zip(frames, flags)):
+
+            line_color = "green" if flag else "red"
+
+            hash_line = hash_axis.vlines(
+                x=index, ymin=hash_axis_min, ymax=hash_axis_max, color=line_color
+            )
+            bbox_line = bbox_distance_axis.vlines(
+                x=index, ymin=bbox_axis_min, ymax=bbox_axis_max, color=line_color
             )
 
-            line.remove()
+            graph = render_current_matplotlib_frame(fig=fig, resolution=video_half_resolution)
+
+            hash_line.remove()
+            bbox_line.remove()
 
             video.write(
-                cv2.cvtColor(cv2.vconcat([video_frame, graph]).astype(np.uint8), cv2.COLOR_BGR2RGB)
+                cv2.cvtColor(
+                    cv2.vconcat([cv2.resize(video_frame, video_half_resolution), graph]).astype(
+                        np.uint8
+                    ),
+                    cv2.COLOR_BGR2RGB,
+                )
             )
 
             LOGGER.info(f"Wrote frame: {index + 1}/{num_frames}")
 
-        axis.remove()
+        for axes in fig.axes:
+            axes.clear()
 
     video.release()
 
@@ -287,7 +386,7 @@ if __name__ == "__main__":
                 ),
                 None,
             ),
-            video_path=OUTPUT_DIRECTORY.joinpath("sample.mp4"),
-            video_square_side_length=1024,
-            frames_per_context=100,
+            video_path=OUTPUT_DIRECTORY.joinpath(f"{int(time.time())}_sample.mp4"),
+            video_square_side_length=500,
+            frames_per_context=50,
         )
