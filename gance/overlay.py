@@ -332,10 +332,11 @@ def render_overlay(  # pylint: disable=too-many-locals
         bbox_distance_axis.legend(loc="upper right")
 
         bbox_all_y_values = [value for value in bounding_box_distances if value is not None]
-        bbox_axis_min = min(bbox_all_y_values) - 5
-        bbox_axis_max = max(bbox_all_y_values) + 5
 
-        bbox_distance_axis.set_ylim(bbox_axis_min, bbox_axis_max)
+        if bbox_all_y_values:
+            bbox_axis_min = min(bbox_all_y_values) - 5
+            bbox_axis_max = max(bbox_all_y_values) + 5
+            bbox_distance_axis.set_ylim(bbox_axis_min, bbox_axis_max)
 
         plt.tight_layout()
 
@@ -348,14 +349,18 @@ def render_overlay(  # pylint: disable=too-many-locals
             hash_line = hash_axis.vlines(
                 x=index, ymin=hash_axis_min, ymax=hash_axis_max, color=line_color
             )
-            bbox_line = bbox_distance_axis.vlines(
-                x=index, ymin=bbox_axis_min, ymax=bbox_axis_max, color=line_color
-            )
+
+            if bbox_all_y_values:
+                bbox_line = bbox_distance_axis.vlines(
+                    x=index, ymin=bbox_axis_min, ymax=bbox_axis_max, color=line_color
+                )
 
             graph = render_current_matplotlib_frame(fig=fig, resolution=video_half_resolution)
 
             hash_line.remove()
-            bbox_line.remove()
+
+            if bbox_all_y_values:
+                bbox_line.remove()
 
             video.write(
                 cv2.cvtColor(
@@ -388,5 +393,5 @@ if __name__ == "__main__":
             ),
             video_path=OUTPUT_DIRECTORY.joinpath(f"{int(time.time())}_sample.mp4"),
             video_square_side_length=500,
-            frames_per_context=50,
+            frames_per_context=100,
         )
