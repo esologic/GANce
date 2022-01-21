@@ -6,13 +6,14 @@ import itertools
 import logging
 import pickle
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from typing import Iterator, List, Optional, Tuple, Union
+from tempfile import NamedTemporaryFile
+from typing import Iterator, List, NamedTuple, Optional, Tuple, Union, cast
 
 import matplotlib.colors as mcolors
 import numpy as np
 import PIL
 from cv2 import cv2
+from lz.transposition import transpose
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.collections import PathCollection
@@ -33,7 +34,7 @@ from gance.data_into_model_visualization.visualization_common import (
     VisualizationInput,
     render_current_matplotlib_frame,
 )
-from gance.gance_types import RGBInt8ImageType
+from gance.gance_types import ImageSourceType, OptionalImageSourceType, RGBInt8ImageType
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import ModelInterface, MultiModel
 from gance.vector_sources.vector_sources_common import (
@@ -396,17 +397,36 @@ def _write_data_to_axes(
     )
 
 
+class ModelOutput(NamedTuple):
+
+    model_images: OptionalImageSourceType
+    visualization_images: OptionalImageSourceType
+
+
+class RenderedFrame(NamedTuple):
+    """
+    Intermediate Type
+    """
+
+    model_frame: Optional[RGBInt8ImageType]
+    visualization_frame: Optional[RGBInt8ImageType]
+
+
+class FrameInputPath(NamedTuple):
+
+    frame: FrameInput
+    path: Path
+
+
 def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     data: VisualizationInput,
-    output_video_path: Path,
     models: Optional[MultiModel],
     default_vector_length: Optional[int] = 1024,
     video_height: Optional[int] = 1024,
-    video_fps: float = 60.0,
     enable_3d: bool = True,
     enable_2d: bool = True,
     frames_to_visualize: Optional[int] = None,
-) -> Path:
+) -> ModelOutput:
     """
     Given an input array, for each possible input vector in the array, feed these vectors into
     the model. Take the output image and combine it with a matplotlib visualization of the entire
@@ -453,6 +473,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
         if frames_to_visualize is None
         else frames_to_visualize
     )
+
     data_visualizations = enable_2d or enable_3d
 
     if data_visualizations:
@@ -485,20 +506,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
     if frames_to_visualize is not None:
         LOGGER.warning(f"Truncating output to the first {frames_to_visualize} frames!")
 
-    frame_inputs = list(
-        itertools.islice(
-            _frame_inputs(visualization_input=data, vector_length=vector_length),
-            frames_to_visualize,
-        )
-    )
-
-    efficient_rendering_order = (
-        sorted(frame_inputs, key=lambda frame_input: frame_input.model_index)
-        if models is not None
-        else frame_inputs
-    )
-
-    def render_frame_in_memory(frame_input: FrameInput) -> RGBInt8ImageType:
+    def render_frame_in_memory(frame_input: FrameInput) -> RenderedFrame:
         """
         Render the given `FrameInput` to an actual image given the context of the run.
         This creates the matplotlib visualizations (if requested) and synthesizes the image out
@@ -508,8 +516,8 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
         """
 
         # TODO: actually verify this color order/data type
-        graphs_frame: Optional[RGBInt8ImageType] = None
-        combined_model_frame: Optional[RGBInt8ImageType] = None
+        visualization_frame: Optional[RGBInt8ImageType] = None
+        model_frame: Optional[RGBInt8ImageType] = None
 
         if data_visualizations:
 
@@ -519,7 +527,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
                 vector_length=vector_length,
             )
 
-            graphs_frame = render_current_matplotlib_frame(
+            visualization_frame = render_current_matplotlib_frame(
                 fig=fig, resolution=data_visualizations_resolution
             )
 
@@ -534,88 +542,75 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
                     f"got {frame_input.combined_sample.data.shape}"
                 )
 
-            combined_model_frame = models.indexed_create_image_generic(
+            model_frame = models.indexed_create_image_generic(
                 index=frame_input.model_index,
                 data=frame_input.combined_sample.data,
             )
 
-        if graphs_frame is not None and combined_model_frame is not None:
-            frame = cv2.hconcat([graphs_frame, combined_model_frame])
-        elif graphs_frame is None and combined_model_frame is not None:
-            frame = combined_model_frame
-        elif graphs_frame is not None and combined_model_frame is None:
-            frame = graphs_frame
-        else:
-            raise ValueError("Invalid frame config.")
+        return RenderedFrame(model_frame=model_frame, visualization_frame=visualization_frame)
 
-        return RGBInt8ImageType(frame)
+    def pickle_frame_in_tmp_dir(
+        frame_input: FrameInput, rendered_frame_count: int
+    ) -> FrameInputPath:
+        """
+        Renders a given frame into memory, and immediately writes it to disk as a pickled file.
+        :param frame_input: The frame to render.
+        :param rendered_frame_count: Consumed in logging.
+        :return: A tuple, the `FrameInput` and a path to the pickle file on disk.
+        """
 
-    with TemporaryDirectory() as td:
-
-        def pickle_frame_in_tmp_dir(
-            frame_input: FrameInput, rendered_frame_count: int
-        ) -> Tuple[FrameInput, Path]:
-            """
-            Renders a given frame into memory, and immediately writes it to disk as a pickled file.
-            :param frame_input: The frame to render.
-            :param rendered_frame_count: Consumed in logging.
-            :return: A tuple, the `FrameInput` and a path to the pickle file on disk.
-            """
-
-            LOGGER.info(
-                f"Rendering frame of {output_video_path.name}. "
-                f"Model index: {frame_input.model_index}. "
-                f"Frame position: {frame_input.frame_index}. "
-                f"Frame count: {rendered_frame_count}/{total_num_frames}. "
-            )
-
-            pickled_image_path = Path(td).joinpath(f"{frame_input.frame_index}.pkl")
-
-            with open(str(pickled_image_path), "wb") as p:
-                pickle.dump(render_frame_in_memory(frame_input), p)
-
-            return frame_input, pickled_image_path
-
-        video = create_video_writer(
-            video_path=output_video_path,
-            num_squares_width=sum(
-                [0 if models is None else 1, 1 if enable_3d else 0, 1 if enable_2d else 0]
-            ),
-            video_fps=video_fps,
-            video_height=video_height,
+        # LOGGER.info
+        print(
+            "Rendering Frame. "
+            f"Model index: {frame_input.model_index}. "
+            f"Frame position: {frame_input.frame_index}. "
+            f"Frame count: {rendered_frame_count}/{total_num_frames}. "
         )
 
-        def load_frame_write_to_video(frame_path: Tuple[FrameInput, Path]) -> None:
-            """
-            Loads the frame at the given path back into local memory, and then writes the resulting
-            image to the VideoWriter.
-            :param frame_path: The frame that is going to be written and the path to it's pickle
-            file on disk.
-            :return: None
-            """
+        # These will get deleted later in the pipeline.
+        with NamedTemporaryFile(mode="wb", delete=False) as p:
+            pickle.dump(render_frame_in_memory(frame_input), p)
+            return FrameInputPath(frame=frame_input, path=Path(p.name))
 
-            LOGGER.info(
-                f"Writing {output_video_path.name} "
-                f"frame #: {frame_path[0].frame_index}/{total_num_frames}"
-            )
+    frame_inputs = itertools.islice(
+        _frame_inputs(visualization_input=data, vector_length=vector_length),
+        frames_to_visualize,
+    )
 
-            with open(str(frame_path[1]), "rb") as p:
-                frame = pickle.load(p)
-                video.write(cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB))
+    efficient_rendering_order = (
+        sorted(frame_inputs, key=lambda frame_input: frame_input.model_index)
+        if models is not None
+        else frame_inputs
+    )
 
-        files_on_disk: List[Tuple[FrameInput, Path]] = [
-            pickle_frame_in_tmp_dir(frame_input, index)
-            for index, frame_input in enumerate(efficient_rendering_order)
-        ]
+    files_on_disk: Iterator[FrameInputPath] = (
+        pickle_frame_in_tmp_dir(frame_input, index)
+        for index, frame_input in enumerate(efficient_rendering_order)
+    )
 
-        # Sort the frames in the order they will be displayed, load them back into local memory
-        # And submit them to the `VideoWriter` to be included in the resulting video.
-        for f_p in sorted(files_on_disk, key=lambda frame_path: frame_path[0].frame_index):
-            load_frame_write_to_video(f_p)
+    def load_and_delete(frame_input_path: FrameInputPath) -> RenderedFrame:
+        """
 
-    video.release()
+        :param frame_input_path:
+        :return:
+        """
+        with open(str(frame_input_path.path), "rb") as p:
+            output: RenderedFrame = pickle.load(p)
 
-    return output_video_path
+        frame_input_path.path.unlink()
+
+        return output
+
+    loaded = map(
+        load_and_delete, sorted(files_on_disk, key=lambda frame_path: frame_path[0].frame_index)
+    )
+
+    model_frames, visualization_frames = transpose(loaded)
+
+    return ModelOutput(
+        model_images=cast(OptionalImageSourceType, model_frames),
+        visualization_images=cast(OptionalImageSourceType, visualization_frames),
+    )
 
 
 def _y_bounds(data: np.ndarray, y_range: Optional[Tuple[int, int]] = None) -> Tuple[int, int]:

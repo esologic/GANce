@@ -5,7 +5,7 @@ Common functionality for dealing with video files
 import itertools
 import math
 from pathlib import Path
-from typing import Iterator, List, NamedTuple, Optional, Tuple
+from typing import Iterable, Iterator, List, NamedTuple, Optional, Tuple
 
 import ffmpeg
 import numpy as np
@@ -13,7 +13,7 @@ from cv2 import cv2
 from ffmpeg.nodes import FilterableStream
 from PIL import Image
 
-from gance.gance_types import RGBInt8ImageType
+from gance.gance_types import ImageSourceType, OptionalImageSourceType, RGBInt8ImageType
 from gance.logger_common import LOGGER
 
 PNG = "png"
@@ -76,6 +76,31 @@ def add_wavs_to_video(video_path: Path, audio_paths: List[Path], output_path: Pa
     )
 
 
+class ImageResolution(NamedTuple):
+
+    width: int
+    height: int
+
+
+def _create_video_writer_resolution(
+    video_path: Path, video_fps: float, image_resolution: ImageResolution
+) -> cv2.VideoWriter:
+    """
+
+    :param video_path:
+    :param video_fps:
+    :param image_resolution:
+    :return:
+    """
+
+    return cv2.VideoWriter(
+        str(video_path),
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        video_fps,
+        (image_resolution.width, image_resolution.height),
+    )
+
+
 def create_video_writer(
     video_path: Path,
     video_fps: float,
@@ -94,11 +119,12 @@ def create_video_writer(
     :return: The openCV `VideoWriter` object.
     """
 
-    return cv2.VideoWriter(
-        str(video_path),
-        cv2.VideoWriter_fourcc(*"mp4v"),
-        video_fps,
-        (video_height * num_squares_width, video_height * num_squares_height),
+    return _create_video_writer_resolution(
+        video_path=video_path,
+        video_fps=video_fps,
+        image_resolution=ImageResolution(
+            width=video_height * num_squares_width, height=video_height * num_squares_height
+        ),
     )
 
 
@@ -222,3 +248,47 @@ def write_image(image: RGBInt8ImageType, path: Path) -> None:
     """
 
     Image.fromarray(image).save(fp=str(path), format=PNG.upper())
+
+
+def image_resolution(image: RGBInt8ImageType) -> ImageResolution:
+    """
+
+    :param image:
+    :return:
+    """
+
+    return ImageResolution(height=image.shape[0], width=image.shape[1])
+
+
+def write_source_to_disk(source: ImageSourceType, video_path: Path, video_fps: float) -> None:
+    """
+
+    :param source:
+    :param video_path:
+    :param video_fps:
+    :return:
+    """
+
+    first_frame = next(source)
+
+    writer = _create_video_writer_resolution(
+        video_path=video_path, video_fps=video_fps, image_resolution=image_resolution(first_frame)
+    )
+
+    writer.write(cv2.cvtColor(first_frame.astype(np.uint8), cv2.COLOR_BGR2RGB))
+
+    for image in source:
+        output_image = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB)
+        writer.write(output_image)
+
+    writer.release()
+
+
+def horizontal_concat_optional_sources(
+    sources: Iterable[OptionalImageSourceType],
+) -> ImageSourceType:
+
+    yield from (
+        cv2.hconcat(list(filter(lambda frame: frame is not None, frames)))
+        for frames in zip(*sources)
+    )

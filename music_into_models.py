@@ -12,6 +12,7 @@ from typing import Any, Callable, Optional, Tuple
 import click
 from click_option_group import RequiredMutuallyExclusiveOptionGroup, optgroup
 
+from gance import video_common
 from gance.assets import OUTPUT_DIRECTORY
 from gance.data_into_model_visualization.model_visualization import viz_model_ins_outs
 from gance.data_into_model_visualization.visualization_common import CreateVisualizationInput
@@ -22,7 +23,6 @@ from gance.data_into_model_visualization.visualization_inputs import (
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import MultiModel, sorted_models_in_directory
 from gance.vector_sources.music import read_wav_scale_for_video
-from gance.video_common import add_wav_to_video
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("numba").setLevel(logging.WARNING)
@@ -71,29 +71,39 @@ def _create_visualization(
         audio_path, vector_length, video_fps
     ).wav_data
 
+    model_output = viz_model_ins_outs(
+        models=models,
+        data=vector_function(
+            time_series_audio_vectors=time_series_audio_vectors,
+            vector_length=vector_length,
+            model_indices=models.model_indices if models is not None else [0, 1, 2],  # TODO
+        ),
+        default_vector_length=vector_length,
+        enable_3d=enable_3d,
+        enable_2d=enable_2d,
+        frames_to_visualize=frames_to_visualize,
+    )
+
     with tempfile.NamedTemporaryFile(suffix=".mp4") as f:
 
         tmp_video_path = Path(f.name)
 
-        viz_model_ins_outs(
-            models=models,
-            data=vector_function(
-                time_series_audio_vectors=time_series_audio_vectors,
-                vector_length=vector_length,
-                model_indices=models.model_indices if models is not None else [0, 1, 2],  # TODO
-            ),
-            output_video_path=tmp_video_path,
-            default_vector_length=vector_length,
-            video_fps=video_fps,
-            enable_3d=enable_3d,
-            enable_2d=enable_2d,
-            frames_to_visualize=frames_to_visualize,
+        frames = video_common.horizontal_concat_optional_sources(
+            [model_output.visualization_images, model_output.model_images]
         )
+
+        video_common.write_source_to_disk(
+            source=frames,
+            video_path=tmp_video_path,
+            video_fps=video_fps,
+        )
+
+        f.flush()
 
         while not tmp_video_path.exists():
             pass
 
-        add_wav_to_video(
+        video_common.add_wav_to_video(
             video_path=tmp_video_path,
             audio_path=audio_path,
             output_path=output_path,
