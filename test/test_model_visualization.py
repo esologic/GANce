@@ -23,12 +23,13 @@ def get_model_output(
     enable_3d: bool, enable_2d: bool, video_fps: float, model_enabled: bool, video_side_length: int
 ) -> Tuple[int, ModelOutput]:
     """
-    Get
-    :param enable_3d:
-    :param enable_2d:
-    :param video_fps:
-    :param model_enabled:
-    :return:
+    Modify only the test-relevant components of the visualization run.
+    :param enable_3d: 3D model panel will be added.
+    :param enable_2d: 2D model panel will be added.
+    :param video_fps: FPS of resulting video stream.
+    :param model_enabled: If model images will be added.
+    :param video_side_length: Controls resolution of output video.
+    :return: Tuple, (number of expected output frames, streams of frames)
     """
 
     with MultiModel(
@@ -105,6 +106,18 @@ def test_viz_model_ins_outs_integration(
     :return: None
     """
 
+    if not (enable_3d or enable_2d or model_enabled):
+        with pytest.raises(ValueError):
+            get_model_output(
+                enable_3d=enable_3d,
+                enable_2d=enable_2d,
+                video_fps=video_fps,
+                model_enabled=model_enabled,
+                video_side_length=video_side_length,
+            )
+        # Bail out early, there's nothing else to test here.
+        return None
+
     expected_num_frames, model_output = get_model_output(
         enable_3d=enable_3d,
         enable_2d=enable_2d,
@@ -132,3 +145,5 @@ def test_viz_model_ins_outs_integration(
         assert expected_num_frames == len(model_frames)
     else:
         assert assert_all_none(model_output.model_images) == expected_num_frames
+
+    return None
