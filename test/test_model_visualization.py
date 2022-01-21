@@ -114,23 +114,21 @@ def test_viz_model_ins_outs_integration(
     )
 
     if enable_3d or enable_2d:
-        visualization_frames = 0
-        for i, frame in enumerate(model_output.visualization_images):
+        visualization_frames = list(model_output.visualization_images)
+        for frame in visualization_frames:
             resolution = image_sources_common.image_resolution(frame)
             assert resolution.height == video_side_length
             assert resolution.width == video_side_length * (enable_2d + enable_3d)
-            visualization_frames = i
-        assert expected_num_frames == visualization_frames
+        assert expected_num_frames == len(visualization_frames)
     else:
         assert assert_all_none(model_output.visualization_images) == expected_num_frames
 
     if model_enabled:
-        model_frames = 0
-        for i, frame in enumerate(model_output.model_images):
+        model_frames = list(model_output.model_images)
+        for frame in model_frames:
             resolution = image_sources_common.image_resolution(frame)
             assert resolution.height == video_side_length
             assert resolution.width == video_side_length
-            model_frames = i
-        assert expected_num_frames == model_frames
+        assert expected_num_frames == len(model_frames)
     else:
         assert assert_all_none(model_output.model_images) == expected_num_frames
