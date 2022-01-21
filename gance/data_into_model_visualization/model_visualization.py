@@ -34,7 +34,8 @@ from gance.data_into_model_visualization.visualization_common import (
     VisualizationInput,
     render_current_matplotlib_frame,
 )
-from gance.gance_types import ImageSourceType, OptionalImageSourceType, RGBInt8ImageType
+from gance.gance_types import OptionalImageSourceType, RGBInt8ImageType
+from gance.image_sources.video_common import create_video_writer
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import ModelInterface, MultiModel
 from gance.vector_sources.vector_sources_common import (
@@ -49,7 +50,6 @@ from gance.vector_sources.vector_types import (
     VectorsLabel,
     is_vector,
 )
-from gance.video_common import create_video_writer
 
 
 def _configure_axes(  # pylint: disable=too-many-locals
@@ -398,21 +398,28 @@ def _write_data_to_axes(
 
 
 class ModelOutput(NamedTuple):
+    """
+    Describes the two image sources that can result from a synthesis run.
+    """
 
     model_images: OptionalImageSourceType
     visualization_images: OptionalImageSourceType
 
 
-class RenderedFrame(NamedTuple):
+class _RenderedFrame(NamedTuple):
     """
-    Intermediate Type
+    Intermediate Type, unpacks the results from a synthesis run into their component parts.
     """
 
     model_frame: Optional[RGBInt8ImageType]
     visualization_frame: Optional[RGBInt8ImageType]
 
 
-class FrameInputPath(NamedTuple):
+class _FrameInputPath(NamedTuple):
+    """
+    Intermediate type, links a frame input to where the resulting image will be
+    stored on disk.
+    """
 
     frame: FrameInput
     path: Path
@@ -506,7 +513,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
     if frames_to_visualize is not None:
         LOGGER.warning(f"Truncating output to the first {frames_to_visualize} frames!")
 
-    def render_frame_in_memory(frame_input: FrameInput) -> RenderedFrame:
+    def render_frame_in_memory(frame_input: FrameInput) -> _RenderedFrame:
         """
         Render the given `FrameInput` to an actual image given the context of the run.
         This creates the matplotlib visualizations (if requested) and synthesizes the image out
@@ -547,11 +554,11 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
                 data=frame_input.combined_sample.data,
             )
 
-        return RenderedFrame(model_frame=model_frame, visualization_frame=visualization_frame)
+        return _RenderedFrame(model_frame=model_frame, visualization_frame=visualization_frame)
 
     def pickle_frame_in_tmp_dir(
         frame_input: FrameInput, rendered_frame_count: int
-    ) -> FrameInputPath:
+    ) -> _FrameInputPath:
         """
         Renders a given frame into memory, and immediately writes it to disk as a pickled file.
         :param frame_input: The frame to render.
@@ -570,7 +577,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
         # These will get deleted later in the pipeline.
         with NamedTemporaryFile(mode="wb", delete=False) as p:
             pickle.dump(render_frame_in_memory(frame_input), p)
-            return FrameInputPath(frame=frame_input, path=Path(p.name))
+            return _FrameInputPath(frame=frame_input, path=Path(p.name))
 
     frame_inputs = itertools.islice(
         _frame_inputs(visualization_input=data, vector_length=vector_length),
@@ -583,19 +590,19 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
         else frame_inputs
     )
 
-    files_on_disk: Iterator[FrameInputPath] = (
+    files_on_disk: Iterator[_FrameInputPath] = (
         pickle_frame_in_tmp_dir(frame_input, index)
         for index, frame_input in enumerate(efficient_rendering_order)
     )
 
-    def load_and_delete(frame_input_path: FrameInputPath) -> RenderedFrame:
+    def load_and_delete(frame_input_path: _FrameInputPath) -> _RenderedFrame:
         """
 
         :param frame_input_path:
         :return:
         """
         with open(str(frame_input_path.path), "rb") as p:
-            output: RenderedFrame = pickle.load(p)
+            output: _RenderedFrame = pickle.load(p)
 
         frame_input_path.path.unlink()
 

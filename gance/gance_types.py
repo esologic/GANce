@@ -2,7 +2,7 @@
 Common types used across this project
 """
 from pathlib import Path
-from typing import Iterable, Iterator, NamedTuple, NewType, Optional, Tuple
+from typing import Iterator, NamedTuple, NewType, Optional, Tuple
 
 import numpy as np  # pylint: disable=unused-import
 

@@ -19,6 +19,7 @@ from gance.data_into_model_visualization.visualization_common import (
     STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE,
 )
 from gance.hash_file import hash_file
+from gance.image_sources.video_common import create_video_writer
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import (
     ModelInterfaceInProcess,
@@ -31,7 +32,6 @@ from gance.projection.projection_file_reader import (
 )
 from gance.vector_sources.vector_sources_common import sub_vectors
 from gance.vector_sources.vector_types import MatricesLabel, SingleMatrix
-from gance.video_common import create_video_writer
 
 
 def _spline_to_points(splines: List[UnivariateSpline], x_values: np.ndarray) -> List[List[float]]:

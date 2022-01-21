@@ -5,19 +5,17 @@ Functions themselves match a standard format so they can be used interchangeably
 """
 
 from pathlib import Path
-from typing import List, NamedTuple, Tuple
+from typing import List, Tuple
 
 import numpy as np
 from sklearn.preprocessing import minmax_scale
 
 from gance.apply_spectrogram import compute_spectrogram_smooth_scale
 from gance.data_into_model_visualization.visualization_common import (
-    CreateVisualizationInput,
     ResultLayers,
     VisualizationInput,
 )
 from gance.dynamic_model_switching import model_index_selector, reduce_vector_rms_rolling_average
-from gance.gance_types import ImageSourceType
 from gance.projection import projection_file_reader
 from gance.vector_sources import vector_sources_common
 from gance.vector_sources.primatives import Sigmas, gaussian_data
@@ -27,13 +25,6 @@ from gance.vector_sources.vector_types import (
     MatricesLabel,
     VectorsLabel,
 )
-
-
-class ProjectionReaderModelInput(NamedTuple):
-
-    target_images: ImageSourceType
-    final_images: ImageSourceType
-    visualization_input: VisualizationInput
 
 
 def _create_spectrogram(

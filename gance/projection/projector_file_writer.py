@@ -43,6 +43,7 @@ from typing_extensions import Protocol
 
 from gance.gance_types import RGBInt8ImageType
 from gance.hash_file import hash_file
+from gance.image_sources.video_common import frames_in_video
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import load_model_network, wrap_loaded_model
 from gance.process_common import COMPLETE_SENTINEL, cleanup_worker, empty_queue_sentinel
@@ -58,7 +59,6 @@ from gance.stylegan2.dataset_tool import TFRecordExporter
 from gance.stylegan2.projector import Projector
 from gance.stylegan2.training import dataset, misc
 from gance.stylegan2.training.dataset import TFRecordDataset
-from gance.video_common import frames_in_video
 
 DEFAULT_EXPECTED_TIME_PER_STEP = 60.0
 

@@ -12,7 +12,6 @@ from typing import Any, Callable, Optional, Tuple
 import click
 from click_option_group import RequiredMutuallyExclusiveOptionGroup, optgroup
 
-from gance import video_common
 from gance.assets import OUTPUT_DIRECTORY
 from gance.data_into_model_visualization.model_visualization import viz_model_ins_outs
 from gance.data_into_model_visualization.visualization_common import CreateVisualizationInput
@@ -20,6 +19,7 @@ from gance.data_into_model_visualization.visualization_inputs import (
     alpha_blend_projection_file,
     alpha_blend_vectors_max_rms_power_audio,
 )
+from gance.image_sources import video_common
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import MultiModel, sorted_models_in_directory
 from gance.vector_sources.music import read_wav_scale_for_video

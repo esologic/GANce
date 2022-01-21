@@ -1,5 +1,5 @@
 """
-Common functionality for dealing with video files
+Common functionality for dealing with video files.
 """
 
 import itertools
@@ -75,21 +75,21 @@ def add_wavs_to_video(video_path: Path, audio_paths: List[Path], output_path: Pa
 
 
 def _create_video_writer_resolution(
-    video_path: Path, video_fps: float, image_resolution: ImageResolution
+    video_path: Path, video_fps: float, resolution: ImageResolution
 ) -> cv2.VideoWriter:
     """
-
-    :param video_path:
-    :param video_fps:
-    :param image_resolution:
-    :return:
+    Create a video writer of a given FPS and resolution.
+    :param video_path: Resulting file path.
+    :param video_fps: FPS of the video.
+    :param resolution: Size of the resulting video.
+    :return: The writer.
     """
 
     return cv2.VideoWriter(
         str(video_path),
         cv2.VideoWriter_fourcc(*"mp4v"),
         video_fps,
-        (image_resolution.width, image_resolution.height),
+        (resolution.width, resolution.height),
     )
 
 
@@ -108,6 +108,8 @@ def create_video_writer(
     :param num_squares_width: Since each section of the video is a `video_height` x `video_height`
     square this parameter sets the width for the video in pixels, with the number of these squares
     that will be written in each frame.
+    :param num_squares_height: Like `num_squares_width`, but for height. Sets the height of
+    the video in units of `video_height`.
     :return: The openCV `VideoWriter` object.
     """
 
@@ -222,11 +224,11 @@ def frames_in_video(
 
 def write_source_to_disk(source: ImageSourceType, video_path: Path, video_fps: float) -> None:
     """
-
-    :param source:
-    :param video_path:
-    :param video_fps:
-    :return:
+    Consume an image source, write it out to disk.
+    :param source: To write to disk.
+    :param video_path: Output video path.
+    :param video_fps: FPS of the output video.
+    :return: None
     """
 
     first_frame = next(source)
@@ -235,11 +237,18 @@ def write_source_to_disk(source: ImageSourceType, video_path: Path, video_fps: f
         video_path=video_path, video_fps=video_fps, image_resolution=image_resolution(first_frame)
     )
 
-    writer.write(cv2.cvtColor(first_frame.astype(np.uint8), cv2.COLOR_BGR2RGB))
+    def write_frame(frame: RGBInt8ImageType) -> None:
+        """
+        Write the given frame to the file.
+        :param frame: To write.
+        :return: None
+        """
+        writer.write(cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB))
+
+    write_frame(first_frame)
 
     for image in source:
-        output_image = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_BGR2RGB)
-        writer.write(output_image)
+        write_frame(image)
 
     writer.release()
 
@@ -247,6 +256,12 @@ def write_source_to_disk(source: ImageSourceType, video_path: Path, video_fps: f
 def horizontal_concat_optional_sources(
     sources: Iterable[OptionalImageSourceType],
 ) -> ImageSourceType:
+    """
+    For each frame in each frame source in `sources`, concatenate frames at the same
+    index, and emit the result.
+    :param sources: An iterable of frame sources.
+    :return: An iterator of the newly combined frames.
+    """
 
     yield from (
         cv2.hconcat(list(filter(lambda frame: frame is not None, frames)))

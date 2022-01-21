@@ -3,8 +3,6 @@ Test of critical functions of video reader using known files.
 """
 
 from pathlib import Path
-
-import gance.image_sources.still_image_common
 from test.assets import (
     BATCH_2_IMAGE_1_PATH,
     SAMPLE_FACE_VIDEO_EXPECTED_FPS,
@@ -18,7 +16,8 @@ import numpy as np
 import pytest
 from py._path.local import LocalPath  # pylint: disable=protected-access
 
-from gance import video_common
+import gance.image_sources.still_image_common
+from gance.image_sources import video_common
 
 
 @pytest.mark.parametrize(

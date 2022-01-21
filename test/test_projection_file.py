@@ -15,11 +15,11 @@ import numpy as np
 import pytest
 from py._path.local import LocalPath  # pylint: disable=protected-access
 
-from gance import video_common
+from gance.image_sources import video_common
+from gance.image_sources.still_image_common import write_image
 from gance.model_interface.model_functions import create_model_interface_process
 from gance.projection import projection_file_reader, projection_visualization, projector_file_writer
 from gance.vector_sources.vector_types import SingleMatrix
-from gance.video_common import write_image
 
 
 def distance(final_latent: SingleMatrix, latent_history: List[SingleMatrix], index: int) -> float:
