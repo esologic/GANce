@@ -11,12 +11,10 @@ import ffmpeg
 import numpy as np
 from cv2 import cv2
 from ffmpeg.nodes import FilterableStream
-from PIL import Image
 
 from gance.gance_types import ImageSourceType, OptionalImageSourceType, RGBInt8ImageType
+from gance.image_sources.image_sources_common import ImageResolution, image_resolution
 from gance.logger_common import LOGGER
-
-PNG = "png"
 
 
 def _write_video(video_path: Path, audio: FilterableStream, output_path: Path) -> None:
@@ -74,12 +72,6 @@ def add_wavs_to_video(video_path: Path, audio_paths: List[Path], output_path: Pa
         audio=ffmpeg.concat(*[_read_wav(audio_path) for audio_path in audio_paths], v=0, a=1),
         output_path=output_path,
     )
-
-
-class ImageResolution(NamedTuple):
-
-    width: int
-    height: int
 
 
 def _create_video_writer_resolution(
@@ -226,38 +218,6 @@ def frames_in_video(
         total_frame_count=int(vid_capture.get(cv2.CAP_PROP_FRAME_COUNT)),
         frames=itertools.islice(frames(), None, None, take_every),
     )
-
-
-def read_image(image_path: Path) -> RGBInt8ImageType:
-    """
-    Read an image from disk into the canonical, in-memory format.
-    :param image_path: Path to the image file on disk.
-    :return: The image
-    """
-    # Verified by hand that this cast is valid
-    return RGBInt8ImageType(np.asarray(Image.open(str(image_path))))
-
-
-def write_image(image: RGBInt8ImageType, path: Path) -> None:
-    """
-    Writes a given image to the path.
-    Uses PNG by default.
-    :param image: Image in memory.
-    :param path: Destination.
-    :return: None
-    """
-
-    Image.fromarray(image).save(fp=str(path), format=PNG.upper())
-
-
-def image_resolution(image: RGBInt8ImageType) -> ImageResolution:
-    """
-
-    :param image:
-    :return:
-    """
-
-    return ImageResolution(height=image.shape[0], width=image.shape[1])
 
 
 def write_source_to_disk(source: ImageSourceType, video_path: Path, video_fps: float) -> None:

@@ -3,6 +3,8 @@ Test of critical functions of video reader using known files.
 """
 
 from pathlib import Path
+
+import gance.image_sources.still_image_common
 from test.assets import (
     BATCH_2_IMAGE_1_PATH,
     SAMPLE_FACE_VIDEO_EXPECTED_FPS,
@@ -61,7 +63,7 @@ def test_read_image() -> None:
     :return: None
     """
 
-    image = np.array(video_common.read_image(BATCH_2_IMAGE_1_PATH))
+    image = np.array(gance.image_sources.still_image_common.read_image(BATCH_2_IMAGE_1_PATH))
 
     # Verified these magic numbers experimentally
     assert image.sum() == 299876727  # whole image
