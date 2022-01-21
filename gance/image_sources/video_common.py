@@ -234,7 +234,7 @@ def write_source_to_disk(source: ImageSourceType, video_path: Path, video_fps: f
     first_frame = next(source)
 
     writer = _create_video_writer_resolution(
-        video_path=video_path, video_fps=video_fps, image_resolution=image_resolution(first_frame)
+        video_path=video_path, video_fps=video_fps, resolution=image_resolution(first_frame)
     )
 
     def write_frame(frame: RGBInt8ImageType) -> None:

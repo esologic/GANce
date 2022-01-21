@@ -549,9 +549,12 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
                     f"got {frame_input.combined_sample.data.shape}"
                 )
 
-            model_frame = models.indexed_create_image_generic(
-                index=frame_input.model_index,
-                data=frame_input.combined_sample.data,
+            model_frame = cv2.resize(
+                models.indexed_create_image_generic(
+                    index=frame_input.model_index,
+                    data=frame_input.combined_sample.data,
+                ),
+                (video_height, video_height),
             )
 
         return _RenderedFrame(model_frame=model_frame, visualization_frame=visualization_frame)
@@ -566,8 +569,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
         :return: A tuple, the `FrameInput` and a path to the pickle file on disk.
         """
 
-        # LOGGER.info
-        print(
+        LOGGER.info(
             "Rendering Frame. "
             f"Model index: {frame_input.model_index}. "
             f"Frame position: {frame_input.frame_index}. "
@@ -597,9 +599,9 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
 
     def load_and_delete(frame_input_path: _FrameInputPath) -> _RenderedFrame:
         """
-
-        :param frame_input_path:
-        :return:
+        Load the pickled frame from disk, and then delete the pickle file.
+        :param frame_input_path: Represents the image and the path to the rendered image on disk.
+        :return: The rendered frame.
         """
         with open(str(frame_input_path.path), "rb") as p:
             output: _RenderedFrame = pickle.load(p)
@@ -608,6 +610,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
 
         return output
 
+    # The `sorted` operation here is what causes the frames to render.
     loaded = map(
         load_and_delete, sorted(files_on_disk, key=lambda frame_path: frame_path[0].frame_index)
     )
