@@ -115,35 +115,31 @@ def test_viz_model_ins_outs_integration(
                 model_enabled=model_enabled,
                 video_side_length=video_side_length,
             )
-        # Bail out early, there's nothing else to test here.
-        return None
-
-    expected_num_frames, model_output = get_model_output(
-        enable_3d=enable_3d,
-        enable_2d=enable_2d,
-        video_fps=video_fps,
-        model_enabled=model_enabled,
-        video_side_length=video_side_length,
-    )
-
-    if enable_3d or enable_2d:
-        visualization_frames = list(model_output.visualization_images)
-        for frame in visualization_frames:
-            resolution = image_sources_common.image_resolution(frame)
-            assert resolution.height == video_side_length
-            assert resolution.width == video_side_length * (enable_2d + enable_3d)
-        assert expected_num_frames == len(visualization_frames)
     else:
-        assert assert_all_none(model_output.visualization_images) == expected_num_frames
+        expected_num_frames, model_output = get_model_output(
+            enable_3d=enable_3d,
+            enable_2d=enable_2d,
+            video_fps=video_fps,
+            model_enabled=model_enabled,
+            video_side_length=video_side_length,
+        )
 
-    if model_enabled:
-        model_frames = list(model_output.model_images)
-        for frame in model_frames:
-            resolution = image_sources_common.image_resolution(frame)
-            assert resolution.height == video_side_length
-            assert resolution.width == video_side_length
-        assert expected_num_frames == len(model_frames)
-    else:
-        assert assert_all_none(model_output.model_images) == expected_num_frames
+        if enable_3d or enable_2d:
+            visualization_frames = list(model_output.visualization_images)
+            for frame in visualization_frames:
+                resolution = image_sources_common.image_resolution(frame)
+                assert resolution.height == video_side_length
+                assert resolution.width == video_side_length * (enable_2d + enable_3d)
+            assert expected_num_frames == len(visualization_frames)
+        else:
+            assert assert_all_none(model_output.visualization_images) == expected_num_frames
 
-    return None
+        if model_enabled:
+            model_frames = list(model_output.model_images)
+            for frame in model_frames:
+                resolution = image_sources_common.image_resolution(frame)
+                assert resolution.height == video_side_length
+                assert resolution.width == video_side_length
+            assert expected_num_frames == len(model_frames)
+        else:
+            assert assert_all_none(model_output.model_images) == expected_num_frames

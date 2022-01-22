@@ -116,7 +116,7 @@ def create_video_writer(
     return _create_video_writer_resolution(
         video_path=video_path,
         video_fps=video_fps,
-        image_resolution=ImageResolution(
+        resolution=ImageResolution(
             width=video_height * num_squares_width, height=video_height * num_squares_height
         ),
     )
