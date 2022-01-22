@@ -3,16 +3,16 @@ Read a projection file back into memory
 """
 
 import itertools
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, NamedTuple, Union, cast
+from typing import Iterator, Union, cast, Optional, Type
+from types import TracebackType
 
 import h5py
 import numpy as np
 from h5py._hl.dataset import Dataset  # pylint: disable=protected-access
 from h5py._hl.group import Group  # pylint: disable=protected-access
 
-from gance.gance_types import RGBInt8ImageType
+from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import ModelInterface
 from gance.projection.projection_types import (
@@ -32,32 +32,18 @@ from gance.projection.projector_file_writer import (
 from gance.vector_sources.vector_types import ConcatenatedMatrices, MatricesLabel, SingleMatrix
 
 
-class ProjectionFileReader(NamedTuple):
+def _double_iter(
+    group: Group, inner_matrix: bool
+) -> Iterator[Iterator[Union[np.ndarray, np.ndarray]]]:
     """
-    Points to everything available for a given projection.
+    Helper function.
+    :param group: Group to search
+    :return: Yield iterators that produce numpy arrays.
     """
-
-    # Contains metadata about the projections, and the source material that was fed in.
-    projection_attributes: ProjectionAttributes
-
-    # The image that this projection was targeting. Should be able to see some visual resemblance.
-    target_images: Iterator[RGBInt8ImageType]
-
-    # The final entry in `latents_history`. This is the most interesting matrix and is exposed
-    # so you don't have to process all of `latents_history` to get to this.
-    final_latents: Iterator[SingleMatrix]
-
-    # These are the final resulting images from each projection, retrained here for convenience.
-    final_images: Iterator[RGBInt8ImageType]
-
-    # The latents over time. Early in list = early in projection.
-    latents_histories: Iterator[Iterator[SingleMatrix]]
-
-    # The noises over time. Early in list = early in projection.
-    noises_histories: Iterator[Iterator[FlattenedNoisesType]]
-
-    # The images produced by projection over time. Early in list = early in projection.
-    images_histories: Iterator[Iterator[RGBInt8ImageType]]
+    yield from (
+        _datasets_in_group(group=group, inner_matrix=inner_matrix)
+        for group in _groups_in_group(group)
+    )
 
 
 def _types_in_group(
@@ -112,56 +98,123 @@ def _datasets_in_group(
     yield from (dataset_for_output(dataset) for dataset in _types_in_group(group, Dataset))
 
 
-@contextmanager
-def load_projection_file(projection_file_path: Path) -> Iterator[ProjectionFileReader]:
+class ProjectionFileReader:
     """
-    Creates a context manager that can then be used to read data from a given projection file.
-    :param projection_file_path: Path to projection file.
-    :return: An NT used to read the data out of the file. Read those docs for more info.
+    Points to everything available for a given projection.
     """
 
-    def _double_iter(
-        group: Group, inner_matrix: bool
-    ) -> Iterator[Iterator[Union[np.ndarray, np.ndarray]]]:
-        """
-        Helper function.
-        :param group: Group to search
-        :return: Yield iterators that produce numpy arrays.
-        """
-        yield from (
-            _datasets_in_group(group=group, inner_matrix=inner_matrix)
-            for group in _groups_in_group(group)
+    def __init__(self, projection_file_path: Path):
+        self._file = h5py.File(name=str(projection_file_path), mode="r")
+
+        a = ProjectionAttributes.from_dict(self._file.attrs)  # type: ignore # pylint: disable=no-member
+        self._projection_attributes: ProjectionAttributes = a
+
+        self._target_images: ImageSourceType = cast(
+            ImageSourceType,
+            _datasets_in_group(self._file[TARGET_IMAGES_GROUP_NAME], inner_matrix=False),
         )
 
-    with h5py.File(name=str(projection_file_path), mode="r") as f:
-        a = ProjectionAttributes.from_dict(f.attrs)  # type: ignore # pylint: disable=no-member
-        yield ProjectionFileReader(
-            projection_attributes=a,
-            target_images=cast(
-                Iterator[RGBInt8ImageType],
-                _datasets_in_group(f[TARGET_IMAGES_GROUP_NAME], inner_matrix=False),
-            ),
-            final_latents=cast(
-                Iterator[SingleMatrix],
-                _datasets_in_group(f[FINAL_LATENTS_GROUP_NAME], inner_matrix=True),
-            ),
-            final_images=cast(
-                Iterator[RGBInt8ImageType],
-                _datasets_in_group(f[FINAL_IMAGE_GROUP_NAME], inner_matrix=False),
-            ),
-            latents_histories=cast(
-                Iterator[Iterator[SingleMatrix]],
-                _double_iter(f[LATENTS_HISTORIES_GROUP_NAME], inner_matrix=True),
-            ),
-            noises_histories=cast(
-                Iterator[Iterator[FlattenedNoisesType]],
-                _double_iter(f[NOISES_HISTORIES_GROUP_NAME], inner_matrix=False),
-            ),
-            images_histories=cast(
-                Iterator[Iterator[RGBInt8ImageType]],
-                _double_iter(f[IMAGES_HISTORIES_GROUP_NAME], inner_matrix=False),
-            ),
+        self._final_latents: Iterator[SingleMatrix] = cast(
+            Iterator[SingleMatrix],
+            _datasets_in_group(self._file[FINAL_LATENTS_GROUP_NAME], inner_matrix=True),
         )
+
+        self._final_images: ImageSourceType = cast(
+            ImageSourceType,
+            _datasets_in_group(self._file[FINAL_IMAGE_GROUP_NAME], inner_matrix=False),
+        )
+
+        self._latents_histories: Iterator[Iterator[SingleMatrix]] = cast(
+            Iterator[Iterator[SingleMatrix]],
+            _double_iter(self._file[LATENTS_HISTORIES_GROUP_NAME], inner_matrix=True),
+        )
+
+        self._noises_histories: Iterator[Iterator[FlattenedNoisesType]] = cast(
+            Iterator[Iterator[FlattenedNoisesType]],
+            _double_iter(self._file[NOISES_HISTORIES_GROUP_NAME], inner_matrix=False),
+        )
+
+        self._images_histories: Iterator[ImageSourceType] = cast(
+            Iterator[ImageSourceType],
+            _double_iter(self._file[IMAGES_HISTORIES_GROUP_NAME], inner_matrix=False),
+        )
+
+    @property
+    def projection_attributes(self: "ProjectionFileReader") -> ProjectionAttributes:
+        """
+        Contains metadata about the projections, and the source material that was fed in.
+        :return:
+        """
+        return self._projection_attributes
+
+    @property
+    def target_images(self: "ProjectionFileReader") -> ImageSourceType:
+        """
+        The image that this projection was targeting.
+        Should be able to see some visual resemblance.
+        :return:
+        """
+        return self._target_images
+
+    @property
+    def final_latents(self: "ProjectionFileReader") -> Iterator[SingleMatrix]:
+        """
+        The final entry in `latents_history`. This is the most interesting matrix and is exposed
+        so you don't have to process all of `latents_history` to get to this.
+        :return:
+        """
+        return self._final_latents
+
+    @property
+    def final_images(self: "ProjectionFileReader") -> ImageSourceType:
+        """
+        These are the final resulting images from each projection, retrained here for convenience.
+        :return:
+        """
+        return self._final_images
+
+    @property
+    def latents_histories(self: "ProjectionFileReader") -> Iterator[Iterator[SingleMatrix]]:
+        """
+        The latents over time. Early in list = early in projection.
+        :return:
+        """
+        return self._latents_histories
+
+    @property
+    def noises_histories(self: "ProjectionFileReader") -> Iterator[Iterator[FlattenedNoisesType]]:
+        """
+        The noises over time. Early in list = early in projection.
+        :return:
+        """
+        return self._noises_histories
+
+    @property
+    def images_histories(self: "ProjectionFileReader") -> Iterator[ImageSourceType]:
+        """
+        The images produced by projection over time. Early in list = early in projection.
+        :return:
+        """
+        return self._images_histories
+
+    def close(self: "ProjectionFileReader") -> None:
+        """
+
+        :return:
+        """
+        self._file.close()
+
+    def __enter__(self: "ProjectionFileReader") -> "ProjectionFileReader":
+        return self
+
+    def __exit__(
+        self: "ProjectionFileReader",
+        exctype: Optional[Type[BaseException]],
+        excinst: Optional[BaseException],
+        exctb: Optional[TracebackType],
+    ) -> bool:
+        self.close()
+        return True
 
 
 def verify_projection_file_assumptions(projection_file_path: Path) -> None:
@@ -382,3 +435,13 @@ def projection_attributes(projection_file_path: Path) -> ProjectionAttributes:
 
     with load_projection_file(projection_file_path) as reader:
         return reader.projection_attributes
+
+
+def load_projection_file(projection_file_path: Path) -> ProjectionFileReader:
+    """
+    Creates a context manager that can then be used to read data from a given projection file.
+    :param projection_file_path: Path to projection file.
+    :return: An NT used to read the data out of the file. Read those docs for more info.
+    """
+
+    return ProjectionFileReader(projection_file_path=projection_file_path)

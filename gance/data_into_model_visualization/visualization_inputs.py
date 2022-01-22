@@ -4,13 +4,9 @@ These are basically transformations of time series audio vectors into things lik
 Functions themselves match a standard format so they can be used interchangeably.
 """
 
-from itertools import repeat
-from itertools import chain
-import more_itertools
+from itertools import chain, repeat
 from pathlib import Path
-from typing import List, Tuple, NamedTuple, Iterable
-
-from gance.gance_types import ImageSourceType
+from typing import Any, Iterable, List, NamedTuple, Tuple, cast
 
 import numpy as np
 from sklearn.preprocessing import minmax_scale
@@ -21,6 +17,7 @@ from gance.data_into_model_visualization.visualization_common import (
     VisualizationInput,
 )
 from gance.dynamic_model_switching import model_index_selector, reduce_vector_rms_rolling_average
+from gance.gance_types import ImageSourceType
 from gance.projection import projection_file_reader
 from gance.vector_sources import vector_sources_common
 from gance.vector_sources.primatives import Sigmas, gaussian_data
@@ -73,7 +70,7 @@ def _create_spectrogram(
     return spectrogram
 
 
-def repeat_each(iterable, n=2):
+def repeat_each(iterable: Iterable[Any], n: int = 2) -> Iterable[Any]:
     """Repeat each element in *iterable* *n* times.
 
     >>> list(repeat_each('ABC', 3))
@@ -165,7 +162,7 @@ class Output(NamedTuple):
     visualization_input: VisualizationInput
 
 
-def benis(
+def benis(  # pylint: disable=too-many-locals
     projection_file_path: Path,
     alpha: float,
     fft_roll_enabled: bool,
@@ -254,8 +251,12 @@ def benis(
     )
 
     return Output(
-        targets=repeat_each(reader.target_images, duplicated.duplication_factor),
-        finals=repeat_each(reader.final_images, duplicated.duplication_factor),
+        targets=cast(
+            ImageSourceType, repeat_each(reader.target_images, duplicated.duplication_factor)
+        ),
+        finals=cast(
+            ImageSourceType, repeat_each(reader.final_images, duplicated.duplication_factor)
+        ),
         visualization_input=VisualizationInput(
             a_vectors=VectorsLabel(
                 data=spectrogram, vector_length=vector_length, label="Rolled Audio Spectrogram"
@@ -339,7 +340,7 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
             data=vector_sources_common.demote_to_vector_select(final_latents.data, index_to_take=0),
             vector_length=vector_length,
             target_vector_count=num_vectors,
-        ),
+        ).vectors,
         target_depth=final_latents.data.shape[0],
     )
 

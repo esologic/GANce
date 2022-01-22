@@ -13,7 +13,7 @@ def test__scale_wav_to_sample_rate(multiplier: float) -> None:
     """
 
     original_wav = music.read_wav_file(WAV_CLAPS_PATH)
-    scaled_wav = music._scale_wav_to_sample_rate(
+    scaled_wav = music._scale_wav_to_sample_rate(  # pylint: disable=protected-access
         wav_file=original_wav, new_sample_rate=int(original_wav.sample_rate * multiplier)
     )
     assert int(len(original_wav.wav_data.data) * multiplier) == len(scaled_wav.wav_data.data)
