@@ -15,12 +15,12 @@ from skimage.feature import Cascade
 
 from gance.gance_types import RGBInt8ImageType
 from gance.hash_file import hash_file
+from gance.image_sources.still_image_common import PNG, write_image
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import MODEL_SUFFIX, MultiModel
 from gance.synthesis_file import write_synthesis_file
 from gance.vector_sources.primatives import DEFAULT_RANDOM_SEED, gaussian_data
 from gance.vector_sources.vector_types import SingleVector
-from gance.video_common import PNG, write_image
 
 
 class _ContainsFaceVectorImage(NamedTuple):

@@ -22,6 +22,7 @@ from gance.data_into_model_visualization.visualization_common import (
     render_current_matplotlib_frame,
 )
 from gance.gance_types import RGBInt8ImageType
+from gance.image_sources.video_common import create_video_writer
 from gance.vector_sources.vector_sources_common import is_vector, sub_vectors
 from gance.vector_sources.vector_types import (
     MatricesLabel,
@@ -29,7 +30,6 @@ from gance.vector_sources.vector_types import (
     SingleVector,
     VectorsLabel,
 )
-from gance.video_common import create_video_writer
 
 
 def multi_plot_vectors(

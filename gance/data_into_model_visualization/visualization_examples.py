@@ -36,6 +36,7 @@ from gance.data_into_model_visualization.visualization_inputs import (
 )
 from gance.data_into_model_visualization.visualize_audio_reducer import visualize_reducer_output
 from gance.dynamic_model_switching import reduce_vector_gzip_compression_rolling_average
+from gance.image_sources.video_common import add_wav_to_video
 from gance.model_interface.model_functions import create_model_interface
 from gance.projection import projection_file_reader
 from gance.projection.projection_visualization import visualize_projection_history
@@ -46,7 +47,6 @@ from gance.vector_sources.vector_sources_common import (
     smooth_across_vectors,
 )
 from gance.vector_sources.vector_types import ConcatenatedVectors, SingleVector, VectorsLabel
-from gance.video_common import add_wav_to_video
 
 
 def demo_smoothing() -> None:

@@ -10,8 +10,8 @@ from typing import List, Optional
 import click
 
 from gance import cli_common
+from gance.image_sources.video_common import add_wavs_to_video
 from gance.projection import projection_visualization
-from gance.video_common import add_wavs_to_video
 
 
 @click.group()

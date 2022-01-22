@@ -24,9 +24,9 @@ from gance.data_into_model_visualization.visualization_common import (
     render_current_matplotlib_frame,
 )
 from gance.gance_types import RGBInt8ImageType
+from gance.image_sources.video_common import create_video_writer
 from gance.logger_common import LOGGER
 from gance.projection.projection_file_reader import load_projection_file
-from gance.video_common import create_video_writer
 
 
 class BoundingBoxType(NamedTuple):

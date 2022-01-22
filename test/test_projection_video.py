@@ -8,9 +8,9 @@ from test.assets import BATCH_2_IMAGE_1_PATH, BATCH_2_IMAGE_2_PATH
 
 import pytest
 
+from gance.image_sources.still_image_common import read_image
 from gance.projection.projector_file_writer import _image_to_tfrecords_directory
 from gance.stylegan2.dataset_tool import compare, create_from_images
-from gance.video_common import read_image
 
 
 @pytest.mark.parametrize(

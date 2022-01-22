@@ -16,7 +16,8 @@ import numpy as np
 import pytest
 from py._path.local import LocalPath  # pylint: disable=protected-access
 
-from gance import video_common
+import gance.image_sources.still_image_common
+from gance.image_sources import video_common
 
 
 @pytest.mark.parametrize(
@@ -61,7 +62,7 @@ def test_read_image() -> None:
     :return: None
     """
 
-    image = np.array(video_common.read_image(BATCH_2_IMAGE_1_PATH))
+    image = np.array(gance.image_sources.still_image_common.read_image(BATCH_2_IMAGE_1_PATH))
 
     # Verified these magic numbers experimentally
     assert image.sum() == 299876727  # whole image

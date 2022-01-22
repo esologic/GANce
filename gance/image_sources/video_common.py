@@ -1,22 +1,20 @@
 """
-Common functionality for dealing with video files
+Common functionality for dealing with video files.
 """
 
 import itertools
 import math
 from pathlib import Path
-from typing import Iterator, List, NamedTuple, Optional, Tuple
+from typing import Iterable, Iterator, List, NamedTuple, Optional, Tuple
 
 import ffmpeg
 import numpy as np
 from cv2 import cv2
 from ffmpeg.nodes import FilterableStream
-from PIL import Image
 
-from gance.gance_types import RGBInt8ImageType
+from gance.gance_types import ImageSourceType, OptionalImageSourceType, RGBInt8ImageType
+from gance.image_sources.image_sources_common import ImageResolution, image_resolution
 from gance.logger_common import LOGGER
-
-PNG = "png"
 
 
 def _write_video(video_path: Path, audio: FilterableStream, output_path: Path) -> None:
@@ -76,6 +74,25 @@ def add_wavs_to_video(video_path: Path, audio_paths: List[Path], output_path: Pa
     )
 
 
+def _create_video_writer_resolution(
+    video_path: Path, video_fps: float, resolution: ImageResolution
+) -> cv2.VideoWriter:
+    """
+    Create a video writer of a given FPS and resolution.
+    :param video_path: Resulting file path.
+    :param video_fps: FPS of the video.
+    :param resolution: Size of the resulting video.
+    :return: The writer.
+    """
+
+    return cv2.VideoWriter(
+        str(video_path),
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        video_fps,
+        (resolution.width, resolution.height),
+    )
+
+
 def create_video_writer(
     video_path: Path,
     video_fps: float,
@@ -91,14 +108,17 @@ def create_video_writer(
     :param num_squares_width: Since each section of the video is a `video_height` x `video_height`
     square this parameter sets the width for the video in pixels, with the number of these squares
     that will be written in each frame.
+    :param num_squares_height: Like `num_squares_width`, but for height. Sets the height of
+    the video in units of `video_height`.
     :return: The openCV `VideoWriter` object.
     """
 
-    return cv2.VideoWriter(
-        str(video_path),
-        cv2.VideoWriter_fourcc(*"mp4v"),
-        video_fps,
-        (video_height * num_squares_width, video_height * num_squares_height),
+    return _create_video_writer_resolution(
+        video_path=video_path,
+        video_fps=video_fps,
+        resolution=ImageResolution(
+            width=video_height * num_squares_width, height=video_height * num_squares_height
+        ),
     )
 
 
@@ -202,23 +222,48 @@ def frames_in_video(
     )
 
 
-def read_image(image_path: Path) -> RGBInt8ImageType:
+def write_source_to_disk(source: ImageSourceType, video_path: Path, video_fps: float) -> None:
     """
-    Read an image from disk into the canonical, in-memory format.
-    :param image_path: Path to the image file on disk.
-    :return: The image
-    """
-    # Verified by hand that this cast is valid
-    return RGBInt8ImageType(np.asarray(Image.open(str(image_path))))
-
-
-def write_image(image: RGBInt8ImageType, path: Path) -> None:
-    """
-    Writes a given image to the path.
-    Uses PNG by default.
-    :param image: Image in memory.
-    :param path: Destination.
+    Consume an image source, write it out to disk.
+    :param source: To write to disk.
+    :param video_path: Output video path.
+    :param video_fps: FPS of the output video.
     :return: None
     """
 
-    Image.fromarray(image).save(fp=str(path), format=PNG.upper())
+    first_frame = next(source)
+
+    writer = _create_video_writer_resolution(
+        video_path=video_path, video_fps=video_fps, resolution=image_resolution(first_frame)
+    )
+
+    def write_frame(frame: RGBInt8ImageType) -> None:
+        """
+        Write the given frame to the file.
+        :param frame: To write.
+        :return: None
+        """
+        writer.write(cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB))
+
+    write_frame(first_frame)
+
+    for image in source:
+        write_frame(image)
+
+    writer.release()
+
+
+def horizontal_concat_optional_sources(
+    sources: Iterable[OptionalImageSourceType],
+) -> ImageSourceType:
+    """
+    For each frame in each frame source in `sources`, concatenate frames at the same
+    index, and emit the result.
+    :param sources: An iterable of frame sources.
+    :return: An iterator of the newly combined frames.
+    """
+
+    yield from (
+        cv2.hconcat(list(filter(lambda frame: frame is not None, frames)))
+        for frames in zip(*sources)
+    )

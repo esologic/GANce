@@ -2,7 +2,6 @@
 
 # Create a `venv` virtual environment, activate and install all required packages for development.
 
-set -euo pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 cd ${DIR}/..

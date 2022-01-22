@@ -1,0 +1,9 @@
+**/faces
+**/models
+**/results
+**/.git
+**/.mypy_cache
+**/.pytest_cache
+**/venv
+**/*.pkl
+**/*.hdf5

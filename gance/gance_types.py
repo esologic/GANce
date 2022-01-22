@@ -2,7 +2,7 @@
 Common types used across this project
 """
 from pathlib import Path
-from typing import NamedTuple, NewType, Optional, Tuple
+from typing import Iterator, NamedTuple, NewType, Optional, Tuple
 
 import numpy as np  # pylint: disable=unused-import
 
@@ -29,3 +29,6 @@ class PathAndBoundingBoxes(NamedTuple):
 
 # dimensions are (Width, Height, Colors)
 RGBInt8ImageType = NewType("RGBInt8ImageType", "np.ndarray[np.uint8]")  # type: ignore
+
+ImageSourceType = Iterator[RGBInt8ImageType]
+OptionalImageSourceType = Iterator[Optional[RGBInt8ImageType]]
