@@ -19,6 +19,7 @@ from gance.data_into_model_visualization.visualization_common import (
 from gance.dynamic_model_switching import model_index_selector, reduce_vector_rms_rolling_average
 from gance.gance_types import ImageSourceType
 from gance.projection import projection_file_reader
+from gance.projection.projection_file_reader import ProjectionFileReader
 from gance.vector_sources import vector_sources_common
 from gance.vector_sources.primatives import Sigmas, gaussian_data
 from gance.vector_sources.vector_types import (
@@ -163,7 +164,7 @@ class Output(NamedTuple):
 
 
 def benis(  # pylint: disable=too-many-locals
-    projection_file_path: Path,
+    reader: ProjectionFileReader,
     alpha: float,
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
@@ -204,8 +205,6 @@ def benis(  # pylint: disable=too-many-locals
     :return: The vector sources to be passed to the visualization functions.
     :return:
     """
-
-    reader = projection_file_reader.load_projection_file(projection_file_path)
 
     final_latents = projection_file_reader.final_latents_matrices_label(reader)
 
