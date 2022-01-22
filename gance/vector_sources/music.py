@@ -3,6 +3,7 @@ Functions/types to be able to read in music via wav files and then present that 
 vector to models.
 """
 
+import multiprocessing
 from functools import partial
 from pathlib import Path
 from typing import NamedTuple, Union

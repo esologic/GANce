@@ -8,13 +8,15 @@ but linspace is more literal.
 """
 
 import math
-from typing import Callable, Iterable, Iterator, Tuple, Union, overload
+import multiprocessing
+from typing import Callable, Iterable, Iterator, NamedTuple, Tuple, Union, overload
 
 import numpy as np
 from scipy import interpolate
 from scipy.interpolate import interp1d
 from scipy.signal import resample, savgol_filter
 
+from gance import divisor
 from gance.vector_sources.vector_types import (
     ConcatenatedMatrices,
     ConcatenatedVectors,
@@ -52,7 +54,8 @@ def remap_values_into_range(
     :return: The result as an iterator.
     """
     scale = interp1d(list(input_range), list(output_range))
-    return list(map(scale, list(data)))
+    with multiprocessing.Pool() as p:
+        return list(p.map(scale, data))
 
 
 def smooth_vector(vector: SingleVector, window_length: int, polyorder: int) -> SingleVector:
@@ -277,9 +280,15 @@ def interpolate_to_vector_count(
     return ConcatenatedVectors(np.concatenate(by_vector))
 
 
+class DuplicationResult(NamedTuple):
+
+    duplication_factor: int
+    vectors: ConcatenatedVectors
+
+
 def duplicate_to_vector_count(
     data: ConcatenatedVectors, vector_length: int, target_vector_count: int
-) -> ConcatenatedVectors:
+) -> DuplicationResult:
     """
     Duplicate sub vectors until the `target_vector_count` is reached in the output.
     Each vector needs to be duplicated the same number of times or a `ValueError` is raised.
@@ -296,16 +305,26 @@ def duplicate_to_vector_count(
     # Each sub array here is the point in the vector across the set of vectors.
     points_over_time = split.swapaxes(1, 0)
 
-    frac, repeats = math.modf(target_vector_count / len(split))
+    duplication_factor = divisor.divide_no_remainder(
+        numerator=target_vector_count, denominator=len(split)
+    )
 
-    if frac != 0:
-        raise ValueError("Cannot repeat values in input to evenly get desired output length")
-
-    scaled_points_over_time = np.array([np.repeat(points, repeats) for points in points_over_time])
+    scaled_points_over_time = np.array(
+        [
+            np.repeat(
+                points,
+                duplication_factor,
+            )
+            for points in points_over_time
+        ]
+    )
 
     by_vector = np.array(scaled_points_over_time).swapaxes(1, 0)
 
-    return ConcatenatedVectors(np.concatenate(by_vector))
+    return DuplicationResult(
+        duplication_factor=duplication_factor,
+        vectors=ConcatenatedVectors(np.concatenate(by_vector)),
+    )
 
 
 def promote_to_matrix_duplicate(

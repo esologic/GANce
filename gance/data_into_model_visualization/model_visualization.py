@@ -569,7 +569,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
         :return: A tuple, the `FrameInput` and a path to the pickle file on disk.
         """
 
-        LOGGER.info(
+        print(
             "Rendering Frame. "
             f"Model index: {frame_input.model_index}. "
             f"Frame position: {frame_input.frame_index}. "

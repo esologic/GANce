@@ -11,7 +11,7 @@ ImageHash==4.2.1
 librosa==0.8.1
 lz==0.11.1
 matplotlib
-more-itertools==8.7.0
+more-itertools==8.12.0
 mypy==0.812
 numpy==1.16.4  # this exact version is needed to make tensorflow/gpu happy!
 opencv-python

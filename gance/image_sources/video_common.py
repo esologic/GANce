@@ -12,6 +12,7 @@ import numpy as np
 from cv2 import cv2
 from ffmpeg.nodes import FilterableStream
 
+from gance import divisor
 from gance.gance_types import ImageSourceType, OptionalImageSourceType, RGBInt8ImageType
 from gance.image_sources.image_sources_common import ImageResolution, image_resolution
 from gance.logger_common import LOGGER
@@ -144,9 +145,8 @@ def reduce_fps_take_every(original_fps: float, new_fps: float) -> Optional[int]:
     """
 
     if new_fps is not None:
-        frac, whole = math.modf(original_fps / new_fps)
-        if frac != 0:
-            raise ValueError(f"Cannot evenly get {new_fps} out of {original_fps}.")
+
+        whole = divisor.divide_no_remainder(numerator=original_fps, denominator=new_fps)
 
         if whole != 1:
             return int(whole)
