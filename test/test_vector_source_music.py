@@ -1,3 +1,8 @@
+"""
+Test of music reader functionality
+"""
+
+
 from test.assets import WAV_CLAPS_PATH
 
 import pytest

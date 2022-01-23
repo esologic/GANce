@@ -4,8 +4,8 @@ Read a projection file back into memory
 
 import itertools
 from pathlib import Path
-from typing import Iterator, Union, cast, Optional, Type
 from types import TracebackType
+from typing import Iterator, Optional, Type, Union, cast
 
 import h5py
 import numpy as np

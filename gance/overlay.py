@@ -3,13 +3,12 @@ Write parts of one video on top of another.
 Do things like track eyes to interesting effect.
 """
 
+from gance.image_sources import video_common
 import itertools
-import statistics
 import time
 from pathlib import Path
 from typing import Dict, Iterator, List, NamedTuple, Optional, Tuple, cast
 
-import face_recognition
 import imagehash
 import more_itertools
 import numpy as np
@@ -18,12 +17,13 @@ from matplotlib import pyplot as plt
 from PIL import Image, ImageDraw
 from scipy.spatial import distance
 
+from gance import faces
 from gance.assets import OUTPUT_DIRECTORY, PROJECTION_FILE_PATH
 from gance.data_into_model_visualization.visualization_common import (
     STANDARD_MATPLOTLIB_DPI,
     render_current_matplotlib_frame,
 )
-from gance.gance_types import RGBInt8ImageType
+from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.image_sources.video_common import create_video_writer
 from gance.logger_common import LOGGER
 from gance.projection.projection_file_reader import load_projection_file
@@ -40,25 +40,32 @@ class BoundingBoxType(NamedTuple):
     height: int
 
 
+class OverlayContext(NamedTuple):
+    """
+    TODO -- fill this out
+    """
+
+    overlay_written: bool
+
+    # The following are params considered when computing the overlay.
+    perceptual_hash_distance: Optional[float] = None
+    average_hash_distance: Optional[float] = None
+    difference_hash_distance: Optional[float] = None
+    wavelet_hash_distance: Optional[float] = None
+    hashes_average_distance: Optional[float] = None
+    bbox_distance: Optional[float] = None
+
+
 class FrameOverlayResult(NamedTuple):
     """
     Represents the overlay computation for each frame in the input.
     TODO: Going to change, improve docs when settled.
     """
 
-    # Output image, contains the overlaid frame.
-    frame: RGBInt8ImageType
-
-    # The following are params considered when computing the overlay.
-    perceptual_hash_distance: float
-    average_hash_distance: float
-    difference_hash_distance: float
-    wavelet_hash_distance: float
-    hashes_average_distance: float
-
-    bbox_distance: float
-
-    overlay_written: bool
+    mask: "Image"
+    foreground: RGBInt8ImageType
+    background: RGBInt8ImageType
+    context: OverlayContext
 
 
 def landmarks_to_bounding_boxes(
@@ -142,6 +149,26 @@ def draw_mask(destination: "Image", bounding_boxes: List[BoundingBoxType]) -> Im
     return destination
 
 
+def apply_mask(
+    foreground_image: RGBInt8ImageType, background_image: RGBInt8ImageType, mask: Image
+) -> RGBInt8ImageType:
+    """
+
+    :param foreground_image:
+    :param background_image:
+    :param mask:
+    :return:
+    """
+    return cast(
+        RGBInt8ImageType,
+        np.asarray(
+            Image.composite(
+                Image.fromarray(foreground_image), Image.fromarray(background_image), mask
+            )
+        ),
+    )
+
+
 def compute_eye_tracking_overlay(  # pylint: disable=too-many-locals
     foreground_images: Iterator[RGBInt8ImageType], background_images: Iterator[RGBInt8ImageType]
 ) -> Iterator[FrameOverlayResult]:
@@ -155,34 +182,29 @@ def compute_eye_tracking_overlay(  # pylint: disable=too-many-locals
     :return: Series of NTs describing the operation, as well as containing the result.
     """
 
+    face_finder = faces.FaceFinderProxy()
+
     for index, (foreground_image, background_image) in enumerate(
         zip(foreground_images, background_images)
     ):
 
-        LOGGER.info(f"Creating frame #{index}")
+        LOGGER.info(f"Computing eye tracking overlay for frame #{index}")
 
         fore_pil_image = Image.fromarray(foreground_image)
         back_pil_image = Image.fromarray(background_image)
 
         foreground_bounding_boxes = landmarks_to_bounding_boxes(
-            face_recognition.face_landmarks(face_image=foreground_image)
+            face_finder.face_landmarks(face_image=foreground_image)
         )
 
         bbox_dist = bounding_box_distance(
             a_boxes=foreground_bounding_boxes,
             b_boxes=landmarks_to_bounding_boxes(
-                face_recognition.face_landmarks(face_image=background_image)
+                face_finder.face_landmarks(face_image=background_image)
             ),
         )
 
         phash_dist = abs(imagehash.phash(fore_pil_image) - imagehash.phash(back_pil_image))
-        ahash_dist = abs(
-            imagehash.average_hash(fore_pil_image) - imagehash.average_hash(back_pil_image)
-        )
-        dhash_dist = abs(imagehash.dhash(fore_pil_image) - imagehash.dhash(back_pil_image))
-        whash_dist = abs(imagehash.whash(fore_pil_image) - imagehash.whash(back_pil_image))
-
-        hashes_averages = statistics.mean([phash_dist, ahash_dist, whash_dist])
 
         overlay_flag = phash_dist <= 30 and (bbox_dist < 50 if bbox_dist else False)
 
@@ -195,32 +217,22 @@ def compute_eye_tracking_overlay(  # pylint: disable=too-many-locals
         )
 
         yield FrameOverlayResult(
-            frame=cv2.hconcat(
-                [
-                    cast(
-                        RGBInt8ImageType,
-                        np.asarray(Image.composite(fore_pil_image, back_pil_image, mask)),
-                    ),
-                    foreground_image,
-                    background_image,
-                ]
+            mask=mask,
+            context=OverlayContext(
+                perceptual_hash_distance=phash_dist,
+                bbox_distance=bbox_dist,
+                overlay_written=overlay_flag,
             ),
-            perceptual_hash_distance=phash_dist,
-            average_hash_distance=ahash_dist,
-            difference_hash_distance=dhash_dist,
-            wavelet_hash_distance=whash_dist,
-            hashes_average_distance=hashes_averages,
-            bbox_distance=bbox_dist,
-            overlay_written=overlay_flag,
+            foreground=foreground_image,
+            background=background_image,
         )
 
 
 def render_overlay(  # pylint: disable=too-many-locals
-    overlay: Iterator[FrameOverlayResult],
-    video_path: Path,
+    overlay: Iterator[OverlayContext],
     frames_per_context: int,
     video_square_side_length: Optional[int],
-) -> None:
+) -> ImageSourceType:
     """
     Writes an overlay iterator to disk.
     :param overlay: To write.
@@ -230,43 +242,33 @@ def render_overlay(  # pylint: disable=too-many-locals
     :return: None
     """
 
-    LOGGER.info(f"Writing Output Video: {video_path}")
-
-    video = create_video_writer(
-        video_path=video_path,
-        num_squares_width=3,
-        num_squares_height=2,
-        video_fps=reader.projection_attributes.projection_fps,
-        video_height=video_square_side_length,
-    )
-
     fig = plt.figure(
-        figsize=(
-            4 * 3,
-            4 * 1,
-        ),
+        figsize=(1, 1),
         dpi=STANDARD_MATPLOTLIB_DPI,
         constrained_layout=False,  # Lets us use `.tight_layout()` later.
     )
 
     hash_axis, bbox_distance_axis = fig.subplots(nrows=2, ncols=1)
 
-    for group_of_frames in more_itertools.grouper(overlay, frames_per_context):
+    for group_index, group_of_frames in enumerate(
+        more_itertools.grouper(overlay, frames_per_context)
+    ):
 
-        current = filter(None, group_of_frames)
+        LOGGER.info(f"Working through frame group #{group_index}")
+
+        current: Iterator[OverlayContext] = filter(None, group_of_frames)
 
         (
-            frames,
+            flags,
             perceptual_hash_distances,
             average_hash_distances,
             difference_hash_distances,
             wavelet_hash_distance,
             hashes_average_distance,
             bounding_box_distances,
-            flags,
         ) = zip(*current)
 
-        num_frames = len(frames)
+        num_frames = len(flags)
         x_axis = np.arange(num_frames)
 
         hash_axis.scatter(
@@ -340,9 +342,9 @@ def render_overlay(  # pylint: disable=too-many-locals
 
         plt.tight_layout()
 
-        video_half_resolution = (3 * video_square_side_length, video_square_side_length)
+        video_half_resolution = (video_square_side_length, video_square_side_length)
 
-        for index, (video_frame, flag) in enumerate(zip(frames, flags)):
+        for index, flag in enumerate(flags):
 
             line_color = "green" if flag else "red"
 
@@ -362,21 +364,12 @@ def render_overlay(  # pylint: disable=too-many-locals
             if bbox_all_y_values:
                 bbox_line.remove()
 
-            video.write(
-                cv2.cvtColor(
-                    cv2.vconcat([cv2.resize(video_frame, video_half_resolution), graph]).astype(
-                        np.uint8
-                    ),
-                    cv2.COLOR_BGR2RGB,
-                )
-            )
-
             LOGGER.info(f"Wrote frame: {index + 1}/{num_frames}")
+
+            yield graph
 
         for axes in fig.axes:
             axes.clear()
-
-    video.release()
 
 
 if __name__ == "__main__":
@@ -389,9 +382,16 @@ if __name__ == "__main__":
                     foreground_images=reader.target_images,
                     background_images=reader.final_images,
                 ),
-                None,
+                100,
             ),
             video_path=OUTPUT_DIRECTORY.joinpath(f"{int(time.time())}_sample.mp4"),
             video_square_side_length=500,
             frames_per_context=100,
         )
+
+        video_common.write_source_to_disk(
+            source=frames,
+            video_path=video_path,
+            video_fps=video_fps,
+        )
+

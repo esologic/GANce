@@ -247,7 +247,8 @@ def write_source_to_disk(source: ImageSourceType, video_path: Path, video_fps: f
 
     write_frame(first_frame)
 
-    for image in source:
+    for index, image in enumerate(source):
+        LOGGER.info(f"Writing frame #{index} to file: {video_path}")
         write_frame(image)
 
     writer.release()

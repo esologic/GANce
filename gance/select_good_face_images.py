@@ -6,20 +6,24 @@ import itertools
 import multiprocessing
 import random
 import shutil
+from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Iterable, Iterator, List, NamedTuple, Optional, Set, Union
 
-import face_recognition
 import more_itertools
 
 from gance.common_paths import DEVON_FACE_IMAGES_PATH
+from gance.faces import FaceFinderProxy
 from gance.gance_types import PathAndBoundingBoxes
+from gance.image_sources import still_image_common
 from gance.logger_common import LOGGER
 from gance.pi_images_common import IMAGE_TIMESTAMP_FORMAT
 
 
-def face_bounding_boxes(path_to_image: Path) -> Optional[PathAndBoundingBoxes]:
+def face_bounding_boxes(
+    face_finder: FaceFinderProxy, path_to_image: Path
+) -> Optional[PathAndBoundingBoxes]:
     """
     Return a list of bounding boxes for each face in a given image. If no faces are detected,
     return None.
@@ -28,12 +32,13 @@ def face_bounding_boxes(path_to_image: Path) -> Optional[PathAndBoundingBoxes]:
     bounding box is (top, right, bottom, left)
     """
     try:
-        image = face_recognition.load_image_file(path_to_image)
+        image = still_image_common.read_image(image_path=path_to_image, mode="RGB")
     except (SyntaxError, OSError):
         LOGGER.error(f"Couldn't open image {path_to_image}")
         return None
+
     return PathAndBoundingBoxes(
-        path_to_image=path_to_image, bounding_boxes=tuple(face_recognition.face_locations(image))
+        path_to_image=path_to_image, bounding_boxes=tuple(face_finder.face_locations(image))
     )
 
 
@@ -147,20 +152,26 @@ def _sort_images_by_filename(images: List[PathAndBoundingBoxes]) -> List[PathAnd
 def _scan_images_in_directories(directories: Iterable[Path]) -> List[List[PathAndBoundingBoxes]]:
     """
     Find face bounding boxes in the images in a given list (iterator) of directories.
+    Note to future Devon: You may be tempted to use a multiprocessing pool here to try and speed
+    things up here. Under the hood, dlib makes decisions to give you the best results for your
+    platform (cpu, GPU) etc, so the `face_recognition` library is going to give you the most
+    effecient search. I did some experimentation, and found that using a regular `map` here
+    vs a `Pool().map` was 33% faster.
     :param directories: The directories to scan.
     :return: A 1D iterator of the scanned images.
     """
 
-    with Pool() as p:
-        return [
-            list(
-                filter(
-                    lambda image: image is not None,
-                    p.map(face_bounding_boxes, _images_in_directory(directory)),
-                )
+    face_finder = FaceFinderProxy()
+
+    return [
+        list(
+            filter(
+                lambda image: image is not None,
+                map(partial(face_bounding_boxes, face_finder), _images_in_directory(directory)),
             )
-            for directory in directories
-        ]
+        )
+        for directory in directories
+    ]
 
 
 def _images_around_faces(
@@ -268,7 +279,7 @@ def select_images_for_training(
         map(
             _sort_images_by_filename,
             _scan_images_in_directories(
-                itertools.chain.from_iterable(
+                directories=itertools.chain.from_iterable(
                     [
                         [Path(path_str) for path_str in dir_type]
                         for dir_type in (primary_directory, secondary_directory)

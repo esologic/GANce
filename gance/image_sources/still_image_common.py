@@ -3,6 +3,7 @@ Functionality for working with still images.
 """
 
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 from PIL import Image
@@ -24,11 +25,18 @@ def write_image(image: RGBInt8ImageType, path: Path) -> None:
     Image.fromarray(image).save(fp=str(path), format=PNG.upper())
 
 
-def read_image(image_path: Path) -> RGBInt8ImageType:
+def read_image(image_path: Path, mode: Optional[str] = None) -> RGBInt8ImageType:
     """
     Read an image from disk into the canonical, in-memory format.
     :param image_path: Path to the image file on disk.
+    :param mode: If given, image will be converted with PIL to this mode.
     :return: The image
     """
+
+    im = Image.open(str(image_path))
+
+    if mode is not None:
+        im = im.convert(mode)
+
     # Verified by hand that this cast is valid
-    return RGBInt8ImageType(np.asarray(Image.open(str(image_path))))
+    return RGBInt8ImageType(np.asarray(im))
