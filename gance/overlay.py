@@ -3,30 +3,22 @@ Write parts of one video on top of another.
 Do things like track eyes to interesting effect.
 """
 
-from gance.image_sources import video_common
 import itertools
-import time
-from pathlib import Path
 from typing import Dict, Iterator, List, NamedTuple, Optional, Tuple, cast
 
 import imagehash
 import more_itertools
 import numpy as np
 from cv2 import cv2
+from lz.transposition import transpose
 from matplotlib import pyplot as plt
 from PIL import Image, ImageDraw
 from scipy.spatial import distance
 
 from gance import faces
-from gance.assets import OUTPUT_DIRECTORY, PROJECTION_FILE_PATH
-from gance.data_into_model_visualization.visualization_common import (
-    STANDARD_MATPLOTLIB_DPI,
-    render_current_matplotlib_frame,
-)
+from gance.data_into_model_visualization import visualization_common
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
-from gance.image_sources.video_common import create_video_writer
 from gance.logger_common import LOGGER
-from gance.projection.projection_file_reader import load_projection_file
 
 
 class BoundingBoxType(NamedTuple):
@@ -54,18 +46,6 @@ class OverlayContext(NamedTuple):
     wavelet_hash_distance: Optional[float] = None
     hashes_average_distance: Optional[float] = None
     bbox_distance: Optional[float] = None
-
-
-class FrameOverlayResult(NamedTuple):
-    """
-    Represents the overlay computation for each frame in the input.
-    TODO: Going to change, improve docs when settled.
-    """
-
-    mask: "Image"
-    foreground: RGBInt8ImageType
-    background: RGBInt8ImageType
-    context: OverlayContext
 
 
 def landmarks_to_bounding_boxes(
@@ -150,7 +130,7 @@ def draw_mask(destination: "Image", bounding_boxes: List[BoundingBoxType]) -> Im
 
 
 def apply_mask(
-    foreground_image: RGBInt8ImageType, background_image: RGBInt8ImageType, mask: Image
+    foreground_image: RGBInt8ImageType, background_image: RGBInt8ImageType, mask: "Image"
 ) -> RGBInt8ImageType:
     """
 
@@ -169,11 +149,46 @@ def apply_mask(
     )
 
 
-def compute_eye_tracking_overlay(  # pylint: disable=too-many-locals
-    foreground_images: Iterator[RGBInt8ImageType], background_images: Iterator[RGBInt8ImageType]
-) -> Iterator[FrameOverlayResult]:
+class EyeTrackingOverlay(NamedTuple):
     """
-    Yield a series of NTs that describe a given overlay operation.
+    The different output streams from an eye tracking overlay computation.
+    See the docs for `_FrameOverlayResult` for meaning as to what the different
+    members are here, these are iterators of those types.
+    Note: really important that the order of the members matches `_FrameOverlayResult`.
+    """
+
+    masks: Iterator["Image"]
+    foregrounds: ImageSourceType
+    backgrounds: ImageSourceType
+    contexts: Iterator[OverlayContext]
+
+
+class _FrameOverlayResult(NamedTuple):
+    """
+    Represents the overlay computation for each frame in the input.
+    """
+
+    # A PIL image that is a mask of the part of `foreground` that should be overlayed onto
+    # `background`.
+    # Note that this mask can be 'empty', and there might be no part of `foreground` that should
+    # be added to `background`.
+    mask: "Image"
+
+    # The image that will be partially drawn onto `background` as defined by `mask`.
+    foreground: RGBInt8ImageType
+
+    # The image that the mask will be drawn onto.
+    background: RGBInt8ImageType
+
+    # Information describing the decision to overlay or not. Consumed by visualization.
+    context: OverlayContext
+
+
+def compute_eye_tracking_overlay(
+    foreground_images: ImageSourceType, background_images: ImageSourceType
+) -> EyeTrackingOverlay:
+    """
+    Yield iterators that describe a given overlay operation.
     Attempts to track the eyes found in the foreground image, and then paste them over the same
     position in the background image. Attempts to only do this overlay when the foreground and
     background images are visually similar.
@@ -184,14 +199,18 @@ def compute_eye_tracking_overlay(  # pylint: disable=too-many-locals
 
     face_finder = faces.FaceFinderProxy()
 
-    for index, (foreground_image, background_image) in enumerate(
-        zip(foreground_images, background_images)
-    ):
+    def overlay_per_frame(
+        index: int, foreground_image: RGBInt8ImageType, background_image: RGBInt8ImageType
+    ) -> _FrameOverlayResult:
+        """
+        Create the NT describing the overlay operation for a given frame.
+        :param index: Frame index (for logging)
+        :param foreground_image: Image on top of `background_image`
+        :param background_image: Image under `foreground_image`.
+        :return: NT.
+        """
 
         LOGGER.info(f"Computing eye tracking overlay for frame #{index}")
-
-        fore_pil_image = Image.fromarray(foreground_image)
-        back_pil_image = Image.fromarray(background_image)
 
         foreground_bounding_boxes = landmarks_to_bounding_boxes(
             face_finder.face_landmarks(face_image=foreground_image)
@@ -204,7 +223,10 @@ def compute_eye_tracking_overlay(  # pylint: disable=too-many-locals
             ),
         )
 
-        phash_dist = abs(imagehash.phash(fore_pil_image) - imagehash.phash(back_pil_image))
+        phash_dist = abs(
+            imagehash.phash(Image.fromarray(foreground_image))
+            - imagehash.phash(Image.fromarray(background_image))
+        )
 
         overlay_flag = phash_dist <= 30 and (bbox_dist < 50 if bbox_dist else False)
 
@@ -216,7 +238,7 @@ def compute_eye_tracking_overlay(  # pylint: disable=too-many-locals
             else blank_mask
         )
 
-        yield FrameOverlayResult(
+        return _FrameOverlayResult(
             mask=mask,
             context=OverlayContext(
                 perceptual_hash_distance=phash_dist,
@@ -227,8 +249,16 @@ def compute_eye_tracking_overlay(  # pylint: disable=too-many-locals
             background=background_image,
         )
 
+    per_frame_results: Iterator[_FrameOverlayResult] = map(
+        overlay_per_frame, *enumerate(zip(foreground_images, background_images))
+    )
 
-def render_overlay(  # pylint: disable=too-many-locals
+    # Split the different members from the per-frame tuples into iterables by type.
+    # Gives consumer option to totally ignore parts of the result.
+    return EyeTrackingOverlay(*transpose(per_frame_results))
+
+
+def visualize_overlay_computation(  # pylint: disable=too-many-locals
     overlay: Iterator[OverlayContext],
     frames_per_context: int,
     video_square_side_length: Optional[int],
@@ -242,19 +272,13 @@ def render_overlay(  # pylint: disable=too-many-locals
     :return: None
     """
 
-    fig = plt.figure(
-        figsize=(1, 1),
-        dpi=STANDARD_MATPLOTLIB_DPI,
-        constrained_layout=False,  # Lets us use `.tight_layout()` later.
-    )
+    fig = visualization_common.standard_matplotlib_figure()
 
     hash_axis, bbox_distance_axis = fig.subplots(nrows=2, ncols=1)
 
     for group_index, group_of_frames in enumerate(
         more_itertools.grouper(overlay, frames_per_context)
     ):
-
-        LOGGER.info(f"Working through frame group #{group_index}")
 
         current: Iterator[OverlayContext] = filter(None, group_of_frames)
 
@@ -344,54 +368,29 @@ def render_overlay(  # pylint: disable=too-many-locals
 
         video_half_resolution = (video_square_side_length, video_square_side_length)
 
-        for index, flag in enumerate(flags):
+        for inter_group_index, flag in enumerate(flags):
+
+            LOGGER.info(f"Visualizing overlay for frame #{group_index + inter_group_index}")
 
             line_color = "green" if flag else "red"
 
             hash_line = hash_axis.vlines(
-                x=index, ymin=hash_axis_min, ymax=hash_axis_max, color=line_color
+                x=inter_group_index, ymin=hash_axis_min, ymax=hash_axis_max, color=line_color
             )
 
             if bbox_all_y_values:
                 bbox_line = bbox_distance_axis.vlines(
-                    x=index, ymin=bbox_axis_min, ymax=bbox_axis_max, color=line_color
+                    x=inter_group_index, ymin=bbox_axis_min, ymax=bbox_axis_max, color=line_color
                 )
 
-            graph = render_current_matplotlib_frame(fig=fig, resolution=video_half_resolution)
+            yield visualization_common.render_current_matplotlib_frame(
+                fig=fig, resolution=video_half_resolution
+            )
 
             hash_line.remove()
 
             if bbox_all_y_values:
                 bbox_line.remove()
 
-            LOGGER.info(f"Wrote frame: {index + 1}/{num_frames}")
-
-            yield graph
-
         for axes in fig.axes:
             axes.clear()
-
-
-if __name__ == "__main__":
-
-    with load_projection_file(Path(PROJECTION_FILE_PATH)) as reader:
-
-        render_overlay(
-            overlay=itertools.islice(
-                compute_eye_tracking_overlay(
-                    foreground_images=reader.target_images,
-                    background_images=reader.final_images,
-                ),
-                100,
-            ),
-            video_path=OUTPUT_DIRECTORY.joinpath(f"{int(time.time())}_sample.mp4"),
-            video_square_side_length=500,
-            frames_per_context=100,
-        )
-
-        video_common.write_source_to_disk(
-            source=frames,
-            video_path=video_path,
-            video_fps=video_fps,
-        )
-

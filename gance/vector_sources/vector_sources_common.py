@@ -7,9 +7,8 @@ but can produce deceptively different results. The resample function I think doe
 but linspace is more literal.
 """
 
-import math
 import multiprocessing
-from typing import Callable, Iterable, Iterator, NamedTuple, Tuple, Union, overload
+from typing import Callable, Iterable, Iterator, Tuple, Union, overload
 
 import numpy as np
 from scipy import interpolate
@@ -35,7 +34,8 @@ def pad_array(array: np.ndarray, size: int) -> np.ndarray:
     :param size: The target length of the array.
     :return: The padded array.
     """
-    return np.pad(array, pad_width=(0, size - len(array)), mode="constant")
+
+    return np.pad(array, pad_width=(0, size - len(array)), mode="constant", constant_values=0)
 
 
 def remap_values_into_range(
@@ -280,15 +280,9 @@ def interpolate_to_vector_count(
     return ConcatenatedVectors(np.concatenate(by_vector))
 
 
-class DuplicationResult(NamedTuple):
-
-    duplication_factor: int
-    vectors: ConcatenatedVectors
-
-
 def duplicate_to_vector_count(
     data: ConcatenatedVectors, vector_length: int, target_vector_count: int
-) -> DuplicationResult:
+) -> ConcatenatedVectors:
     """
     Duplicate sub vectors until the `target_vector_count` is reached in the output.
     Each vector needs to be duplicated the same number of times or a `ValueError` is raised.
@@ -321,10 +315,7 @@ def duplicate_to_vector_count(
 
     by_vector = np.array(scaled_points_over_time).swapaxes(1, 0)
 
-    return DuplicationResult(
-        duplication_factor=duplication_factor,
-        vectors=ConcatenatedVectors(np.concatenate(by_vector)),
-    )
+    return ConcatenatedVectors(np.concatenate(by_vector))
 
 
 def promote_to_matrix_duplicate(

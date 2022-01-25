@@ -37,7 +37,9 @@ def get_model_output(
     ) as multi_models:
 
         time_series_audio_vectors = read_wav_scale_for_video(
-            WAV_CLAPS_PATH, multi_models.expected_vector_length, video_fps
+            wav=WAV_CLAPS_PATH,
+            vector_length=multi_models.expected_vector_length,
+            frames_per_second=video_fps,
         ).wav_data
 
         data = alpha_blend_vectors_max_rms_power_audio(

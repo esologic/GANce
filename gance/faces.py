@@ -3,13 +3,13 @@ Common face recognition/detection related functionality.
 Wrapped in a way that is compatible with the rest of this project.
 """
 
-from typing import Dict, List, Tuple, Optional
 from types import ModuleType
+from typing import Dict, List, Optional, Tuple, cast
 
 from gance.gance_types import LabeledCoordinates
 
 
-class FaceFinderProxy(object):
+class FaceFinderProxy:
     """
     Under the hood, `face_recognition` uses dnnlib, which stylegan also uses.
     An init function is called upon import, which makes the loading of models within the
@@ -28,12 +28,14 @@ class FaceFinderProxy(object):
         """
 
         if not self._imported:
-            import face_recognition
+            import face_recognition  # pylint: disable=import-outside-toplevel
 
             self._face_recognition = face_recognition
             self._imported = True
 
-    def face_locations(self: "FaceFinderProxy", *args, **kwargs) -> Tuple[LabeledCoordinates]:
+    def face_locations(  # type: ignore[no-untyped-def]
+        self: "FaceFinderProxy", *args, **kwargs
+    ) -> Tuple[LabeledCoordinates]:
         """
         Call face_recognition.face_locations through the proxy.
         :param args: Forwarded to lib function.
@@ -42,9 +44,14 @@ class FaceFinderProxy(object):
         """
 
         self._import_just_in_time()
-        return tuple(self._face_recognition.face_locations(*args, **kwargs))
+        return cast(
+            Tuple[LabeledCoordinates],
+            tuple(
+                self._face_recognition.face_locations(*args, **kwargs)  # type: ignore[union-attr]
+            ),
+        )
 
-    def face_landmarks(
+    def face_landmarks(  # type: ignore[no-untyped-def]
         self: "FaceFinderProxy", *args, **kwargs
     ) -> List[Dict[str, Tuple[int, ...]]]:
         """
@@ -55,4 +62,7 @@ class FaceFinderProxy(object):
         """
 
         self._import_just_in_time()
-        return self._face_recognition.face_landmarks(*args, **kwargs)
+        return cast(
+            List[Dict[str, Tuple[int, ...]]],
+            self._face_recognition.face_landmarks(*args, **kwargs),  # type: ignore[union-attr]
+        )

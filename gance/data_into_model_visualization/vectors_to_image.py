@@ -17,9 +17,8 @@ from typing_extensions import Protocol
 from gance.apply_spectrogram import compute_spectrogram, reshape_spectrogram_to_vectors
 from gance.data_into_model_visualization.vectors_3d import plot_vectors_3d
 from gance.data_into_model_visualization.visualization_common import (
-    STANDARD_MATPLOTLIB_DPI,
-    STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE,
     render_current_matplotlib_frame,
+    standard_matplotlib_figure,
 )
 from gance.gance_types import RGBInt8ImageType
 from gance.image_sources.video_common import create_video_writer
@@ -180,11 +179,7 @@ def vector_visualizer(
     """
 
     # Needs to be this aspect ratio, would be easy to pass these in if needed later on.
-    fig = plt.figure(
-        figsize=(STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE, STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE),
-        dpi=STANDARD_MATPLOTLIB_DPI,
-        constrained_layout=False,  # Lets us use `.tight_layout()` later.
-    )
+    fig = standard_matplotlib_figure()
 
     axis = fig.add_subplot(1, 1, 1)
     axis.set_ylim([y_min - 1, y_max + 1])

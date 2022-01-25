@@ -23,7 +23,7 @@ def test_reduce_vector_rms_alignment() -> None:
 
     audio = ConcatenatedVectors(
         read_wav_scale_for_video(
-            wav_path=WAV_CLAPS_PATH, vector_length=vector_length, frames_per_second=60.0
+            wav=WAV_CLAPS_PATH, vector_length=vector_length, frames_per_second=60.0
         ).wav_data
     )
 

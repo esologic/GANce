@@ -9,7 +9,10 @@ import numpy as np
 from matplotlib import colors as mcolors
 from matplotlib import pyplot as plt
 
-from gance.data_into_model_visualization.visualization_common import VectorsReducer
+from gance.data_into_model_visualization.visualization_common import (
+    VectorsReducer,
+    standard_matplotlib_figure,
+)
 from gance.dynamic_model_switching import model_index_selector
 from gance.vector_sources.music import read_wav_scale_for_video
 
@@ -23,7 +26,7 @@ def visualize_reducer_output(audio_path: Path, reducer: VectorsReducer) -> None:
     vector_length = 1000
 
     audio = read_wav_scale_for_video(
-        wav_path=audio_path, vector_length=vector_length, frames_per_second=60.0
+        wav=audio_path, vector_length=vector_length, frames_per_second=60.0
     ).wav_data
 
     reduced = model_index_selector(
@@ -34,7 +37,7 @@ def visualize_reducer_output(audio_path: Path, reducer: VectorsReducer) -> None:
     )
 
     # Needs to be this aspect ratio
-    fig = plt.figure(figsize=(10, 10), dpi=100, constrained_layout=False)
+    fig = standard_matplotlib_figure()
 
     gs = fig.add_gridspec(nrows=4)
 

@@ -5,6 +5,8 @@
 
 * The `visualize_final_latents` command in `read_projection_file.py` can now accept multiple input audio 
 files that will be appended to each other and then added to the resulting video.
+* Finally, resolved the dlib import problem by creating `faces.py`, which enables the import of the
+offending library right before use, rather than on loading.
 
 
 0.17.0 - (2021-11-22)

@@ -13,11 +13,8 @@ from matplotlib import colors as mcolors
 from matplotlib import pyplot as plt
 from scipy.interpolate import UnivariateSpline
 
+from gance.data_into_model_visualization import visualization_common
 from gance.data_into_model_visualization.vectors_to_image import SingleVectorViz, vector_visualizer
-from gance.data_into_model_visualization.visualization_common import (
-    STANDARD_MATPLOTLIB_DPI,
-    STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE,
-)
 from gance.hash_file import hash_file
 from gance.image_sources.video_common import create_video_writer
 from gance.logger_common import LOGGER
@@ -106,11 +103,7 @@ def visualize_projection_convergence(  # pylint: disable=too-many-locals
     standard_deviation = int(np.std(points_of_interest))
 
     # Needs to be this aspect ratio, would be easy to pass these in if needed later on.
-    fig = plt.figure(
-        figsize=(STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE, STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE),
-        dpi=STANDARD_MATPLOTLIB_DPI,
-        constrained_layout=False,  # Lets us use `.tight_layout()` later.
-    )
+    fig = visualization_common.standard_matplotlib_figure()
 
     fig.suptitle(
         os.linesep.join(

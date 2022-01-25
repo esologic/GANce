@@ -14,14 +14,15 @@ from click_option_group import RequiredMutuallyExclusiveOptionGroup, optgroup
 
 from gance.assets import OUTPUT_DIRECTORY
 from gance.data_into_model_visualization.model_visualization import viz_model_ins_outs
-from gance.data_into_model_visualization.visualization_common import CreateVisualizationInput
 from gance.data_into_model_visualization.visualization_inputs import (
+    CreateVisualizationInput,
     alpha_blend_projection_file,
     alpha_blend_vectors_max_rms_power_audio,
 )
 from gance.image_sources import video_common
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import MultiModel, sorted_models_in_directory
+from gance.projection import projection_file_reader
 from gance.vector_sources.music import read_wav_scale_for_video
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
@@ -68,7 +69,9 @@ def _create_visualization(
     LOGGER.info(f"Writing video: {output_path}")
 
     time_series_audio_vectors = read_wav_scale_for_video(
-        audio_path, vector_length, video_fps
+        wav=audio_path,
+        vector_length=vector_length,
+        frames_per_second=video_fps,
     ).wav_data
 
     model_output = viz_model_ins_outs(
@@ -414,24 +417,28 @@ def projection_file_blend(  # pylint: disable=too-many-arguments
     :return: None
     """
 
-    _configure_run(
-        wav=wav,
-        output_path=output_path,
-        models_directory=models_directory,
-        vector_length=vector_length,
-        index=index,
-        frames_to_visualize=frames_to_visualize,
-        output_fps=output_fps,
-        debug_2d=debug_2d,
-        vector_function=partial(
+    with projection_file_reader.load_projection_file(Path(projection_file_path)) as reader:
+
+        vector_function = partial(
             alpha_blend_projection_file,
-            Path(projection_file_path),
+            projection_file_reader.final_latents_matrices_label(reader),
             alpha,
             fft_roll_enabled,
             fft_amplitude_range,
             blend_depth,
-        ),
-    )
+        )
+
+        _configure_run(
+            wav=wav,
+            output_path=output_path,
+            models_directory=models_directory,
+            vector_length=vector_length,
+            index=index,
+            frames_to_visualize=frames_to_visualize,
+            output_fps=output_fps,
+            debug_2d=debug_2d,
+            vector_function=vector_function,
+        )
 
 
 if __name__ == "__main__":

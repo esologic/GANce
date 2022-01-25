@@ -10,8 +10,8 @@ from typing import Callable, Iterator, NamedTuple
 
 import click
 import numpy as np
-from gance import faces
 
+from gance import faces
 from gance.gance_types import RGBInt8ImageType
 from gance.hash_file import hash_file
 from gance.image_sources.still_image_common import PNG, write_image

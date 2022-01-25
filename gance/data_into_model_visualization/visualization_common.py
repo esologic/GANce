@@ -7,6 +7,7 @@ from typing import List, NamedTuple, Optional, Tuple, Union
 import numpy as np
 import PIL
 from cv2 import cv2
+from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from typing_extensions import Protocol
@@ -113,27 +114,6 @@ class FrameInput(NamedTuple):
     model_index_layers: List[DataLabel]
 
 
-class CreateVisualizationInput(Protocol):  # pylint: disable=too-few-public-methods
-    """
-    Defines the standard shape of a visualization input function.
-    """
-
-    def __call__(
-        self: "CreateVisualizationInput",
-        time_series_audio_vectors: np.ndarray,
-        vector_length: int,
-        model_indices: List[int],
-    ) -> VisualizationInput:
-        """
-        :param time_series_audio_vectors: The input audio file in time series form. Shouldn't
-        be a spectrogram etc.
-        :param vector_length: The length of the input vector to the model.
-        :param model_indices: The indices of the candidate models to be chosen from to render
-        an image.
-        :return: A NamedTuple for holding the result, each part is consumed in a different way.
-        """
-
-
 class ConfiguredAxes(NamedTuple):
     """
     Intermediate type, stores configured axes to be then fed visualization data.
@@ -168,4 +148,17 @@ def render_current_matplotlib_frame(fig: Figure, resolution: Tuple[int, int]) ->
             ),
             resolution,
         )
+    )
+
+
+def standard_matplotlib_figure() -> Figure:
+    """
+    Standard square aspect ratio matplotlib figure used in a few places in this repo.
+    :return: The configured figure.
+    """
+
+    return plt.figure(
+        figsize=(STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE, STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE),
+        dpi=STANDARD_MATPLOTLIB_DPI,
+        constrained_layout=False,  # Lets us use `.tight_layout()` later.
     )

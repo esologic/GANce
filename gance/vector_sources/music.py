@@ -3,10 +3,9 @@ Functions/types to be able to read in music via wav files and then present that 
 vector to models.
 """
 
-import multiprocessing
 from functools import partial
 from pathlib import Path
-from typing import NamedTuple, Union
+from typing import NamedTuple, Union, overload
 
 import numpy as np
 import resampy
@@ -31,8 +30,28 @@ class WavFileProperties(NamedTuple):
     name: str
 
 
+@overload
 def read_wav_scale_for_video(
-    wav_path: Path, vector_length: int, frames_per_second: float
+    wav: WavFileProperties,
+    vector_length: int,
+    frames_per_second: float,
+) -> WavFileProperties:
+    ...
+
+
+@overload
+def read_wav_scale_for_video(
+    wav: Path,
+    vector_length: int,
+    frames_per_second: float,
+) -> WavFileProperties:
+    ...
+
+
+def read_wav_scale_for_video(
+    wav: Union[Path, WavFileProperties],
+    vector_length: int,
+    frames_per_second: float,
 ) -> WavFileProperties:
     """
     Reads a `.wav` file into memory, converting it to mono, and then re-sampling the signal.
@@ -42,39 +61,37 @@ def read_wav_scale_for_video(
     If the scaled wav file is not evenly divisible in length by `vector_length`, zeros are added
     to the end.
 
-    :param wav_path: Path to the `.wav` file.
+    :param wav: Path to the `.wav` file.
     :param vector_length: The side length of the network, ex: 1024.
     :param frames_per_second: The FPS of the resulting video.
     :return: The data, the new sample rate, and a label as a NT.
     """
 
-    input_wav = read_wav_file(wav_path)
+    input_wav = read_wav_file(wav) if isinstance(wav, Path) else wav
 
     if len(input_wav.wav_data.shape) > 1:
-        wav_file = WavFileProperties(
+        input_wav = WavFileProperties(
             wav_data=input_wav.wav_data.mean(axis=1),
             sample_rate=input_wav.sample_rate,
             name=f"{input_wav.name}_mono",
         )
-    else:
-        wav_file = input_wav
 
-    num_wav_samples = wav_file.wav_data.shape[0]
+    num_wav_samples = input_wav.wav_data.shape[0]
 
     scaled_sample_rate = int(
-        wav_file.sample_rate
-        * (vector_length * (frames_per_second * (num_wav_samples / wav_file.sample_rate)))
+        input_wav.sample_rate
+        * (vector_length * (frames_per_second * (num_wav_samples / input_wav.sample_rate)))
         / num_wav_samples
     )
 
-    scaled_wav = _scale_wav_to_sample_rate(wav_file, scaled_sample_rate)
+    scaled_wav = _scale_wav_to_sample_rate(input_wav, scaled_sample_rate)
 
     return WavFileProperties(
         wav_data=pad_array(
             scaled_wav.wav_data,
             int(np.ceil(scaled_wav.wav_data.shape[0] / vector_length) * vector_length),
         ),
-        sample_rate=wav_file.sample_rate,
+        sample_rate=input_wav.sample_rate,
         name=f"{scaled_wav.name}_padded",
     )
 

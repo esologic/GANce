@@ -3,11 +3,9 @@ Functions used to select images with faces in them from the pool of candidate im
 """
 import datetime
 import itertools
-import multiprocessing
 import random
 import shutil
 from functools import partial
-from multiprocessing import Pool
 from pathlib import Path
 from typing import Iterable, Iterator, List, NamedTuple, Optional, Set, Union
 
@@ -27,6 +25,7 @@ def face_bounding_boxes(
     """
     Return a list of bounding boxes for each face in a given image. If no faces are detected,
     return None.
+    :param face_finder: Interface for being able to find faces.
     :param path_to_image: The path to the image.
     :return: The list of bounding boxes for each face in the image at the path. Point order for the
     bounding box is (top, right, bottom, left)
@@ -50,8 +49,12 @@ def select_good_face_images(candidate_paths: List[Path]) -> List[Path]:
     :return: A list of Named Tuples
     """
 
-    with multiprocessing.Pool(11) as p:
-        paths_and_bounding_boxes = p.map(face_bounding_boxes, candidate_paths)
+    face_finder = FaceFinderProxy()
+
+    # Note: Do not try to make this faster by spreading it across multiple processes.
+    # The underlying dlib code is already parallelized using the gpu, and the overhead
+    # of breaking up the work decreases throughput.
+    paths_and_bounding_boxes = map(partial(face_bounding_boxes, face_finder), candidate_paths)
 
     # Filter out images that do not contain faces
     contains_faces = filter(

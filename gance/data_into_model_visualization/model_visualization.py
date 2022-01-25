@@ -157,7 +157,11 @@ def _configure_axes(  # pylint: disable=too-many-locals
     )
 
 
-def _frame_inputs(visualization_input: VisualizationInput, vector_length: int) -> List[FrameInput]:
+def _frame_inputs(
+    visualization_input: VisualizationInput,
+    vector_length: int,
+    model_index_window_width: Optional[int] = None,
+) -> List[FrameInput]:
     """
     Split a `VisualizationInput` into many `FrameInputs` that each represent the data that should
     be exposed to the visualization/model in the given frame.
@@ -168,18 +172,23 @@ def _frame_inputs(visualization_input: VisualizationInput, vector_length: int) -
     :return: One `FrameInput` per possible frames in `visualization_input`.
     """
 
-    model_index_window_width = int(np.ceil(visualization_input.model_indices.data.shape[0] / 5))
+    num_points = visualization_input.model_indices.data.shape[0]
+    model_index_window_width = (
+        model_index_window_width
+        if model_index_window_width is not None
+        else int(np.ceil(num_points / 5))
+    )
+    width = model_index_window_width * int(np.ceil(num_points / model_index_window_width))
+
     index_windows = sub_vectors(
-        ConcatenatedVectors(
-            pad_array(visualization_input.model_indices.data, model_index_window_width * 5)
-        ),
+        ConcatenatedVectors(pad_array(visualization_input.model_indices.data, width)),
         model_index_window_width,
     )
 
     context_windows = [
         DataLabel(
             data=sub_vectors(
-                ConcatenatedVectors(pad_array(layer.data, model_index_window_width * 5)),
+                ConcatenatedVectors(pad_array(layer.data, width)),
                 model_index_window_width,
             ),
             label=layer.label,
@@ -433,6 +442,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
     enable_3d: bool = True,
     enable_2d: bool = True,
     frames_to_visualize: Optional[int] = None,
+    model_index_window_width: Optional[int] = None,
 ) -> ModelOutput:
     """
     Given an input array, for each possible input vector in the array, feed these vectors into
@@ -569,7 +579,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
         :return: A tuple, the `FrameInput` and a path to the pickle file on disk.
         """
 
-        print(
+        LOGGER.info(
             "Rendering Frame. "
             f"Model index: {frame_input.model_index}. "
             f"Frame position: {frame_input.frame_index}. "
@@ -582,7 +592,11 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
             return _FrameInputPath(frame=frame_input, path=Path(p.name))
 
     frame_inputs = itertools.islice(
-        _frame_inputs(visualization_input=data, vector_length=vector_length),
+        _frame_inputs(
+            visualization_input=data,
+            vector_length=vector_length,
+            model_index_window_width=model_index_window_width,
+        ),
         frames_to_visualize,
     )
 

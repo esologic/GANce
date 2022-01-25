@@ -98,7 +98,7 @@ def _datasets_in_group(
     yield from (dataset_for_output(dataset) for dataset in _types_in_group(group, Dataset))
 
 
-class ProjectionFileReader:
+class ProjectionFileReader:  # pylint: disable=too-many-instance-attributes
     """
     Points to everything available for a given projection.
     """
@@ -214,6 +214,10 @@ class ProjectionFileReader:
         exctb: Optional[TracebackType],
     ) -> bool:
         self.close()
+
+        if excinst is not None:
+            raise excinst
+
         return True
 
 
