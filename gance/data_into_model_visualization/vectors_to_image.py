@@ -1,7 +1,7 @@
 """
 Functions around visualizing sets of vectors, resulting in images.
 """
-import itertools
+
 from contextlib import _GeneratorContextManager  # pylint: disable=unused-import
 from contextlib import contextmanager
 from pathlib import Path
@@ -9,7 +9,6 @@ from typing import Iterator, List, Optional, Tuple, Union
 
 import numpy as np
 from cv2 import cv2
-from matplotlib import colors as mcolors
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from typing_extensions import Protocol
@@ -17,6 +16,7 @@ from typing_extensions import Protocol
 from gance.apply_spectrogram import compute_spectrogram, reshape_spectrogram_to_vectors
 from gance.data_into_model_visualization.vectors_3d import plot_vectors_3d
 from gance.data_into_model_visualization.visualization_common import (
+    infinite_colors,
     render_current_matplotlib_frame,
     standard_matplotlib_figure,
 )
@@ -206,12 +206,7 @@ def vector_visualizer(
             axis.scatter(x_values, sub_vector, color=color)
             for sub_vector, color in zip(
                 plotting_y,
-                itertools.cycle(
-                    # This is a deterministic way to get the same sequence of colors frame after
-                    # frame. There might be a cleaner way to do this.
-                    list(mcolors.BASE_COLORS.keys())
-                    + list(mcolors.TABLEAU_COLORS.keys())
-                ),
+                infinite_colors(),
             )
         ]
 

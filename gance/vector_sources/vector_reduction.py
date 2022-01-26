@@ -2,6 +2,7 @@
 Functions to aide in selecting the model for a given frame in a visualization based on the audio
 associated with that frame.
 """
+
 import zlib
 from multiprocessing import Pool
 from typing import List
@@ -12,12 +13,7 @@ import pandas as pd
 from scipy.ndimage import maximum_filter1d
 from scipy.signal import savgol_filter
 
-from gance.apply_spectrogram import compute_spectrogram, reshape_spectrogram_to_vectors
-from gance.data_into_model_visualization.visualization_common import (
-    DataLabel,
-    ResultLayers,
-    VectorsReducer,
-)
+from gance.data_into_model_visualization.visualization_common import DataLabel, ResultLayers
 from gance.vector_sources.vector_sources_common import remap_values_into_range, sub_vectors
 from gance.vector_sources.vector_types import ConcatenatedVectors, SingleVector
 
@@ -141,26 +137,19 @@ def reduce_vector_gzip_compression_rolling_average(
     more explanation.
     """
 
-    spectrogram = reshape_spectrogram_to_vectors(
-        spectrogram_data=compute_spectrogram(time_series_audio_vectors, vector_length),
-        vector_length=vector_length,
-    )
-
     with Pool() as p:
         compressed_sizes = p.map(
             _compressed_vector_size,
-            sub_vectors(data=spectrogram, vector_length=vector_length),
+            sub_vectors(data=time_series_audio_vectors, vector_length=vector_length),
         )
 
-    output = DataLabel(np.array(compressed_sizes), "Gzipped Spectrogram")
+    output = DataLabel(np.array(compressed_sizes), "Gzipped Audio")
 
     return _smoothed_rolling_average(output)
 
 
-def model_index_selector(
-    time_series_audio_vectors: ConcatenatedVectors,
-    vector_length: int,
-    reducer: VectorsReducer,
+def quantize_results_layers(
+    results_layers: ResultLayers,
     model_indices: List[int],
 ) -> ResultLayers:
     """
@@ -181,19 +170,15 @@ def model_index_selector(
     should map to first item out of the iterator etc.
     """
 
-    result_layers: ResultLayers = reducer(
-        time_series_audio_vectors=time_series_audio_vectors, vector_length=vector_length
-    )
-
     scaled_into_index_range = remap_values_into_range(
-        data=result_layers.result.data,
-        input_range=(min(result_layers.result.data), max(result_layers.result.data)),
+        data=results_layers.result.data,
+        input_range=(min(results_layers.result.data), max(results_layers.result.data)),
         output_range=(0, len(model_indices) - 1),
     )
 
     quantized = np.rint(scaled_into_index_range).astype(int)
 
     return ResultLayers(
-        result=DataLabel(quantized, f"{result_layers.result.label} Scaled, Quantized"),
-        layers=[result_layers.result] + result_layers.layers,
+        result=DataLabel(quantized, f"{results_layers.result.label} Scaled, Quantized"),
+        layers=[results_layers.result] + results_layers.layers,
     )

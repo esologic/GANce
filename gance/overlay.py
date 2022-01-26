@@ -185,7 +185,10 @@ class _FrameOverlayResult(NamedTuple):
 
 
 def compute_eye_tracking_overlay(
-    foreground_images: ImageSourceType, background_images: ImageSourceType
+    foreground_images: ImageSourceType,
+    background_images: ImageSourceType,
+    min_phash_distance: int = 30,
+    min_bbox_distance: float = 50.0,
 ) -> EyeTrackingOverlay:
     """
     Yield iterators that describe a given overlay operation.
@@ -200,15 +203,18 @@ def compute_eye_tracking_overlay(
     face_finder = faces.FaceFinderProxy()
 
     def overlay_per_frame(
-        index: int, foreground_image: RGBInt8ImageType, background_image: RGBInt8ImageType
+        packed: Tuple[int, Tuple[RGBInt8ImageType, RGBInt8ImageType]]
     ) -> _FrameOverlayResult:
         """
         Create the NT describing the overlay operation for a given frame.
-        :param index: Frame index (for logging)
-        :param foreground_image: Image on top of `background_image`
-        :param background_image: Image under `foreground_image`.
+        :param packed: input args as a tuple. Composed of:
+            index: Frame index (for logging)
+            foreground_image: Image on top of `background_image`
+            background_image: Image under `foreground_image`.
         :return: NT.
         """
+
+        (index, (foreground_image, background_image)) = packed
 
         LOGGER.info(f"Computing eye tracking overlay for frame #{index}")
 
@@ -228,7 +234,9 @@ def compute_eye_tracking_overlay(
             - imagehash.phash(Image.fromarray(background_image))
         )
 
-        overlay_flag = phash_dist <= 30 and (bbox_dist < 50 if bbox_dist else False)
+        overlay_flag = phash_dist <= min_phash_distance and (
+            bbox_dist < min_bbox_distance if bbox_dist else False
+        )
 
         blank_mask = Image.new("L", foreground_image.shape[0:2], 0)
 
@@ -250,12 +258,16 @@ def compute_eye_tracking_overlay(
         )
 
     per_frame_results: Iterator[_FrameOverlayResult] = map(
-        overlay_per_frame, *enumerate(zip(foreground_images, background_images))
+        overlay_per_frame, enumerate(zip(foreground_images, background_images))
     )
+
+    masks, foregrounds, backgrounds, contexts = transpose(per_frame_results)
 
     # Split the different members from the per-frame tuples into iterables by type.
     # Gives consumer option to totally ignore parts of the result.
-    return EyeTrackingOverlay(*transpose(per_frame_results))
+    return EyeTrackingOverlay(
+        masks=masks, foregrounds=foregrounds, backgrounds=backgrounds, contexts=contexts
+    )
 
 
 def visualize_overlay_computation(  # pylint: disable=too-many-locals

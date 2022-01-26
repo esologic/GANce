@@ -1,12 +1,13 @@
 """
 Common types, constants, functions used in visualization, to avoid cyclic imports.
 """
-
-from typing import List, NamedTuple, Optional, Tuple, Union
+import itertools
+from typing import Iterator, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import PIL
 from cv2 import cv2
+from matplotlib import colors as mcolors
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -75,13 +76,11 @@ class VisualizationInput(NamedTuple):
     # to create images.
     combined: Union[VectorsLabel, MatricesLabel]
 
-    # Should be one integer per vector, this contains which model should be used per frame.
-    model_indices: DataLabel
-
-    # Consumed only by data visualization, not actually fed into the synthesis.
+    # Results should be one integer per vector, this contains which model should be used per frame.
+    # Layers are only consumed by data visualization, not actually fed into the synthesis.
     # A list of `DataLabel` NTs that represent the different transformations on the input
     # vectors that led to the output values stored in `model_index`.
-    model_index_layers: List[DataLabel]
+    model_indices: ResultLayers
 
 
 class FrameInput(NamedTuple):
@@ -162,3 +161,13 @@ def standard_matplotlib_figure() -> Figure:
         dpi=STANDARD_MATPLOTLIB_DPI,
         constrained_layout=False,  # Lets us use `.tight_layout()` later.
     )
+
+
+def infinite_colors() -> Iterator[str]:
+    """
+    This is a deterministic way to get the same sequence of colors over and over again
+    for eternity. Probably a better way to do this.
+    :return: Iterator of strings to be input to matplotlib color arguments.
+    """
+
+    return itertools.cycle(list(mcolors.BASE_COLORS.keys()) + list(mcolors.TABLEAU_COLORS.keys()))

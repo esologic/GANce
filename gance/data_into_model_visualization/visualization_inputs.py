@@ -15,9 +15,12 @@ from gance.data_into_model_visualization.visualization_common import (
     ResultLayers,
     VisualizationInput,
 )
-from gance.dynamic_model_switching import model_index_selector, reduce_vector_rms_rolling_average
 from gance.vector_sources import vector_sources_common
 from gance.vector_sources.primatives import Sigmas, gaussian_data
+from gance.vector_sources.vector_reduction import (
+    quantize_results_layers,
+    reduce_vector_rms_rolling_average,
+)
 from gance.vector_sources.vector_types import (
     ConcatenatedMatrices,
     ConcatenatedVectors,
@@ -69,10 +72,10 @@ def _create_spectrogram(
     )
 
     if fft_roll_enabled:
-        roll_values: ResultLayers = model_index_selector(
-            time_series_audio_vectors=time_series_audio_vectors,
-            vector_length=vector_length,
-            reducer=reduce_vector_rms_rolling_average,
+        roll_values: ResultLayers = quantize_results_layers(
+            results_layers=reduce_vector_rms_rolling_average(
+                time_series_audio_vectors=time_series_audio_vectors, vector_length=vector_length
+            ),
             model_indices=list(np.arange(0, 3)),
         )
 
@@ -140,10 +143,10 @@ def alpha_blend_vectors_max_rms_power_audio(
 
     combined = noise * (1.0 - alpha) + spectrogram * alpha
 
-    indices_layers: ResultLayers = model_index_selector(
-        time_series_audio_vectors=time_series_audio_vectors,
-        vector_length=vector_length,
-        reducer=reduce_vector_rms_rolling_average,
+    indices_layers: ResultLayers = quantize_results_layers(
+        results_layers=reduce_vector_rms_rolling_average(
+            time_series_audio_vectors=time_series_audio_vectors, vector_length=vector_length
+        ),
         model_indices=model_indices,
     )
 
@@ -159,8 +162,7 @@ def alpha_blend_vectors_max_rms_power_audio(
             vector_length=vector_length,
             label=f"Combined w/ Alpha Blending, a={alpha}",
         ),
-        model_indices=indices_layers.result,
-        model_index_layers=indices_layers.layers,
+        model_indices=indices_layers,
     )
 
 
@@ -241,10 +243,10 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
         (alpha_blended, projected_vectors[blend_depth:18])  # pylint: disable=unsubscriptable-object
     )
 
-    indices_layers: ResultLayers = model_index_selector(
-        time_series_audio_vectors=time_series_audio_vectors,
-        vector_length=vector_length,
-        reducer=reduce_vector_rms_rolling_average,
+    indices_layers: ResultLayers = quantize_results_layers(
+        results_layers=reduce_vector_rms_rolling_average(
+            time_series_audio_vectors=time_series_audio_vectors, vector_length=vector_length
+        ),
         model_indices=model_indices,
     )
 
@@ -262,6 +264,5 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
             vector_length=vector_length,
             label=f"Combined w/ Alpha Blending, a={alpha}",
         ),
-        model_indices=indices_layers.result,
-        model_index_layers=indices_layers.layers,
+        model_indices=indices_layers,
     )

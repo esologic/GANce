@@ -13,13 +13,14 @@ from cv2 import cv2
 
 from gance import divisor, overlay
 from gance.assets import NOVA_PATH, OUTPUT_DIRECTORY, PRODUCTION_MODEL_PATH, PROJECTION_FILE_PATH
+from gance.data_into_model_visualization import visualize_vector_reduction
 from gance.data_into_model_visualization.model_visualization import viz_model_ins_outs
 from gance.data_into_model_visualization.visualization_inputs import alpha_blend_projection_file
 from gance.gance_types import ImageSourceType
 from gance.image_sources import video_common
 from gance.model_interface.model_functions import MultiModel
 from gance.projection import projection_file_reader
-from gance.vector_sources import music
+from gance.vector_sources import music, vector_reduction
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("numba").setLevel(logging.WARNING)
@@ -28,7 +29,7 @@ logging.getLogger("numba").setLevel(logging.WARNING)
 if __name__ == "__main__":
 
     frames_to_visualize = None
-    video_fps = 60
+    video_fps = 30
 
     with MultiModel(model_paths=[PRODUCTION_MODEL_PATH]) as multi_models:
 
@@ -58,9 +59,9 @@ if __name__ == "__main__":
                 models=multi_models,
                 data=alpha_blend_projection_file(
                     final_latents_matrices_label=final_latents,
-                    alpha=0.5,
+                    alpha=0.25,
                     fft_roll_enabled=True,
-                    fft_amplitude_range=(-5, 5),
+                    fft_amplitude_range=(-1, 1),
                     blend_depth=10,
                     time_series_audio_vectors=time_series_audio_vectors.wav_data,
                     vector_length=multi_models.expected_vector_length,
@@ -84,18 +85,37 @@ if __name__ == "__main__":
                 video_square_side_length=1024,
             )
 
+            music_overlay_mask_visualization = visualize_vector_reduction.visualize_result_layers(
+                result_layers=vector_reduction.reduce_vector_gzip_compression_rolling_average(
+                    time_series_audio_vectors=time_series_audio_vectors.wav_data,
+                    vector_length=multi_models.expected_vector_length,
+                ),
+                frames_per_context=250,
+                video_height=1024,
+                title="Overlay binary mask",
+            )
+
             frames = (
-                cv2.hconcat(
+                cv2.vconcat(
                     [
-                        overlay.apply_mask(
-                            foreground_image=foreground,
-                            background_image=background,
-                            mask=mask,
+                        cv2.hconcat(
+                            [
+                                overlay.apply_mask(
+                                    foreground_image=foreground,
+                                    background_image=background,
+                                    mask=mask,
+                                ),
+                                background,
+                                foreground,
+                            ]
                         ),
-                        background,
-                        foreground,
-                        overlay_visualization_frame,
-                        visualization_image,
+                        cv2.hconcat(
+                            [
+                                music_overlay_mask_visualization_image,
+                                overlay_visualization_frame,
+                                visualization_image,
+                            ]
+                        ),
                     ]
                 )
                 for (
@@ -104,12 +124,14 @@ if __name__ == "__main__":
                     background,
                     overlay_visualization_frame,
                     visualization_image,
+                    music_overlay_mask_visualization_image,
                 ) in zip(
                     overlay_results.masks,
                     overlay_results.foregrounds,
                     overlay_results.backgrounds,
                     overlay_visualization,
                     model_output.visualization_images,
+                    music_overlay_mask_visualization,
                 )
             )
 

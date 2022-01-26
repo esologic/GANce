@@ -7,9 +7,8 @@ import logging
 import pickle
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Iterator, List, NamedTuple, Optional, Tuple, Union, cast
+from typing import Iterator, List, NamedTuple, Optional, Tuple, Union
 
-import matplotlib.colors as mcolors
 import numpy as np
 import PIL
 from cv2 import cv2
@@ -32,6 +31,7 @@ from gance.data_into_model_visualization.visualization_common import (
     DataLabel,
     FrameInput,
     VisualizationInput,
+    infinite_colors,
     render_current_matplotlib_frame,
 )
 from gance.gance_types import OptionalImageSourceType, RGBInt8ImageType
@@ -107,23 +107,24 @@ def _configure_axes(  # pylint: disable=too-many-locals
 
         model_selection_context.set_ylim(
             (
-                min([layer.data.min() for layer in visualization_input.model_index_layers]),
-                max([layer.data.max() for layer in visualization_input.model_index_layers]),
+                min([layer.data.min() for layer in visualization_input.model_indices.layers]),
+                max([layer.data.max() for layer in visualization_input.model_indices.layers]),
             )
         )
         model_selection_context.set_title(
-            f"Composition of model index selection: {visualization_input.model_indices.label}"
+            "Composition of model index selection: "
+            f"{visualization_input.model_indices.result.label}"
         )
 
         model_index_limits = (
-            visualization_input.model_indices.data.min(),
-            visualization_input.model_indices.data.max(),
+            visualization_input.model_indices.result.data.min(),
+            visualization_input.model_indices.result.data.max(),
         )
         model_index_plot_axis.set_ylim(model_index_limits)
 
         current_model_index_plot_axis.set_xlim(model_index_limits)
         current_model_index_plot_axis.set_xticks(
-            np.arange(visualization_input.model_indices.data.max())
+            np.arange(visualization_input.model_indices.result.data.max())
         )
         current_model_index_plot_axis.set_xticklabels(
             current_model_index_plot_axis.get_xticks(), rotation=90
@@ -172,7 +173,7 @@ def _frame_inputs(
     :return: One `FrameInput` per possible frames in `visualization_input`.
     """
 
-    num_points = visualization_input.model_indices.data.shape[0]
+    num_points = visualization_input.model_indices.result.data.shape[0]
     model_index_window_width = (
         model_index_window_width
         if model_index_window_width is not None
@@ -181,7 +182,7 @@ def _frame_inputs(
     width = model_index_window_width * int(np.ceil(num_points / model_index_window_width))
 
     index_windows = sub_vectors(
-        ConcatenatedVectors(pad_array(visualization_input.model_indices.data, width)),
+        ConcatenatedVectors(pad_array(visualization_input.model_indices.result.data, width)),
         model_index_window_width,
     )
 
@@ -193,7 +194,7 @@ def _frame_inputs(
             ),
             label=layer.label,
         )
-        for layer in visualization_input.model_index_layers
+        for layer in visualization_input.model_indices.layers
     ]
 
     def create_frame_input(
@@ -244,7 +245,7 @@ def _frame_inputs(
     return [
         create_frame_input(index, a_sample, b_sample, combined_sample, model_index)
         for index, (a_sample, b_sample, combined_sample, model_index) in enumerate(
-            zip(*data_parts, visualization_input.model_indices.data),
+            zip(*data_parts, visualization_input.model_indices.result.data),
         )
     ]
 
@@ -367,15 +368,7 @@ def _write_data_to_axes(
             axes.model_selection_context.plot(
                 x_values, layer.data, alpha=0.5, label=layer.label, color=str(color)
             )[0]
-            for layer, color in zip(
-                frame_input.model_index_layers,
-                itertools.cycle(
-                    # This is a deterministic way to get the same sequence of colors frame after
-                    # frame. There might be a cleaner way to do this.
-                    list(mcolors.BASE_COLORS.keys())
-                    + list(mcolors.TABLEAU_COLORS.keys())
-                ),
-            )
+            for layer, color in zip(frame_input.model_index_layers, infinite_colors())
         ]
 
         return context_lines + [
@@ -434,7 +427,37 @@ class _FrameInputPath(NamedTuple):
     path: Path
 
 
-def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def compute_force_synthesis_order(
+    force_optimize_synthesis_order: bool, num_model_indices: Optional[int]
+) -> bool:
+    """
+
+    :param force_optimize_synthesis_order:
+    :param num_model_indices:
+    :return:
+    """
+
+    if num_model_indices is not None and num_model_indices > 1:
+        return force_optimize_synthesis_order
+
+    return False
+
+
+def load_and_delete(frame_input_path: _FrameInputPath) -> _RenderedFrame:
+    """
+    Load the pickled frame from disk, and then delete the pickle file.
+    :param frame_input_path: Represents the image and the path to the rendered image on disk.
+    :return: The rendered frame.
+    """
+    with open(str(frame_input_path.path), "rb") as p:
+        output: _RenderedFrame = pickle.load(p)
+
+    frame_input_path.path.unlink()
+
+    return output
+
+
+def viz_model_ins_outs(  # pylint: disable=too-many-locals # <------- pain
     data: VisualizationInput,
     models: Optional[MultiModel],
     default_vector_length: Optional[int] = 1024,
@@ -443,6 +466,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
     enable_2d: bool = True,
     frames_to_visualize: Optional[int] = None,
     model_index_window_width: Optional[int] = None,
+    force_optimize_synthesis_order: bool = True,
 ) -> ModelOutput:
     """
     Given an input array, for each possible input vector in the array, feed these vectors into
@@ -480,10 +504,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
     if not enable_3d and not enable_2d and models is None:
         raise ValueError("Nothing to render!")
 
-    if models is None:
-        vector_length = default_vector_length
-    else:
-        vector_length = models.expected_vector_length
+    vector_length = default_vector_length if models is None else models.expected_vector_length
 
     total_num_frames = (
         len(sub_vectors(data=data.combined.data, vector_length=vector_length))
@@ -532,7 +553,6 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
         :return: The resulting image (frame) as a numpy array.
         """
 
-        # TODO: actually verify this color order/data type
         visualization_frame: Optional[RGBInt8ImageType] = None
         model_frame: Optional[RGBInt8ImageType] = None
 
@@ -560,7 +580,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
                 )
 
             model_frame = cv2.resize(
-                models.indexed_create_image_generic(
+                models.indexed_create_image_generic(  # This is the call that uses the model.
                     index=frame_input.model_index,
                     data=frame_input.combined_sample.data,
                 ),
@@ -580,7 +600,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
         """
 
         LOGGER.info(
-            "Rendering Frame. "
+            "Rendering Frame to pickle file. "
             f"Model index: {frame_input.model_index}. "
             f"Frame position: {frame_input.frame_index}. "
             f"Frame count: {rendered_frame_count}/{total_num_frames}. "
@@ -600,41 +620,32 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals,too-many-branches,too
         frames_to_visualize,
     )
 
-    efficient_rendering_order = (
-        sorted(frame_inputs, key=lambda frame_input: frame_input.model_index)
-        if models is not None
-        else frame_inputs
-    )
+    if compute_force_synthesis_order(
+        force_optimize_synthesis_order, len(models.model_indices) if models is not None else None
+    ):
+        LOGGER.info("Will synthesis order will be optimized")
 
-    files_on_disk: Iterator[_FrameInputPath] = (
-        pickle_frame_in_tmp_dir(frame_input, index)
-        for index, frame_input in enumerate(efficient_rendering_order)
-    )
+        efficient_rendering_order = (
+            sorted(frame_inputs, key=lambda frame_input: frame_input.model_index)
+            if models is not None
+            else frame_inputs
+        )
 
-    def load_and_delete(frame_input_path: _FrameInputPath) -> _RenderedFrame:
-        """
-        Load the pickled frame from disk, and then delete the pickle file.
-        :param frame_input_path: Represents the image and the path to the rendered image on disk.
-        :return: The rendered frame.
-        """
-        with open(str(frame_input_path.path), "rb") as p:
-            output: _RenderedFrame = pickle.load(p)
+        files_on_disk: Iterator[_FrameInputPath] = (
+            pickle_frame_in_tmp_dir(frame_input, index)
+            for index, frame_input in enumerate(efficient_rendering_order)
+        )
 
-        frame_input_path.path.unlink()
+        # The `sorted` operation here is what causes the frames to render.
+        rendered_frames = map(
+            load_and_delete, sorted(files_on_disk, key=lambda frame_path: frame_path[0].frame_index)
+        )
 
-        return output
+    else:
+        LOGGER.info("Will synthesis order will not be optimized")
+        rendered_frames = map(render_frame_in_memory, frame_inputs)
 
-    # The `sorted` operation here is what causes the frames to render.
-    loaded = map(
-        load_and_delete, sorted(files_on_disk, key=lambda frame_path: frame_path[0].frame_index)
-    )
-
-    model_frames, visualization_frames = transpose(loaded)
-
-    return ModelOutput(
-        model_images=cast(OptionalImageSourceType, model_frames),
-        visualization_images=cast(OptionalImageSourceType, visualization_frames),
-    )
+    return ModelOutput(*transpose(rendered_frames))
 
 
 def _y_bounds(data: np.ndarray, y_range: Optional[Tuple[int, int]] = None) -> Tuple[int, int]:

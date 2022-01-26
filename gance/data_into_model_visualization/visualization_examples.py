@@ -30,14 +30,14 @@ from gance.data_into_model_visualization.vectors_to_image import (
 from gance.data_into_model_visualization.visualization_inputs import (
     alpha_blend_vectors_max_rms_power_audio,
 )
-from gance.data_into_model_visualization.visualize_audio_reducer import visualize_reducer_output
-from gance.dynamic_model_switching import reduce_vector_gzip_compression_rolling_average
+from gance.data_into_model_visualization.visualize_vector_reduction import visualize_reducer_output
 from gance.image_sources.video_common import add_wav_to_video
 from gance.model_interface.model_functions import create_model_interface
 from gance.projection import projection_file_reader
 from gance.projection.projection_visualization import visualize_projection_history
 from gance.vector_sources import music, primatives, vector_sources_common
 from gance.vector_sources.music import read_wav_scale_for_video
+from gance.vector_sources.vector_reduction import reduce_vector_gzip_compression_rolling_average
 from gance.vector_sources.vector_sources_common import (
     rotate_vectors_over_time,
     smooth_across_vectors,
