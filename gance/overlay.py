@@ -3,12 +3,14 @@ Write parts of one video on top of another.
 Do things like track eyes to interesting effect.
 """
 
+
 import itertools
 from typing import Dict, Iterator, List, NamedTuple, Optional, Tuple, cast
 
 import imagehash
 import more_itertools
 import numpy as np
+import pandas as pd
 from cv2 import cv2
 from lz.transposition import transpose
 from matplotlib import pyplot as plt
@@ -16,9 +18,13 @@ from PIL import Image, ImageDraw
 from scipy.spatial import distance
 
 from gance import faces
+from gance.assets import NOVA_PATH
 from gance.data_into_model_visualization import visualization_common
-from gance.gance_types import ImageSourceType, RGBInt8ImageType
+from gance.gance_types import ImageSourceType, OptionalImageSourceType, RGBInt8ImageType
+from gance.image_sources.image_sources_common import image_resolution
 from gance.logger_common import LOGGER
+from gance.vector_sources import music, vector_reduction
+from gance.vector_sources.vector_reduction import DataLabel, ResultLayers
 
 
 class BoundingBoxType(NamedTuple):
@@ -37,7 +43,7 @@ class OverlayContext(NamedTuple):
     TODO -- fill this out
     """
 
-    overlay_written: bool
+    overlay_written: bool = False
 
     # The following are params considered when computing the overlay.
     perceptual_hash_distance: Optional[float] = None
@@ -157,9 +163,9 @@ class EyeTrackingOverlay(NamedTuple):
     Note: really important that the order of the members matches `_FrameOverlayResult`.
     """
 
-    masks: Iterator["Image"]
-    foregrounds: ImageSourceType
-    backgrounds: ImageSourceType
+    masks: Iterator[Optional["Image"]]
+    foregrounds: OptionalImageSourceType
+    backgrounds: OptionalImageSourceType
     contexts: Iterator[OverlayContext]
 
 
@@ -172,16 +178,16 @@ class _FrameOverlayResult(NamedTuple):
     # `background`.
     # Note that this mask can be 'empty', and there might be no part of `foreground` that should
     # be added to `background`.
-    mask: "Image"
+    mask: Optional["Image"] = None
 
     # The image that will be partially drawn onto `background` as defined by `mask`.
-    foreground: RGBInt8ImageType
+    foreground: Optional[RGBInt8ImageType] = None
 
     # The image that the mask will be drawn onto.
-    background: RGBInt8ImageType
+    background: Optional[RGBInt8ImageType] = None
 
     # Information describing the decision to overlay or not. Consumed by visualization.
-    context: OverlayContext
+    context: Optional[OverlayContext] = OverlayContext()
 
 
 def compute_eye_tracking_overlay(
@@ -189,6 +195,7 @@ def compute_eye_tracking_overlay(
     background_images: ImageSourceType,
     min_phash_distance: int = 30,
     min_bbox_distance: float = 50.0,
+    skip_mask: Optional[List[bool]] = None,
 ) -> EyeTrackingOverlay:
     """
     Yield iterators that describe a given overlay operation.
@@ -202,21 +209,31 @@ def compute_eye_tracking_overlay(
 
     face_finder = faces.FaceFinderProxy()
 
+    frame_count = itertools.count()
+
     def overlay_per_frame(
-        packed: Tuple[int, Tuple[RGBInt8ImageType, RGBInt8ImageType]]
+        packed: Tuple[RGBInt8ImageType, RGBInt8ImageType, bool]
     ) -> _FrameOverlayResult:
         """
         Create the NT describing the overlay operation for a given frame.
         :param packed: input args as a tuple. Composed of:
-            index: Frame index (for logging)
             foreground_image: Image on top of `background_image`
             background_image: Image under `foreground_image`.
+            skip
         :return: NT.
         """
 
-        (index, (foreground_image, background_image)) = packed
+        foreground_image, background_image, skip = packed
 
-        LOGGER.info(f"Computing eye tracking overlay for frame #{index}")
+        current_frame_number = next(frame_count)
+
+        blank_mask = Image.new("L", image_resolution(foreground_image), 0)
+
+        if skip:
+            LOGGER.info(f"Skipping eye tracking overlay for frame #{current_frame_number}")
+            return _FrameOverlayResult(
+                mask=blank_mask, foreground=foreground_image, background=background_image
+            )
 
         foreground_bounding_boxes = landmarks_to_bounding_boxes(
             face_finder.face_landmarks(face_image=foreground_image)
@@ -238,12 +255,16 @@ def compute_eye_tracking_overlay(
             bbox_dist < min_bbox_distance if bbox_dist else False
         )
 
-        blank_mask = Image.new("L", foreground_image.shape[0:2], 0)
-
         mask = (
             draw_mask(destination=blank_mask, bounding_boxes=foreground_bounding_boxes)
             if overlay_flag
             else blank_mask
+        )
+
+        LOGGER.info(
+            f"Computed eye tracking overlay for "
+            f"frame #{current_frame_number}, "
+            f"content? {overlay_flag}"
         )
 
         return _FrameOverlayResult(
@@ -257,10 +278,18 @@ def compute_eye_tracking_overlay(
             background=background_image,
         )
 
-    per_frame_results: Iterator[_FrameOverlayResult] = map(
-        overlay_per_frame, enumerate(zip(foreground_images, background_images))
+    packed_compute = zip(
+        foreground_images,
+        background_images,
+        (
+            skip_mask
+            if skip_mask is not None
+            # This will create an chain of `False` that is the length of the input images.
+            else itertools.cycle([False])
+        ),
     )
 
+    per_frame_results: Iterator[_FrameOverlayResult] = map(overlay_per_frame, packed_compute)
     masks, foregrounds, backgrounds, contexts = transpose(per_frame_results)
 
     # Split the different members from the per-frame tuples into iterables by type.
@@ -288,12 +317,14 @@ def visualize_overlay_computation(  # pylint: disable=too-many-locals
 
     hash_axis, bbox_distance_axis = fig.subplots(nrows=2, ncols=1)
 
-    for group_index, group_of_frames in enumerate(
-        more_itertools.grouper(overlay, frames_per_context)
-    ):
+    frame_count = itertools.count()
+
+    for group_of_frames in more_itertools.grouper(overlay, frames_per_context):
 
         current: Iterator[OverlayContext] = filter(None, group_of_frames)
 
+        # When we unzip here, the left side of the equation are all lists!
+        # So it's okay to iterate over them more than once.
         (
             flags,
             perceptual_hash_distances,
@@ -354,8 +385,8 @@ def visualize_overlay_computation(  # pylint: disable=too-many-locals
         hash_axis.legend(loc="upper right")
 
         hash_all_y_values = [value for value in perceptual_hash_distances if value is not None]
-        hash_axis_min = min(hash_all_y_values) - 5
-        hash_axis_max = max(hash_all_y_values) + 5
+        hash_axis_min = min(hash_all_y_values) - 5 if hash_all_y_values else -5
+        hash_axis_max = max(hash_all_y_values) + 5 if hash_all_y_values else 5
 
         hash_axis.set_ylim(hash_axis_min, hash_axis_max)
 
@@ -382,7 +413,7 @@ def visualize_overlay_computation(  # pylint: disable=too-many-locals
 
         for inter_group_index, flag in enumerate(flags):
 
-            LOGGER.info(f"Visualizing overlay for frame #{group_index + inter_group_index}")
+            LOGGER.info(f"Visualizing overlay for frame #{next(frame_count)}")
 
             line_color = "green" if flag else "red"
 
@@ -406,3 +437,39 @@ def visualize_overlay_computation(  # pylint: disable=too-many-locals
 
         for axes in fig.axes:
             axes.clear()
+
+
+if __name__ == "__main__":
+
+    vector_length = 512
+    fps = 30.0
+
+    time_series_audio_vectors = music.read_wav_scale_for_video(
+        wav=NOVA_PATH,
+        vector_length=vector_length,
+        frames_per_second=fps,
+    )
+
+    overlay_mask = vector_reduction.rolling_sum_results_layers(
+        vector_reduction.absolute_value_results_layers(
+            results_layers=ResultLayers(
+                result=DataLabel(
+                    data=vector_reduction.derive_results_layers(
+                        vector_reduction.reduce_vector_gzip_compression_rolling_average(
+                            time_series_audio_vectors=time_series_audio_vectors.wav_data,
+                            vector_length=vector_length,
+                        ),
+                        order=1,
+                    ).result.data,
+                    label="Gzipped audio, smoothed, averaged, 1st order derivation.",
+                ),
+            ),
+        ),
+        window_length=10,
+    )
+
+    music_overlay_filter_mask: List[bool] = list(
+        pd.Series(overlay_mask.result.data).fillna(np.inf) > 20
+    )
+
+    print("stop")

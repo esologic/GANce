@@ -10,6 +10,7 @@ from typing import List
 import librosa
 import numpy as np
 import pandas as pd
+from scipy.interpolate import UnivariateSpline
 from scipy.ndimage import maximum_filter1d
 from scipy.signal import savgol_filter
 
@@ -182,3 +183,87 @@ def quantize_results_layers(
         result=DataLabel(quantized, f"{results_layers.result.label} Scaled, Quantized"),
         layers=[results_layers.result] + results_layers.layers,
     )
+
+
+def _derive_data(data: np.ndarray, order: int) -> np.ndarray:
+    """
+    Take a given order derivative of the input data.
+    Note: `np.nan` values within the input are converted to zero before taking the derivative.
+    :param data: To derive.
+    :return: derivative as an array, same length as input array.
+    """
+
+    data = np.nan_to_num(data)
+    x_axis = np.arange(len(data))
+    return UnivariateSpline(x=x_axis, y=data).derivative(n=order)(x_axis)
+
+
+def derive_results_layers(results_layers: ResultLayers, order: int) -> ResultLayers:
+    """
+
+    :param results_layers:
+    :param order:
+    :return:
+    """
+
+    return ResultLayers(
+        result=DataLabel(
+            _derive_data(data=results_layers.result.data, order=order),
+            "First order derivation",
+        ),
+        layers=[results_layers.result] + results_layers.layers,
+    )
+
+
+def absolute_value_results_layers(results_layers: ResultLayers) -> ResultLayers:
+    """
+
+    :param results_layers:
+    :param order:
+    :return:
+    """
+
+    return ResultLayers(
+        result=DataLabel(
+            np.abs(results_layers.result.data),
+            "Absolute Value",
+        ),
+        layers=[results_layers.result] + results_layers.layers,
+    )
+
+
+def rolling_sum_results_layers(results_layers: ResultLayers, window_length: int) -> ResultLayers:
+    """
+
+    :param results_layers:
+    :param order:
+    :return:
+    """
+
+    series = pd.Series(results_layers.result.data)
+
+    return ResultLayers(
+        result=DataLabel(
+            np.array(series.rolling(window_length).sum()),
+            f"Rolling Sum (window={window_length})",
+        ),
+        layers=[results_layers.result] + results_layers.layers,
+    )
+
+
+def track_length_filter(bool_tracks: pd.Series, track_length: int) -> np.ndarray:
+    """
+
+    :param data:
+    :param threshold_value: INCLUSIVE!
+    :param track_length: INCLUSIVE!
+    :return:
+    """
+
+    df = pd.DataFrame({"bool_tracks": bool_tracks.astype(int)})
+
+    df["track_number"] = df.bool_tracks.astype(int).diff(1).fillna(0).abs().cumsum().squeeze()
+    df["track_length"] = df.track_number.groupby(df.track_number).transform(len)
+    df["output_mask"] = (df.bool_tracks == 1) & (df.track_length >= track_length)
+
+    return df.output_mask.tolist()

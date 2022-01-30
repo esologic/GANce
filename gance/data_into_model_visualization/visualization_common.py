@@ -24,6 +24,8 @@ from gance.vector_sources.vector_types import (
 STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE = 10
 STANDARD_MATPLOTLIB_DPI = 100
 
+DataLabelDataType = Union[np.ndarray, SingleVector, SingleMatrix]
+
 
 class DataLabel(NamedTuple):
     """
@@ -31,7 +33,7 @@ class DataLabel(NamedTuple):
     Label is only consumed by visualizations.
     """
 
-    data: Union[np.ndarray, SingleVector, SingleMatrix]
+    data: DataLabelDataType
     label: str
 
 
@@ -42,7 +44,7 @@ class ResultLayers(NamedTuple):
     """
 
     result: DataLabel
-    layers: List[DataLabel]
+    layers: List[DataLabel] = []
 
 
 class VectorsReducer(Protocol):  # pylint: disable=too-few-public-methods

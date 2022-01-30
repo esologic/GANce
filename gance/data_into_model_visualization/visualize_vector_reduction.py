@@ -2,12 +2,15 @@
 Functions to visualize the vector reduction process.
 """
 import itertools
+import time
 from pathlib import Path
 
 import more_itertools
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
 
+from gance.assets import NOVA_PATH, OUTPUT_DIRECTORY
 from gance.data_into_model_visualization import visualization_common
 from gance.data_into_model_visualization.visualization_common import (
     VectorsReducer,
@@ -15,8 +18,11 @@ from gance.data_into_model_visualization.visualization_common import (
     standard_matplotlib_figure,
 )
 from gance.gance_types import ImageSourceType
+from gance.image_sources.video_common import write_source_to_disk
+from gance.logger_common import LOGGER
+from gance.vector_sources import vector_reduction
 from gance.vector_sources.music import read_wav_scale_for_video
-from gance.vector_sources.vector_reduction import ResultLayers, quantize_results_layers
+from gance.vector_sources.vector_reduction import ResultLayers
 
 
 def visualize_reducer_output(audio_path: Path, reducer: VectorsReducer) -> None:
@@ -31,7 +37,7 @@ def visualize_reducer_output(audio_path: Path, reducer: VectorsReducer) -> None:
         wav=audio_path, vector_length=vector_length, frames_per_second=60.0
     ).wav_data
 
-    reduced = quantize_results_layers(
+    reduced = vector_reduction.quantize_results_layers(
         results_layers=reducer(time_series_audio_vectors=audio, vector_length=vector_length),
         model_indices=list(range(30)),
     )
@@ -92,6 +98,8 @@ def visualize_result_layers(  # pylint: disable=too-many-locals
 
     fig = standard_matplotlib_figure()
 
+    point_count = itertools.count()
+
     axis = fig.add_subplot(1, 1, 1)
 
     for current_values in zip(
@@ -130,9 +138,14 @@ def visualize_result_layers(  # pylint: disable=too-many-locals
         axis.grid()
         axis.legend(loc="upper right")
 
-        all_values = result_values + list(itertools.chain.from_iterable(layers_values))
-        y_min = min(all_values)
-        y_max = max(all_values)
+        all_values = list(
+            filter(
+                lambda value: not pd.isna(value),
+                result_values,  # + list(itertools.chain.from_iterable(layers_values))
+            )
+        )
+        y_min = min(all_values) - 10 if all_values else -10
+        y_max = max(all_values) + 10 if all_values else 10
 
         axis.set_ylim(y_min, y_max)
 
@@ -142,6 +155,11 @@ def visualize_result_layers(  # pylint: disable=too-many-locals
 
             line = axis.vlines(x=inter_group_index, ymin=y_min - 5, ymax=y_max + 5, color="red")
 
+            LOGGER.info(
+                f"Visualizing index #{next(point_count)} "
+                f"of the layers of [{result_layers.result.label}]"
+            )
+
             yield visualization_common.render_current_matplotlib_frame(
                 fig=fig, resolution=(video_height, video_height)
             )
@@ -150,3 +168,42 @@ def visualize_result_layers(  # pylint: disable=too-many-locals
 
         for axes in fig.axes:
             axes.clear()
+
+
+if __name__ == "__main__":
+
+    time_series_audio_vectors = read_wav_scale_for_video(
+        wav=NOVA_PATH,
+        vector_length=512,
+        frames_per_second=30.0,
+    )
+
+    gzip_results = vector_reduction.reduce_vector_gzip_compression_rolling_average(
+        time_series_audio_vectors=time_series_audio_vectors.wav_data,
+        vector_length=512,
+    )
+
+    overlay_mask = vector_reduction.rolling_sum_results_layers(
+        vector_reduction.absolute_value_results_layers(
+            vector_reduction.derive_results_layers(
+                gzip_results,
+                order=1,
+            )
+        ),
+        window_length=10,
+    )
+
+    music_overlay_mask_visualization = visualize_result_layers(
+        result_layers=gzip_results,
+        frames_per_context=250,
+        video_height=1024,
+        title="Overlay binary mask",
+    )
+
+    video_path = OUTPUT_DIRECTORY.joinpath(f"{int(time.time())}_overlay_test.mp4")
+
+    write_source_to_disk(
+        source=itertools.islice(music_overlay_mask_visualization, 250),
+        video_path=video_path,
+        video_fps=30.0,
+    )
