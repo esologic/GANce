@@ -254,14 +254,12 @@ def rolling_sum_results_layers(results_layers: ResultLayers, window_length: int)
 def track_length_filter(bool_tracks: pd.Series, track_length: int) -> np.ndarray:
     """
 
-    :param data:
-    :param threshold_value: INCLUSIVE!
+    :param bool_tracks: INCLUSIVE!
     :param track_length: INCLUSIVE!
     :return:
     """
 
     df = pd.DataFrame({"bool_tracks": bool_tracks.astype(int)})
-
     df["track_number"] = df.bool_tracks.astype(int).diff(1).fillna(0).abs().cumsum().squeeze()
     df["track_length"] = df.track_number.groupby(df.track_number).transform(len)
     df["output_mask"] = (df.bool_tracks == 1) & (df.track_length >= track_length)

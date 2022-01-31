@@ -13,6 +13,7 @@ import more_itertools
 import numpy as np
 from cv2 import cv2
 from ffmpeg.nodes import FilterableStream
+from guppy import hpy
 
 from gance import divisor
 from gance.gance_types import ImageSourceType, OptionalImageSourceType, RGBInt8ImageType
@@ -236,6 +237,8 @@ def write_source_to_disk_forward(
     :return: None
     """
 
+    h = hpy()
+
     def setup_iteration(output_path: Path) -> ImageSourceType:
         """
         Helper function to set up the output and forwarding operation.
@@ -262,6 +265,7 @@ def write_source_to_disk_forward(
             writer.write(cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB))
 
         for index, image in enumerate(itertools.chain([first_frame], source)):
+            print(h.heap())
             LOGGER.info(f"Writing frame #{index} to file: {video_path}")
             write_frame(image)
             yield image

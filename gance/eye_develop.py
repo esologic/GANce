@@ -30,7 +30,11 @@ logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("numba").setLevel(logging.WARNING)
 
 
-if __name__ == "__main__":
+def main() -> None:  # pylint: disable=too-many-locals
+    """
+
+    :return:
+    """
 
     frames_to_visualize = None
     video_fps = 30
@@ -109,10 +113,6 @@ if __name__ == "__main__":
                 skip_mask=skip_mask,
             )
 
-            filtered_by_track_length = vector_reduction.track_length_filter(
-                bool_tracks=(pd.Series(skip_mask) | pd.Series(skip_mask)), track_length=5
-            )
-
             overlay_visualization = overlay.visualize_overlay_computation(
                 overlay=overlay_results.contexts,
                 frames_per_context=context_windows_length,
@@ -133,17 +133,14 @@ if __name__ == "__main__":
                         foreground_image=foreground,
                         background_image=background,
                         mask=mask,
-                    )
-                    if track_long_enough
-                    else background,
+                    ),
                     foreground,
                     background,
                 )
-                for (mask, foreground, background, track_long_enough) in zip(
+                for (mask, foreground, background) in zip(
                     overlay_results.masks,
                     overlay_results.foregrounds,
                     overlay_results.backgrounds,
-                    filtered_by_track_length,
                 )
             )
 
@@ -159,46 +156,47 @@ if __name__ == "__main__":
             )
 
             if full_context:
-
-                full_context_frames = (
-                    cv2.vconcat(
-                        [
-                            cv2.hconcat(
-                                [
-                                    final,
-                                    background,
-                                    foreground,
-                                ]
-                            ),
-                            cv2.hconcat(
-                                [
-                                    music_overlay_mask_visualization_image,
-                                    overlay_visualization_frame,
-                                    visualization_image,
-                                ]
-                            ),
-                        ]
-                    )
-                    for (
-                        final,
-                        foreground,
-                        background,
-                        overlay_visualization_frame,
-                        visualization_image,
-                        music_overlay_mask_visualization_image,
-                    ) in zip(
-                        finals,
-                        foregrounds,
-                        backgrounds,
-                        overlay_visualization,
-                        model_output.visualization_images,
-                        music_overlay_mask_visualization,
-                    )
-                )
-
                 video_common.write_source_to_disk_consume(
-                    source=full_context_frames,
+                    source=(
+                        cv2.vconcat(
+                            [
+                                cv2.hconcat(
+                                    [
+                                        final,
+                                        background,
+                                        foreground,
+                                    ]
+                                ),
+                                cv2.hconcat(
+                                    [
+                                        music_overlay_mask_visualization_image,
+                                        overlay_visualization_frame,
+                                        visualization_image,
+                                    ]
+                                ),
+                            ]
+                        )
+                        for (
+                            final,
+                            foreground,
+                            background,
+                            overlay_visualization_frame,
+                            visualization_image,
+                            music_overlay_mask_visualization_image,
+                        ) in zip(
+                            finals,
+                            foregrounds,
+                            backgrounds,
+                            overlay_visualization,
+                            model_output.visualization_images,
+                            music_overlay_mask_visualization,
+                        )
+                    ),
                     video_path=OUTPUT_DIRECTORY.joinpath(f"{current_time}_full_context.mp4"),
                     video_fps=video_fps,
                     audio_path=NOVA_PATH,
                 )
+
+
+if __name__ == "__main__":
+    main()

@@ -586,9 +586,9 @@ class MultiModel:
         Loads the model at the set index into memory for use.
         :return: None
         """
-        self._currently_loaded_model = create_model_interface_process(
-            model_path=self._model_paths[self._currently_loaded_model_index]
-        )
+        model_path = self._model_paths[self._currently_loaded_model_index]
+        LOGGER.info(f"Loading Model: {model_path}")
+        self._currently_loaded_model = create_model_interface_process(model_path=model_path)
         self._expected_vector_length = (
             self._currently_loaded_model.model_interface.expected_vector_length
         )
