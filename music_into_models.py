@@ -95,7 +95,7 @@ def _create_visualization(
             [model_output.visualization_images, model_output.model_images]
         )
 
-        video_common.write_source_to_disk(
+        video_common.write_source_to_disk_consume(
             source=frames,
             video_path=tmp_video_path,
             video_fps=video_fps,

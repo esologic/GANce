@@ -5,9 +5,11 @@ Common functionality for dealing with video files.
 import itertools
 import math
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Iterable, Iterator, List, NamedTuple, Optional, Tuple
 
 import ffmpeg
+import more_itertools
 import numpy as np
 from cv2 import cv2
 from ffmpeg.nodes import FilterableStream
@@ -222,36 +224,80 @@ def frames_in_video(
     )
 
 
-def write_source_to_disk(source: ImageSourceType, video_path: Path, video_fps: float) -> None:
+def write_source_to_disk_forward(
+    source: ImageSourceType, video_path: Path, video_fps: float, audio_path: Optional[Path] = None
+) -> ImageSourceType:
     """
     Consume an image source, write it out to disk.
     :param source: To write to disk.
     :param video_path: Output video path.
     :param video_fps: FPS of the output video.
+    :param audio_path: If given, the audio file at this path will be written to the output video.
     :return: None
     """
 
-    first_frame = next(source)
+    def setup_iteration(output_path: Path) -> ImageSourceType:
+        """
+        Helper function to set up the output and forwarding operation.
+        :param output_path: Intermediate video path.
+        :return: The frames to yield.
+        """
 
-    writer = _create_video_writer_resolution(
-        video_path=video_path, video_fps=video_fps, resolution=image_resolution(first_frame)
+        try:
+            first_frame = next(source)
+        except StopIteration:
+            LOGGER.error("Frame source was empty, nothing to write to disk.")
+            raise
+
+        writer = _create_video_writer_resolution(
+            video_path=output_path, video_fps=video_fps, resolution=image_resolution(first_frame)
+        )
+
+        def write_frame(frame: RGBInt8ImageType) -> None:
+            """
+            Write the given frame to the file.
+            :param frame: To write.
+            :return: None
+            """
+            writer.write(cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB))
+
+        for index, image in enumerate(itertools.chain([first_frame], source)):
+            LOGGER.info(f"Writing frame #{index} to file: {video_path}")
+            write_frame(image)
+            yield image
+
+        writer.release()
+
+    if audio_path is None:
+        yield from setup_iteration(video_path)
+    else:
+        # Don't write the video-only file to disk at the output path, instead
+        with NamedTemporaryFile(suffix=video_path.suffix) as file:
+            temp_video_path = Path(file.name)
+            yield from setup_iteration(temp_video_path)
+            file.flush()
+            add_wav_to_video(
+                video_path=temp_video_path, audio_path=audio_path, output_path=video_path
+            )
+
+
+def write_source_to_disk_consume(
+    source: ImageSourceType, video_path: Path, video_fps: float, audio_path: Optional[Path] = None
+) -> None:
+    """
+    Consume an image source, write it out to disk.
+    :param source: To write to disk.
+    :param video_path: Output video path.
+    :param video_fps: FPS of the output video.
+    :param audio_path: If given, the audio file at this path will be written to the output video.
+    :return: None
+    """
+
+    more_itertools.consume(
+        write_source_to_disk_forward(
+            source=source, video_path=video_path, video_fps=video_fps, audio_path=audio_path
+        )
     )
-
-    def write_frame(frame: RGBInt8ImageType) -> None:
-        """
-        Write the given frame to the file.
-        :param frame: To write.
-        :return: None
-        """
-        writer.write(cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB))
-
-    write_frame(first_frame)
-
-    for index, image in enumerate(source):
-        LOGGER.info(f"Writing frame #{index} to file: {video_path}")
-        write_frame(image)
-
-    writer.release()
 
 
 def horizontal_concat_optional_sources(

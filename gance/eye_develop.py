@@ -6,19 +6,20 @@ Also tools to visualize these vectors against the model outputs.
 import itertools
 import logging
 import time
-from typing import List, cast
+from typing import Iterator, List, Tuple, cast
 
 import more_itertools
 import numpy as np
 import pandas as pd
 from cv2 import cv2
+from lz.transposition import transpose
 
 from gance import divisor, overlay
 from gance.assets import NOVA_PATH, OUTPUT_DIRECTORY, PRODUCTION_MODEL_PATH, PROJECTION_FILE_PATH
 from gance.data_into_model_visualization import visualize_vector_reduction
 from gance.data_into_model_visualization.model_visualization import viz_model_ins_outs
 from gance.data_into_model_visualization.visualization_inputs import alpha_blend_projection_file
-from gance.gance_types import ImageSourceType
+from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.image_sources import video_common
 from gance.model_interface.model_functions import MultiModel
 from gance.projection import projection_file_reader
@@ -31,7 +32,7 @@ logging.getLogger("numba").setLevel(logging.WARNING)
 
 if __name__ == "__main__":
 
-    frames_to_visualize = 100
+    frames_to_visualize = None
     video_fps = 30
     context_windows_length = 200
     video_square_side_length = 1024
@@ -49,7 +50,7 @@ if __name__ == "__main__":
                 frames_per_second=video_fps,
             )
 
-            intermediate = vector_reduction.rolling_sum_results_layers(
+            overlay_mask = vector_reduction.rolling_sum_results_layers(
                 vector_reduction.absolute_value_results_layers(
                     results_layers=ResultLayers(
                         result=DataLabel(
@@ -67,9 +68,9 @@ if __name__ == "__main__":
                 window_length=video_fps * 1,
             )
 
-            overlay_mask = vector_reduction.derive_results_layers(intermediate, order=1)
+            for_mask = pd.Series(overlay_mask.result.data).fillna(np.inf)
 
-            skip_mask: List[bool] = list(pd.Series(overlay_mask.result.data).fillna(np.inf) > 20)
+            skip_mask: List[bool] = list(for_mask > 75)
 
             final_latents = projection_file_reader.final_latents_matrices_label(reader)
 
@@ -108,6 +109,10 @@ if __name__ == "__main__":
                 skip_mask=skip_mask,
             )
 
+            filtered_by_track_length = vector_reduction.track_length_filter(
+                bool_tracks=(pd.Series(skip_mask) | pd.Series(skip_mask)), track_length=5
+            )
+
             overlay_visualization = overlay.visualize_overlay_computation(
                 overlay=overlay_results.contexts,
                 frames_per_context=context_windows_length,
@@ -119,19 +124,48 @@ if __name__ == "__main__":
                 frames_per_context=context_windows_length,
                 video_height=video_square_side_length,
                 title="Overlay binary mask",
+                horizontal_line=75,
             )
 
-            frames = (
+            final_frames: Iterator[Tuple[RGBInt8ImageType, RGBInt8ImageType, RGBInt8ImageType]] = (
                 (
+                    overlay.apply_mask(
+                        foreground_image=foreground,
+                        background_image=background,
+                        mask=mask,
+                    )
+                    if track_long_enough
+                    else background,
+                    foreground,
+                    background,
+                )
+                for (mask, foreground, background, track_long_enough) in zip(
+                    overlay_results.masks,
+                    overlay_results.foregrounds,
+                    overlay_results.backgrounds,
+                    filtered_by_track_length,
+                )
+            )
+
+            finals, foregrounds, backgrounds = transpose(final_frames)
+
+            current_time = int(time.time())
+
+            finals = video_common.write_source_to_disk_forward(
+                source=finals,
+                video_path=OUTPUT_DIRECTORY.joinpath(f"{current_time}_hero_only.mp4"),
+                video_fps=video_fps,
+                audio_path=NOVA_PATH,
+            )
+
+            if full_context:
+
+                full_context_frames = (
                     cv2.vconcat(
                         [
                             cv2.hconcat(
                                 [
-                                    overlay.apply_mask(
-                                        foreground_image=foreground,
-                                        background_image=background,
-                                        mask=mask,
-                                    ),
+                                    final,
                                     background,
                                     foreground,
                                 ]
@@ -146,46 +180,25 @@ if __name__ == "__main__":
                         ]
                     )
                     for (
-                        mask,
+                        final,
                         foreground,
                         background,
                         overlay_visualization_frame,
                         visualization_image,
                         music_overlay_mask_visualization_image,
                     ) in zip(
-                        overlay_results.masks,
-                        overlay_results.foregrounds,
-                        overlay_results.backgrounds,
+                        finals,
+                        foregrounds,
+                        backgrounds,
                         overlay_visualization,
                         model_output.visualization_images,
                         music_overlay_mask_visualization,
                     )
                 )
-                if full_context
-                else (
-                    overlay.apply_mask(
-                        foreground_image=foreground,
-                        background_image=background,
-                        mask=mask,
-                    )
-                    for (mask, foreground, background) in zip(
-                        overlay_results.masks,
-                        overlay_results.foregrounds,
-                        overlay_results.backgrounds,
-                    )
+
+                video_common.write_source_to_disk_consume(
+                    source=full_context_frames,
+                    video_path=OUTPUT_DIRECTORY.joinpath(f"{current_time}_full_context.mp4"),
+                    video_fps=video_fps,
+                    audio_path=NOVA_PATH,
                 )
-            )
-
-            video_path = OUTPUT_DIRECTORY.joinpath(f"{int(time.time())}_overlay_test.mp4")
-
-            video_common.write_source_to_disk(
-                source=frames,
-                video_path=video_path,
-                video_fps=video_fps,
-            )
-
-            video_common.add_wav_to_video(
-                video_path=video_path,
-                audio_path=NOVA_PATH,
-                output_path=OUTPUT_DIRECTORY.joinpath(f"{int(time.time())}_overlay_test_audio.mp4"),
-            )

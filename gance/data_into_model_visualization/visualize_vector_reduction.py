@@ -4,6 +4,7 @@ Functions to visualize the vector reduction process.
 import itertools
 import time
 from pathlib import Path
+from typing import Optional
 
 import more_itertools
 import numpy as np
@@ -18,7 +19,7 @@ from gance.data_into_model_visualization.visualization_common import (
     standard_matplotlib_figure,
 )
 from gance.gance_types import ImageSourceType
-from gance.image_sources.video_common import write_source_to_disk
+from gance.image_sources.video_common import write_source_to_disk_consume
 from gance.logger_common import LOGGER
 from gance.vector_sources import vector_reduction
 from gance.vector_sources.music import read_wav_scale_for_video
@@ -85,7 +86,11 @@ def visualize_reducer_output(audio_path: Path, reducer: VectorsReducer) -> None:
 
 
 def visualize_result_layers(  # pylint: disable=too-many-locals
-    result_layers: ResultLayers, video_height: int, frames_per_context: int, title: str
+    result_layers: ResultLayers,
+    video_height: int,
+    frames_per_context: int,
+    title: str,
+    horizontal_line: Optional[float] = None,
 ) -> ImageSourceType:
     """
 
@@ -141,13 +146,18 @@ def visualize_result_layers(  # pylint: disable=too-many-locals
         all_values = list(
             filter(
                 lambda value: not pd.isna(value),
-                result_values,  # + list(itertools.chain.from_iterable(layers_values))
+                result_values + list(itertools.chain.from_iterable(layers_values)),
             )
         )
         y_min = min(all_values) - 10 if all_values else -10
         y_max = max(all_values) + 10 if all_values else 10
 
         axis.set_ylim(y_min, y_max)
+
+        if horizontal_line is not None:
+            axis.hlines(
+                y=horizontal_line, xmin=0, xmax=max(x_axis), linestyles="dotted", colors="purple"
+            )
 
         plt.tight_layout()
 
@@ -202,7 +212,7 @@ if __name__ == "__main__":
 
     video_path = OUTPUT_DIRECTORY.joinpath(f"{int(time.time())}_overlay_test.mp4")
 
-    write_source_to_disk(
+    write_source_to_disk_consume(
         source=itertools.islice(music_overlay_mask_visualization, 250),
         video_path=video_path,
         video_fps=30.0,
