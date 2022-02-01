@@ -36,7 +36,7 @@ def main() -> None:  # pylint: disable=too-many-locals
     :return:
     """
 
-    frames_to_visualize = None
+    frames_to_visualize = 1000
     video_fps = 30
     context_windows_length = 200
     video_square_side_length = 1024
@@ -76,12 +76,12 @@ def main() -> None:  # pylint: disable=too-many-locals
 
             skip_mask: List[bool] = list(for_mask > 75)
 
-            final_latents = projection_file_reader.final_latents_matrices_label(reader)
-
             model_output = viz_model_ins_outs(
                 models=multi_models,
                 data=alpha_blend_projection_file(
-                    final_latents_matrices_label=final_latents,
+                    final_latents_matrices_label=projection_file_reader.final_latents_matrices_label(
+                        reader
+                    ),
                     alpha=0.25,
                     fft_roll_enabled=True,
                     fft_amplitude_range=(-1, 1),
@@ -113,18 +113,10 @@ def main() -> None:  # pylint: disable=too-many-locals
                 skip_mask=skip_mask,
             )
 
-            overlay_visualization = overlay.visualize_overlay_computation(
-                overlay=overlay_results.contexts,
-                frames_per_context=context_windows_length,
-                video_square_side_length=video_square_side_length,
-            )
-
-            music_overlay_mask_visualization = visualize_vector_reduction.visualize_result_layers(
-                result_layers=overlay_mask,
-                frames_per_context=context_windows_length,
-                video_height=video_square_side_length,
-                title="Overlay binary mask",
-                horizontal_line=75,
+            # TODO: This pulls the whole overlay result (images and all) into memory.
+            long_tracks_mask = vector_reduction.track_length_filter(
+                bool_tracks=(~pd.Series(skip_mask) & pd.Series(overlay_results.mask_contents)),
+                track_length=5,
             )
 
             final_frames: Iterator[Tuple[RGBInt8ImageType, RGBInt8ImageType, RGBInt8ImageType]] = (
@@ -133,14 +125,17 @@ def main() -> None:  # pylint: disable=too-many-locals
                         foreground_image=foreground,
                         background_image=background,
                         mask=mask,
-                    ),
+                    )
+                    if in_long_track
+                    else background,
                     foreground,
                     background,
                 )
-                for (mask, foreground, background) in zip(
+                for (mask, foreground, background, in_long_track) in zip(
                     overlay_results.masks,
                     overlay_results.foregrounds,
                     overlay_results.backgrounds,
+                    long_tracks_mask,
                 )
             )
 
@@ -156,6 +151,23 @@ def main() -> None:  # pylint: disable=too-many-locals
             )
 
             if full_context:
+
+                overlay_visualization = overlay.visualize_overlay_computation(
+                    overlay=overlay_results.contexts,
+                    frames_per_context=context_windows_length,
+                    video_square_side_length=video_square_side_length,
+                )
+
+                music_overlay_mask_visualization = (
+                    visualize_vector_reduction.visualize_result_layers(
+                        result_layers=overlay_mask,
+                        frames_per_context=context_windows_length,
+                        video_height=video_square_side_length,
+                        title="Overlay binary mask",
+                        horizontal_line=75,
+                    )
+                )
+
                 video_common.write_source_to_disk_consume(
                     source=(
                         cv2.vconcat(

@@ -167,7 +167,7 @@ class EyeTrackingOverlay(NamedTuple):
     foregrounds: OptionalImageSourceType
     backgrounds: OptionalImageSourceType
     contexts: Iterator[OverlayContext]
-    mask_contents: List[bool]
+    mask_contents: Iterator[bool]
 
 
 class _FrameOverlayResult(NamedTuple):
