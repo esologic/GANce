@@ -1,66 +1,100 @@
 """
-Thank u: https://stackoverflow.com/questions/21157739/how-to-iterate-through-a-python-queue-queue-with-a-for-loop-instead-of-a-while-l
+Tries to do `itertools.tee`, but on disk instead of in memory.
+
+Thank u: https://stackoverflow.com/a/70917416
 """
 
 import pickle
+import shutil
 from pathlib import Path
 from queue import Queue
 from tempfile import NamedTemporaryFile
-from typing import Any, Iterator, Tuple, TypeVar
-
-IterationResult = TypeVar("IterationResult")
+from typing import Iterator, List, Tuple, TypeVar
 
 from sentinels import NOTHING
 
+IterationItem = TypeVar("IterationItem")
 
-def cache_iterator_on_disk(
-    iterator: Iterator[IterationResult], copies: int
-) -> Tuple[Iterator[IterationResult], Tuple[Iterator[IterationResult], ...]]:
+
+def load_queue_items(queue: "Queue[Path]") -> Iterator[IterationItem]:
+    """
+    Iterate over the items in a queue.
+    Load the objects on disk back into memory and yield them.
+    Before yielding the objects, deletes their source file.
+    :param queue: To consume.
+    :return: An iterator of the items stored in the queue.
     """
 
-    :param iterator:
-    :param copies:
-    :return:
+    def load_item(path: Path) -> IterationItem:
+        """
+        Helper function.
+        :param path: Load the object at this path.
+        :return: The loaded object
+        """
+
+        with open(str(path), "rb") as p:
+            output: IterationItem = pickle.load(p)
+            path.unlink()
+
+        return output
+
+    return map(load_item, iter(queue.get, NOTHING))
+
+
+def iterator_on_disk(
+    iterator: Iterator[IterationItem], copies: int
+) -> Tuple[Iterator[IterationItem], Tuple[Iterator[IterationItem], ...]]:
+    """
+    Caches the results from an input iterator onto disk rather than into memory for re-iteration
+    later. Kind of like `itertools.tee`, but instead of going into memory with the copies, the
+    intermediate objects are stored on disk.
+    :param iterator: The iterator to duplicate.
+    :param copies: The number of secondary iterators to make. Think of this like the `n` argument
+    to `itertools.tee`.
+    :return: A tuple:
+        (
+            The primary iterator. Consume this one to populate the values in the secondary
+            iterators.,
+            A tuple of secondary iterators. When one of these is incremented, it's next object
+            is loaded from disk and yielded. Note that if you iterate on these past the head of
+            `primary`, then the iteration will block.
+        )
     """
 
-    path_queues = [Queue() for _ in range(copies)]
+    path_queues: List["Queue[Path]"] = [Queue() for _ in range(copies)]
 
-    def item_into_queues(item: Any) -> None:
+    def forward_iterator() -> Iterator[  # pylint: disable=inconsistent-return-statements
+        IterationItem
+    ]:
+        """
+        Works through the input iterator, and as new times are produced, saves
+        them to disk, and fills the queues with their locations.
+        :return: Yields the original items from the input iterator.
         """
 
-        :param item:
-        :return:
-        """
-        for queue in path_queues:
-            queue.put(item)
+        for item in iterator:
 
-    item_into_queues(NOTHING)
-
-    def forward_iterator() -> Iterator[IterationResult]:
-        """
-
-        :return:
-        """
-
-        for result in iterator:
             # These will get deleted after being loaded into memory later.
-            with NamedTemporaryFile(mode="wb", delete=False) as p:
-                pickle.dump(result, p)
-                item_into_queues(Path(p.name))
+            with NamedTemporaryFile(mode="wb", delete=False) as primary_dump:
+                pickle.dump(item, primary_dump)
 
-            yield result
+            queues = iter(path_queues)
 
-    def iterate_over_queue(queue: "Queue") -> Iterator[IterationResult]:
-        """
+            try:
+                queue = next(queues)
+            except StopIteration:
+                return None
 
-        :param queue:
-        :return:
-        """
+            queue.put(Path(primary_dump.name))
 
-        for result_path in iter(queue.get, NOTHING):
-            with open(str(result_path), "rb") as p:
-                output = pickle.load(p)
-            result_path.unlink()
-            yield output
+            for queue in queues:
+                with NamedTemporaryFile(mode="wb", delete=False) as secondary_dump:
+                    queue.put(Path(shutil.copy(src=primary_dump.name, dst=secondary_dump.name)))
 
-    return forward_iterator(), tuple(iterate_over_queue(queue) for queue in path_queues)
+            yield item
+
+        # Tells the queues that no more items will be coming out.
+        for queue in path_queues:
+            queue.put(NOTHING)
+
+    return forward_iterator(), tuple(load_queue_items(queue) for queue in path_queues)

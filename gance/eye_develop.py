@@ -76,12 +76,13 @@ def main() -> None:  # pylint: disable=too-many-locals
 
             skip_mask: List[bool] = list(for_mask > 75)
 
+            # Variable here is to avoid long line.
+            final_latents = projection_file_reader.final_latents_matrices_label(reader)
+
             model_output = viz_model_ins_outs(
                 models=multi_models,
                 data=alpha_blend_projection_file(
-                    final_latents_matrices_label=projection_file_reader.final_latents_matrices_label(
-                        reader
-                    ),
+                    final_latents_matrices_label=final_latents,
                     alpha=0.25,
                     fft_roll_enabled=True,
                     fft_amplitude_range=(-1, 1),
