@@ -21,6 +21,7 @@ from gance.data_into_model_visualization.model_visualization import viz_model_in
 from gance.data_into_model_visualization.visualization_inputs import alpha_blend_projection_file
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.image_sources import video_common
+from gance.iterator_on_disk import iterator_on_disk
 from gance.model_interface.model_functions import MultiModel
 from gance.projection import projection_file_reader
 from gance.vector_sources import music, vector_reduction
@@ -98,23 +99,30 @@ def main() -> None:  # pylint: disable=too-many-locals
                 model_index_window_width=context_windows_length,
             )
 
-            targets = cast(
-                ImageSourceType,
-                more_itertools.repeat_each(
-                    reader.target_images,
-                    divisor.divide_no_remainder(
-                        numerator=video_fps, denominator=reader.projection_attributes.projection_fps
+            foreground_images, (foreground_duplicate,) = iterator_on_disk(
+                iterator=cast(
+                    ImageSourceType,
+                    more_itertools.repeat_each(
+                        reader.target_images,
+                        divisor.divide_no_remainder(
+                            numerator=video_fps,
+                            denominator=reader.projection_attributes.projection_fps,
+                        ),
                     ),
                 ),
+                copies=1,
+            )
+
+            background_images, (background_duplicate,) = iterator_on_disk(
+                iterator=model_output.model_images, copies=1
             )
 
             overlay_results = overlay.compute_eye_tracking_overlay(
-                foreground_images=itertools.islice(targets, frames_to_visualize),
-                background_images=model_output.model_images,
+                foreground_images=itertools.islice(foreground_images, frames_to_visualize),
+                background_images=background_images,
                 skip_mask=skip_mask,
             )
 
-            # TODO: This pulls the whole overlay result (images and all) into memory.
             long_tracks_mask = vector_reduction.track_length_filter(
                 bool_tracks=(~pd.Series(skip_mask) & pd.Series(overlay_results.mask_contents)),
                 track_length=5,
@@ -134,8 +142,8 @@ def main() -> None:  # pylint: disable=too-many-locals
                 )
                 for (mask, foreground, background, in_long_track) in zip(
                     overlay_results.masks,
-                    overlay_results.foregrounds,
-                    overlay_results.backgrounds,
+                    foreground_duplicate,
+                    background_duplicate,
                     long_tracks_mask,
                 )
             )

@@ -164,8 +164,6 @@ class EyeTrackingOverlay(NamedTuple):
     """
 
     masks: Iterator[Optional["Image"]]
-    foregrounds: OptionalImageSourceType
-    backgrounds: OptionalImageSourceType
     contexts: Iterator[OverlayContext]
     mask_contents: Iterator[bool]
 
@@ -294,14 +292,12 @@ def compute_eye_tracking_overlay(
     )
 
     per_frame_results: Iterator[_FrameOverlayResult] = map(overlay_per_frame, packed_compute)
-    masks, foregrounds, backgrounds, contexts, mask_contents = transpose(per_frame_results)
+    masks, _, _, contexts, mask_contents = transpose(per_frame_results)
 
     # Split the different members from the per-frame tuples into iterables by type.
     # Gives consumer option to totally ignore parts of the result.
     return EyeTrackingOverlay(
         masks=masks,
-        foregrounds=foregrounds,
-        backgrounds=backgrounds,
         contexts=contexts,
         mask_contents=mask_contents,
     )
