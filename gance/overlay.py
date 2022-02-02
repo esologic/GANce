@@ -20,7 +20,7 @@ from scipy.spatial import distance
 from gance import faces
 from gance.assets import NOVA_PATH
 from gance.data_into_model_visualization import visualization_common
-from gance.gance_types import ImageSourceType, OptionalImageSourceType, RGBInt8ImageType
+from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.image_sources.image_sources_common import image_resolution
 from gance.logger_common import LOGGER
 from gance.vector_sources import music, vector_reduction
