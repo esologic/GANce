@@ -103,7 +103,11 @@ class ProjectionFileReader:  # pylint: disable=too-many-instance-attributes
     Points to everything available for a given projection.
     """
 
-    def __init__(self, projection_file_path: Path):
+    def __init__(self, projection_file_path: Path) -> None:
+        """
+        :param projection_file_path: Path to the projection file on disk.
+        """
+
         self._file = h5py.File(name=str(projection_file_path), mode="r")
 
         a = ProjectionAttributes.from_dict(self._file.attrs)  # type: ignore # pylint: disable=no-member

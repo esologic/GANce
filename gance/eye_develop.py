@@ -2,11 +2,9 @@
 Functions to feed vectors into a model and record the output.
 Also tools to visualize these vectors against the model outputs.
 """
-
-import itertools
 import logging
 import time
-from typing import Iterator, List, Tuple, cast
+from typing import Iterator, List, Tuple
 
 import more_itertools
 import numpy as np
@@ -19,9 +17,9 @@ from gance.assets import NOVA_PATH, OUTPUT_DIRECTORY, PRODUCTION_MODEL_PATH, PRO
 from gance.data_into_model_visualization import visualize_vector_reduction
 from gance.data_into_model_visualization.model_visualization import viz_model_ins_outs
 from gance.data_into_model_visualization.visualization_inputs import alpha_blend_projection_file
-from gance.gance_types import ImageSourceType, RGBInt8ImageType
+from gance.gance_types import RGBInt8ImageType
 from gance.image_sources import video_common
-from gance.iterator_on_disk import iterator_on_disk
+from gance.iterator_on_disk import HDF5_SERIALIZER, iterator_on_disk
 from gance.model_interface.model_functions import MultiModel
 from gance.projection import projection_file_reader
 from gance.vector_sources import music, vector_reduction
@@ -37,22 +35,21 @@ def main() -> None:  # pylint: disable=too-many-locals
     :return:
     """
 
-    frames_to_visualize = 1000
+    frames_to_visualize = None
     video_fps = 30
     context_windows_length = 200
     video_square_side_length = 1024
-    full_context = True
+    full_context = False
 
     with MultiModel(model_paths=[PRODUCTION_MODEL_PATH]) as multi_models:
 
         with projection_file_reader.load_projection_file(PROJECTION_FILE_PATH) as reader:
 
-            wav = music.read_wav_file(NOVA_PATH)
-
             time_series_audio_vectors = music.read_wav_scale_for_video(
-                wav=wav,
+                wav=NOVA_PATH,
                 vector_length=multi_models.expected_vector_length,
                 frames_per_second=video_fps,
+                cache_path=OUTPUT_DIRECTORY.joinpath("wav_cache.p"),
             )
 
             overlay_mask = vector_reduction.rolling_sum_results_layers(
@@ -73,9 +70,7 @@ def main() -> None:  # pylint: disable=too-many-locals
                 window_length=video_fps * 1,
             )
 
-            for_mask = pd.Series(overlay_mask.result.data).fillna(np.inf)
-
-            skip_mask: List[bool] = list(for_mask > 75)
+            skip_mask: List[bool] = list(pd.Series(overlay_mask.result.data).fillna(np.inf) > 75)
 
             # Variable here is to avoid long line.
             final_latents = projection_file_reader.final_latents_matrices_label(reader)
@@ -100,48 +95,56 @@ def main() -> None:  # pylint: disable=too-many-locals
             )
 
             foreground_images, (foreground_duplicate,) = iterator_on_disk(
-                iterator=cast(
-                    ImageSourceType,
-                    more_itertools.repeat_each(
-                        reader.target_images,
-                        divisor.divide_no_remainder(
-                            numerator=video_fps,
-                            denominator=reader.projection_attributes.projection_fps,
-                        ),
+                iterator=more_itertools.repeat_each(
+                    reader.target_images,
+                    divisor.divide_no_remainder(
+                        numerator=video_fps,
+                        denominator=reader.projection_attributes.projection_fps,
                     ),
                 ),
                 copies=1,
+                serializer=HDF5_SERIALIZER,
             )
 
             background_images, (background_duplicate,) = iterator_on_disk(
-                iterator=model_output.model_images, copies=1
+                iterator=model_output.model_images,
+                copies=1,
+                serializer=HDF5_SERIALIZER,
             )
 
             overlay_results = overlay.compute_eye_tracking_overlay(
-                foreground_images=itertools.islice(foreground_images, frames_to_visualize),
+                foreground_images=foreground_images,
                 background_images=background_images,
                 skip_mask=skip_mask,
             )
 
+            logging.info(
+                "Starting to compute mask to filter out short sequences of overlay frames."
+            )
+
+            boxes_list = list(overlay_results.bbox_lists)
+
             long_tracks_mask = vector_reduction.track_length_filter(
-                bool_tracks=(~pd.Series(skip_mask) & pd.Series(overlay_results.mask_contents)),
-                track_length=5,
+                bool_tracks=(
+                    ~pd.Series(skip_mask) & pd.Series((box is not None for box in boxes_list))
+                ),
+                track_length=3,
             )
 
             final_frames: Iterator[Tuple[RGBInt8ImageType, RGBInt8ImageType, RGBInt8ImageType]] = (
                 (
-                    overlay.apply_mask(
+                    overlay.write_boxes_onto_image(
                         foreground_image=foreground,
                         background_image=background,
-                        mask=mask,
+                        bounding_boxes=bounding_boxes,
                     )
                     if in_long_track
                     else background,
                     foreground,
                     background,
                 )
-                for (mask, foreground, background, in_long_track) in zip(
-                    overlay_results.masks,
+                for (bounding_boxes, foreground, background, in_long_track) in zip(
+                    boxes_list,
                     foreground_duplicate,
                     background_duplicate,
                     long_tracks_mask,
@@ -217,6 +220,8 @@ def main() -> None:  # pylint: disable=too-many-locals
                     video_fps=video_fps,
                     audio_path=NOVA_PATH,
                 )
+            else:
+                more_itertools.consume(finals)
 
 
 if __name__ == "__main__":

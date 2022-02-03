@@ -9,40 +9,132 @@ import shutil
 from pathlib import Path
 from queue import Queue
 from tempfile import NamedTemporaryFile
-from typing import Iterator, List, Tuple, TypeVar
+from typing import Iterator, List, NamedTuple, Tuple, TypeVar
 
+import h5py
+import numpy as np
 from sentinels import NOTHING
+from typing_extensions import Protocol
 
 IterationItem = TypeVar("IterationItem")
 
 
-def load_queue_items(queue: "Queue[Path]") -> Iterator[IterationItem]:
+class SerializeItem(Protocol):
+    """
+    Describes a function that writes a given item out to disk.
+    """
+
+    def __call__(self, path: Path, item: IterationItem) -> None:
+        """
+        :param path: Path to write the serialized object to on disk.
+        :param item: Object to serialize.
+        :return: None
+        """
+
+
+class DeSerializeItem(Protocol):
+    """
+    Describes a function that loads an item from disk back into memory.
+    """
+
+    def __call__(self, path: Path) -> IterationItem:
+        """
+        :param path: Path to the object on disk.
+        :return: Item loaded back into memory.
+        """
+
+
+class Serializer(NamedTuple):
+    """
+    A pair of functions, one to write and one to load items from disk.
+    """
+
+    serialize: SerializeItem
+    deserialize: DeSerializeItem
+
+
+def serialize_pickle(path: Path, item: IterationItem) -> None:
+    """
+    Writes an item to disk using the built-in pickle module.
+    :param path: Path to write the serialized object to on disk.
+    :param item: Object to serialize.
+    :return: None
+    """
+
+    with open(str(path), "wb") as p:
+        pickle.dump(item, p)
+
+
+def deserialize_pickle(path: Path) -> IterationItem:
+    """
+    Loads a pickled item from disk using the built-in pickle module.
+    :param path: Path to the object on disk.
+    :return: Item loaded back into memory.
+    """
+
+    with open(str(path), "rb") as p:
+        output: IterationItem = pickle.load(p)
+        return output
+
+
+PICKLE_SERIALIZER = Serializer(serialize=serialize_pickle, deserialize=deserialize_pickle)
+
+HDF5_DATASET_NAME = "item_dataset"
+
+
+def serialize_hdf5(path: Path, item: np.ndarray) -> None:
+    """
+    Writes an item to disk using hdf5, a format for storing data arrays on disk.
+    :param path: Path to write the serialized object to on disk.
+    :param item: Object to serialize.
+    :return: None
+    """
+
+    with h5py.File(name=str(path), mode="w") as f:
+        f.create_dataset(
+            HDF5_DATASET_NAME,
+            shape=item.shape,
+            dtype=item.dtype,
+            data=item,
+            compression="gzip",
+            shuffle=True,
+        )
+
+
+def deserialize_hdf5(path: Path) -> np.ndarray:
+    """
+    Loads an item to disk using hdf5, a format for storing data arrays on disk.
+    :param path: Path to the object on disk.
+    :return: Item loaded back into memory.
+    """
+
+    with h5py.File(name=str(path), mode="r") as f:
+        return np.array(f[HDF5_DATASET_NAME])
+
+
+HDF5_SERIALIZER = Serializer(serialize=serialize_hdf5, deserialize=deserialize_hdf5)
+
+
+def load_queue_items(queue: "Queue[Path]", deserialize: DeSerializeItem) -> Iterator[IterationItem]:
     """
     Iterate over the items in a queue.
     Load the objects on disk back into memory and yield them.
     Before yielding the objects, deletes their source file.
     :param queue: To consume.
+    :param deserialize: Function to load the items from disk.
     :return: An iterator of the items stored in the queue.
     """
 
-    def load_item(path: Path) -> IterationItem:
-        """
-        Helper function.
-        :param path: Load the object at this path.
-        :return: The loaded object
-        """
-
-        with open(str(path), "rb") as p:
-            output: IterationItem = pickle.load(p)
-            path.unlink()
-
-        return output
-
-    return map(load_item, iter(queue.get, NOTHING))
+    for path in iter(queue.get, NOTHING):
+        output: IterationItem = deserialize(path)
+        path.unlink()
+        yield output
 
 
 def iterator_on_disk(
-    iterator: Iterator[IterationItem], copies: int
+    iterator: Iterator[IterationItem],
+    copies: int,
+    serializer: Serializer = PICKLE_SERIALIZER,
 ) -> Tuple[Iterator[IterationItem], Tuple[Iterator[IterationItem], ...]]:
     """
     Caches the results from an input iterator onto disk rather than into memory for re-iteration
@@ -51,6 +143,7 @@ def iterator_on_disk(
     :param iterator: The iterator to duplicate.
     :param copies: The number of secondary iterators to make. Think of this like the `n` argument
     to `itertools.tee`.
+    :param serializer: Defines how the objects will be stored on disk.
     :return: A tuple:
         (
             The primary iterator. Consume this one to populate the values in the secondary
@@ -63,9 +156,7 @@ def iterator_on_disk(
 
     path_queues: List["Queue[Path]"] = [Queue() for _ in range(copies)]
 
-    def forward_iterator() -> Iterator[  # pylint: disable=inconsistent-return-statements
-        IterationItem
-    ]:
+    def forward_iterator() -> Iterator[IterationItem]:
         """
         Works through the input iterator, and as new times are produced, saves
         them to disk, and fills the queues with their locations.
@@ -75,21 +166,16 @@ def iterator_on_disk(
         for item in iterator:
 
             # These will get deleted after being loaded into memory later.
-            with NamedTemporaryFile(mode="wb", delete=False) as primary_dump:
-                pickle.dump(item, primary_dump)
+            with NamedTemporaryFile(mode="wb", delete=True) as primary_dump:
 
-            queues = iter(path_queues)
+                primary_path = Path(primary_dump.name)
+                serializer.serialize(path=primary_path, item=item)
 
-            try:
-                queue = next(queues)
-            except StopIteration:
-                return None
-
-            queue.put(Path(primary_dump.name))
-
-            for queue in queues:
-                with NamedTemporaryFile(mode="wb", delete=False) as secondary_dump:
-                    queue.put(Path(shutil.copy(src=primary_dump.name, dst=secondary_dump.name)))
+                for queue in path_queues:
+                    with NamedTemporaryFile(mode="wb", delete=False) as secondary_dump:
+                        secondary_path = Path(secondary_dump.name)
+                        shutil.copy(src=primary_path, dst=secondary_path)
+                        queue.put(secondary_path)
 
             yield item
 
@@ -97,4 +183,6 @@ def iterator_on_disk(
         for queue in path_queues:
             queue.put(NOTHING)
 
-    return forward_iterator(), tuple(load_queue_items(queue) for queue in path_queues)
+    return forward_iterator(), tuple(
+        load_queue_items(queue, deserialize=serializer.deserialize) for queue in path_queues
+    )

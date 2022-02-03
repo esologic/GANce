@@ -2,15 +2,16 @@
 Functions/types to be able to read in music via wav files and then present that data as an input
 vector to models.
 """
-
+import pickle
 from functools import partial
 from pathlib import Path
-from typing import NamedTuple, Union, overload
+from typing import NamedTuple, Optional, Union, overload
 
 import numpy as np
 import resampy
 from scipy.io import wavfile
 
+from gance.logger_common import LOGGER
 from gance.vector_sources.vector_sources_common import pad_array, remap_values_into_range
 
 
@@ -35,15 +36,14 @@ def read_wav_scale_for_video(
     wav: WavFileProperties,
     vector_length: int,
     frames_per_second: float,
+    cache_path: Optional[Path] = None,
 ) -> WavFileProperties:
     ...
 
 
 @overload
 def read_wav_scale_for_video(
-    wav: Path,
-    vector_length: int,
-    frames_per_second: float,
+    wav: Path, vector_length: int, frames_per_second: float, cache_path: Optional[Path] = None
 ) -> WavFileProperties:
     ...
 
@@ -52,6 +52,7 @@ def read_wav_scale_for_video(
     wav: Union[Path, WavFileProperties],
     vector_length: int,
     frames_per_second: float,
+    cache_path: Optional[Path] = None,
 ) -> WavFileProperties:
     """
     Reads a `.wav` file into memory, converting it to mono, and then re-sampling the signal.
@@ -64,8 +65,21 @@ def read_wav_scale_for_video(
     :param wav: Path to the `.wav` file.
     :param vector_length: The side length of the network, ex: 1024.
     :param frames_per_second: The FPS of the resulting video.
+    :param cache_path: This is an expensive operation, write the result to this path.
+    If this path exists, return it rather than computing the file.
     :return: The data, the new sample rate, and a label as a NT.
     """
+
+    if cache_path is not None:
+        LOGGER.debug("Looking for cached audio.")
+        if cache_path.exists():
+            with open(str(cache_path), "rb") as read_file:
+                LOGGER.debug("Cached audio found. Loading.")
+                output: WavFileProperties = pickle.load(read_file)
+                LOGGER.debug("Audio loaded.")
+                return output
+        else:
+            LOGGER.warning("No audio cache found, will be created.")
 
     input_wav = read_wav_file(wav) if isinstance(wav, Path) else wav
 
@@ -86,7 +100,7 @@ def read_wav_scale_for_video(
 
     scaled_wav = _scale_wav_to_sample_rate(input_wav, scaled_sample_rate)
 
-    return WavFileProperties(
+    output = WavFileProperties(
         wav_data=pad_array(
             scaled_wav.wav_data,
             int(np.ceil(scaled_wav.wav_data.shape[0] / vector_length) * vector_length),
@@ -94,6 +108,12 @@ def read_wav_scale_for_video(
         sample_rate=input_wav.sample_rate,
         name=f"{scaled_wav.name}_padded",
     )
+
+    if cache_path is not None:
+        with open(str(cache_path), "wb") as write_file:
+            pickle.dump(output, write_file)
+
+    return output
 
 
 def read_wav_file(wav_path: Path, convert_to_32bit_float: bool = True) -> WavFileProperties:

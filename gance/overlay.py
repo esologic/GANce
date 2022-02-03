@@ -3,7 +3,6 @@ Write parts of one video on top of another.
 Do things like track eyes to interesting effect.
 """
 
-
 import itertools
 from typing import Dict, Iterator, List, NamedTuple, Optional, Tuple, cast
 
@@ -21,13 +20,13 @@ from gance import faces
 from gance.assets import NOVA_PATH
 from gance.data_into_model_visualization import visualization_common
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
-from gance.image_sources.image_sources_common import image_resolution
+from gance.image_sources.image_sources_common import ImageResolution, image_resolution
 from gance.logger_common import LOGGER
 from gance.vector_sources import music, vector_reduction
 from gance.vector_sources.vector_reduction import DataLabel, ResultLayers
 
 
-class BoundingBoxType(NamedTuple):
+class BoundingBox(NamedTuple):
     """
     Describes a bounding box rectangle as output by opencv.
     """
@@ -54,9 +53,7 @@ class OverlayContext(NamedTuple):
     bbox_distance: Optional[float] = None
 
 
-def landmarks_to_bounding_boxes(
-    landmarks: List[Dict[str, Tuple[int, ...]]]
-) -> List[BoundingBoxType]:
+def landmarks_to_bounding_boxes(landmarks: List[Dict[str, Tuple[int, ...]]]) -> List[BoundingBox]:
     """
     For each of the sets of keypoints, pull out the interesting ones, and draw a bounding box
     around them. Currently, the left and right eye keypoints are used.
@@ -65,12 +62,12 @@ def landmarks_to_bounding_boxes(
     """
 
     return [
-        BoundingBoxType(*cv2.boundingRect(np.array(landmark["left_eye"] + landmark["right_eye"])))
+        BoundingBox(*cv2.boundingRect(np.array(landmark["left_eye"] + landmark["right_eye"])))
         for landmark in landmarks
     ]
 
 
-def bounding_box_center(bounding_box: BoundingBoxType) -> Tuple[float, float]:
+def bounding_box_center(bounding_box: BoundingBox) -> Tuple[float, float]:
     """
     Finds the center x,y coordinate of a given bounding box.
     :param bounding_box: Box to analyze.
@@ -81,7 +78,7 @@ def bounding_box_center(bounding_box: BoundingBoxType) -> Tuple[float, float]:
 
 
 def bounding_box_distance(
-    a_boxes: List[BoundingBoxType], b_boxes: List[BoundingBoxType]
+    a_boxes: List[BoundingBox], b_boxes: List[BoundingBox]
 ) -> Optional[float]:
     """
     Calculate the minimum distance between two sets of bounding boxes.
@@ -105,7 +102,7 @@ def bounding_box_distance(
         return None
 
 
-def draw_mask(destination: "Image", bounding_boxes: List[BoundingBoxType]) -> Image:
+def _draw_mask(resolution: ImageResolution, bounding_boxes: List[BoundingBox]) -> "Image":
     """
     Draw bounding boxes as a white mask on a given image. Edges of bounding boxes are
     included in mask.
@@ -114,7 +111,8 @@ def draw_mask(destination: "Image", bounding_boxes: List[BoundingBoxType]) -> Im
     :return: The input image, but now with the bounding boxes down onto it.
     """
 
-    draw = ImageDraw.Draw(destination)
+    output = Image.new("L", tuple(resolution))
+    draw = ImageDraw.Draw(output)
 
     for bounding_box in bounding_boxes:
 
@@ -132,27 +130,49 @@ def draw_mask(destination: "Image", bounding_boxes: List[BoundingBoxType]) -> Im
             fill=255,
         )
 
-    return destination
+    return output
 
 
-def apply_mask(
-    foreground_image: RGBInt8ImageType, background_image: RGBInt8ImageType, mask: "Image"
+def _apply_mask(
+    foreground_image: "Image", background_image: RGBInt8ImageType, mask: "Image"
 ) -> RGBInt8ImageType:
     """
-
-    :param foreground_image:
+    Writes a masked region of the foreground
+    :param foreground_image: An image that has already been converted to a PIL Image
     :param background_image:
     :param mask:
     :return:
     """
     return cast(
         RGBInt8ImageType,
-        np.asarray(
-            Image.composite(
-                Image.fromarray(foreground_image), Image.fromarray(background_image), mask
-            )
-        ),
+        np.asarray(Image.composite(foreground_image, Image.fromarray(background_image), mask)),
     )
+
+
+def write_boxes_onto_image(
+    foreground_image: RGBInt8ImageType,
+    background_image: RGBInt8ImageType,
+    bounding_boxes: List[BoundingBox],
+) -> RGBInt8ImageType:
+    """
+
+    :param foreground_image:
+    :param background_image:
+    :param bounding_boxes:
+    :return:
+    """
+
+    foreground = Image.fromarray(foreground_image)
+
+    mask = _draw_mask(image_resolution(foreground_image), bounding_boxes)
+
+    output = _apply_mask(
+        foreground_image=foreground,
+        background_image=background_image,
+        mask=mask,
+    )
+
+    return output
 
 
 class EyeTrackingOverlay(NamedTuple):
@@ -163,9 +183,8 @@ class EyeTrackingOverlay(NamedTuple):
     Note: really important that the order of the members matches `_FrameOverlayResult`.
     """
 
-    masks: Iterator[Optional["Image"]]
+    bbox_lists: Iterator[Optional[List[BoundingBox]]]
     contexts: Iterator[OverlayContext]
-    mask_contents: Iterator[bool]
 
 
 class _FrameOverlayResult(NamedTuple):
@@ -173,22 +192,12 @@ class _FrameOverlayResult(NamedTuple):
     Represents the overlay computation for each frame in the input.
     """
 
-    # A PIL image that is a mask of the part of `foreground` that should be overlayed onto
-    # `background`.
-    # Note that this mask can be 'empty', and there might be no part of `foreground` that should
-    # be added to `background`.
-    mask: Optional["Image"] = None
-
-    # The image that will be partially drawn onto `background` as defined by `mask`.
-    foreground: Optional[RGBInt8ImageType] = None
-
-    # The image that the mask will be drawn onto.
-    background: Optional[RGBInt8ImageType] = None
+    # If an overlay should be created, the regions of the foreground image that should
+    # be written over the background is described by these bounding boxes.
+    foreground_bounding_boxes: Optional[List[BoundingBox]] = None
 
     # Information describing the decision to overlay or not. Consumed by visualization.
-    context: Optional[OverlayContext] = OverlayContext()
-
-    mask_content: bool = False
+    context: Optional[OverlayContext] = None
 
 
 def compute_eye_tracking_overlay(
@@ -228,13 +237,9 @@ def compute_eye_tracking_overlay(
 
         current_frame_number = next(frame_count)
 
-        blank_mask = Image.new("L", image_resolution(foreground_image), 0)
-
         if skip:
             LOGGER.info(f"Skipping eye tracking overlay for frame #{current_frame_number}")
-            return _FrameOverlayResult(
-                mask=blank_mask, foreground=foreground_image, background=background_image
-            )
+            return _FrameOverlayResult()
 
         foreground_bounding_boxes = landmarks_to_bounding_boxes(
             face_finder.face_landmarks(face_image=foreground_image)
@@ -256,12 +261,6 @@ def compute_eye_tracking_overlay(
             bbox_dist < min_bbox_distance if bbox_dist else False
         )
 
-        mask = (
-            draw_mask(destination=blank_mask, bounding_boxes=foreground_bounding_boxes)
-            if overlay_flag
-            else blank_mask
-        )
-
         LOGGER.info(
             f"Computed eye tracking overlay for "
             f"frame #{current_frame_number}, "
@@ -269,38 +268,31 @@ def compute_eye_tracking_overlay(
         )
 
         return _FrameOverlayResult(
-            mask=mask,
+            foreground_bounding_boxes=foreground_bounding_boxes if overlay_flag else None,
             context=OverlayContext(
                 perceptual_hash_distance=phash_dist,
                 bbox_distance=bbox_dist,
                 overlay_written=overlay_flag,
             ),
-            foreground=foreground_image,
-            background=background_image,
-            mask_content=overlay_flag,
         )
 
-    packed_compute = zip(
-        foreground_images,
-        background_images,
-        (
-            skip_mask
-            if skip_mask is not None
-            # This will create an chain of `False` that is the length of the input images.
-            else itertools.cycle([False])
+    per_frame_results: Iterator[_FrameOverlayResult] = map(
+        overlay_per_frame,
+        zip(
+            foreground_images,
+            background_images,
+            (
+                skip_mask
+                if skip_mask is not None
+                # This will create an chain of `False` that is the length of the input images.
+                else itertools.cycle([False])
+            ),
         ),
     )
 
-    per_frame_results: Iterator[_FrameOverlayResult] = map(overlay_per_frame, packed_compute)
-    masks, _, _, contexts, mask_contents = transpose(per_frame_results)
-
     # Split the different members from the per-frame tuples into iterables by type.
     # Gives consumer option to totally ignore parts of the result.
-    return EyeTrackingOverlay(
-        masks=masks,
-        contexts=contexts,
-        mask_contents=mask_contents,
-    )
+    return EyeTrackingOverlay(*transpose(per_frame_results))
 
 
 def visualize_overlay_computation(  # pylint: disable=too-many-locals

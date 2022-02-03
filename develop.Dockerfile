@@ -12,7 +12,6 @@ RUN apt-get update && apt-get install openssh-server sudo -y
 # User Config
 RUN useradd -rm -d /home/gpu -s /bin/bash -g root -G sudo -u 1000 gpu
 RUN  echo 'gpu:password' | chpasswd
-USER gpu
 
 # SSH Config
 RUN service ssh start
