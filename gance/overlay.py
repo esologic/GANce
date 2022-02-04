@@ -197,7 +197,7 @@ class _FrameOverlayResult(NamedTuple):
     foreground_bounding_boxes: Optional[List[BoundingBox]] = None
 
     # Information describing the decision to overlay or not. Consumed by visualization.
-    context: Optional[OverlayContext] = None
+    context: Optional[OverlayContext] = OverlayContext()
 
 
 def compute_eye_tracking_overlay(

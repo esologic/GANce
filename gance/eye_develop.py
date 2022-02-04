@@ -39,7 +39,7 @@ def main() -> None:  # pylint: disable=too-many-locals
     video_fps = 30
     context_windows_length = 200
     video_square_side_length = 1024
-    full_context = False
+    full_context = True
 
     with MultiModel(model_paths=[PRODUCTION_MODEL_PATH]) as multi_models:
 
@@ -128,7 +128,7 @@ def main() -> None:  # pylint: disable=too-many-locals
                 bool_tracks=(
                     ~pd.Series(skip_mask) & pd.Series((box is not None for box in boxes_list))
                 ),
-                track_length=3,
+                track_length=10,
             )
 
             final_frames: Iterator[Tuple[RGBInt8ImageType, RGBInt8ImageType, RGBInt8ImageType]] = (

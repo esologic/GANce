@@ -6,12 +6,11 @@ import itertools
 import logging
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Iterator, List, NamedTuple, Optional, Tuple, Union
+from typing import Iterator, List, NamedTuple, Optional, Tuple, Union, cast
 
 import numpy as np
 import PIL
 from cv2 import cv2
-from lz.transposition import transpose
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.collections import PathCollection
@@ -33,7 +32,7 @@ from gance.data_into_model_visualization.visualization_common import (
     infinite_colors,
     render_current_matplotlib_frame,
 )
-from gance.gance_types import OptionalImageSourceType, RGBInt8ImageType
+from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.image_sources.video_common import create_video_writer
 from gance.iterator_on_disk import deserialize_hdf5, serialize_hdf5
 from gance.logger_common import LOGGER
@@ -404,8 +403,8 @@ class ModelOutput(NamedTuple):
     Describes the two image sources that can result from a synthesis run.
     """
 
-    model_images: OptionalImageSourceType
-    visualization_images: OptionalImageSourceType
+    model_images: Optional[ImageSourceType]
+    visualization_images: Optional[ImageSourceType]
 
 
 class _RenderedFrame(NamedTuple):
@@ -443,17 +442,16 @@ def compute_force_synthesis_order(
     return False
 
 
-def load_and_delete(frame_input_path: _FrameInputPath) -> _RenderedFrame:
+def load_model_image_and_delete(frame_input_path: _FrameInputPath) -> RGBInt8ImageType:
     """
     Load the pickled frame from disk, and then delete the pickle file.
     :param frame_input_path: Represents the image and the path to the rendered image on disk.
     :return: The rendered frame.
     """
 
-    output: _RenderedFrame = deserialize_hdf5(path=frame_input_path.path)
-
+    LOGGER.info(f"Loading frame from disk: #{frame_input_path.frame.frame_index}")
+    output: RGBInt8ImageType = deserialize_hdf5(path=frame_input_path.path)
     frame_input_path.path.unlink()
-
     return output
 
 
@@ -485,7 +483,6 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals # <------- pain
     Note: This is the most complicated function in the whole project.
 
     :param data: The data array to visualize.
-    :param output_video_path: The path to write the video to.
     :param models: The face-generating model.
     :param default_vector_length: If no model is given, this will be used as the length
     of the "input vector"s.
@@ -512,9 +509,31 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals # <------- pain
         else frames_to_visualize
     )
 
-    data_visualizations = enable_2d or enable_3d
+    if frames_to_visualize is not None:
+        LOGGER.warning(f"Truncating output to the first {frames_to_visualize} frames!")
 
-    if data_visualizations:
+    input_sources = iter(
+        itertools.tee(
+            itertools.islice(
+                _frame_inputs(
+                    visualization_input=data,
+                    vector_length=vector_length,
+                    model_index_window_width=model_index_window_width,
+                ),
+                frames_to_visualize,
+            ),
+            sum([enable_3d and not enable_2d, models is not None]),
+        )
+    )
+
+    def create_visualization_frames(
+        frame_inputs: Iterator[FrameInput],
+    ) -> ImageSourceType:
+        """
+        Visualize the data that will be fed into the synthesis process.
+        :param frame_inputs: To visualize.
+        :return: Visualization images.
+        """
 
         # Needs to be this aspect ratio
         fig = plt.figure(
@@ -541,24 +560,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals # <------- pain
             video_height,
         )
 
-    if frames_to_visualize is not None:
-        LOGGER.warning(f"Truncating output to the first {frames_to_visualize} frames!")
-
-    # TODO -- break this up into two functions,
-    # one for visualization side and one for model output side.
-    def render_frame_in_memory(frame_input: FrameInput) -> _RenderedFrame:
-        """
-        Render the given `FrameInput` to an actual image given the context of the run.
-        This creates the matplotlib visualizations (if requested) and synthesizes the image out
-        of the model (if requested).
-        :param frame_input: The information needed to create the frame.
-        :return: The resulting image (frame) as a numpy array.
-        """
-
-        visualization_frame: Optional[RGBInt8ImageType] = None
-        model_frame: Optional[RGBInt8ImageType] = None
-
-        if data_visualizations:
+        for frame_input in frame_inputs:
 
             drawn_elements = _write_data_to_axes(
                 axes=configured_axes,
@@ -566,7 +568,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals # <------- pain
                 vector_length=vector_length,
             )
 
-            visualization_frame = render_current_matplotlib_frame(
+            yield render_current_matplotlib_frame(
                 fig=fig, resolution=data_visualizations_resolution
             )
 
@@ -574,80 +576,96 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals # <------- pain
             for element in drawn_elements:
                 element.remove()
 
-        if models is not None:
+    def create_model_frames(frame_inputs: Iterator[FrameInput]) -> ImageSourceType:
+        """
+        Create an iterator what when consumed yields synthesized frames from the model
+        given the input data per frame.
+        :param frame_inputs: To feed into the model.
+        :return: Iterator of images from the model.
+        """
+
+        def render_model_frame_in_memory(frame_input: FrameInput) -> RGBInt8ImageType:
+            """
+            Render the given `FrameInput` to an actual image given the context of the run.
+            This creates the matplotlib visualizations (if requested) and synthesizes the image out
+            of the model (if requested).
+            :param frame_input: The information needed to create the frame.
+            :return: The resulting image (frame) as a numpy array.
+            """
+
+            LOGGER.info(f"Using model to synthesize frame #{frame_input.frame_index}")
+
             if underlying_vector_length(frame_input.combined_sample.data) != vector_length:
                 LOGGER.warning(
                     f"Bad Sample Shape, expected {vector_length}, "
                     f"got {frame_input.combined_sample.data.shape}"
                 )
 
-            model_frame = cv2.resize(
-                models.indexed_create_image_generic(  # This is the call that uses the model.
-                    index=frame_input.model_index,
-                    data=frame_input.combined_sample.data,
+            return cast(
+                RGBInt8ImageType,
+                cv2.resize(
+                    models.indexed_create_image_generic(  # This is the call that uses the model.
+                        index=frame_input.model_index,
+                        data=frame_input.combined_sample.data,
+                    ),
+                    (video_height, video_height),
                 ),
-                (video_height, video_height),
             )
 
-        return _RenderedFrame(model_frame=model_frame, visualization_frame=visualization_frame)
+        def serialize_frame(frame_input: FrameInput, rendered_frame_count: int) -> _FrameInputPath:
+            """
+            Renders a given frame into memory, and immediately writes it to disk as a pickled file.
+            :param frame_input: The frame to render.
+            :param rendered_frame_count: Consumed in logging.
+            :return: A tuple, the `FrameInput` and a path to the pickle file on disk.
+            """
 
-    def serialize_frame(frame_input: FrameInput, rendered_frame_count: int) -> _FrameInputPath:
-        """
-        Renders a given frame into memory, and immediately writes it to disk as a pickled file.
-        :param frame_input: The frame to render.
-        :param rendered_frame_count: Consumed in logging.
-        :return: A tuple, the `FrameInput` and a path to the pickle file on disk.
-        """
+            LOGGER.info(
+                "Serializing frame to file."
+                f"Model index: {frame_input.model_index}. "
+                f"Frame position: {frame_input.frame_index}. "
+                f"Frame count: {rendered_frame_count}/{total_num_frames}. "
+            )
 
-        LOGGER.info(
-            "Serializing frame to file."
-            f"Model index: {frame_input.model_index}. "
-            f"Frame position: {frame_input.frame_index}. "
-            f"Frame count: {rendered_frame_count}/{total_num_frames}. "
-        )
+            # These will get deleted later in the pipeline.
+            with NamedTemporaryFile(mode="w", delete=False) as p:
+                frame_path = Path(p.name)
+                frame = render_model_frame_in_memory(frame_input)
+                serialize_hdf5(path=frame_path, item=frame)
+                return _FrameInputPath(frame=frame_input, path=frame_path)
 
-        # These will get deleted later in the pipeline.
-        with NamedTemporaryFile(mode="w", delete=False) as p:
-            frame_path = Path(p.name)
-            frame = render_frame_in_memory(frame_input)
-            serialize_hdf5(path=frame_path, item=frame)
-            return _FrameInputPath(frame=frame_input, path=frame_path)
+        if compute_force_synthesis_order(
+            force_optimize_synthesis_order,
+            len(models.model_indices) if models is not None else None,
+        ):
+            LOGGER.info("Will synthesis order will be optimized")
 
-    frame_inputs = itertools.islice(
-        _frame_inputs(
-            visualization_input=data,
-            vector_length=vector_length,
-            model_index_window_width=model_index_window_width,
-        ),
-        frames_to_visualize,
+            efficient_rendering_order = (
+                sorted(frame_inputs, key=lambda frame_input: frame_input.model_index)
+                if models is not None
+                else frame_inputs
+            )
+
+            files_on_disk: Iterator[_FrameInputPath] = (
+                serialize_frame(frame_input, index)
+                for index, frame_input in enumerate(efficient_rendering_order)
+            )
+
+            # The `sorted` operation here is what causes the frames to render.
+            return map(
+                load_model_image_and_delete,
+                sorted(files_on_disk, key=lambda frame_path: frame_path[0].frame_index),
+            )
+        else:
+            LOGGER.info("Will synthesis order will not be optimized")
+            return map(render_model_frame_in_memory, frame_inputs)
+
+    return ModelOutput(
+        model_images=create_model_frames(next(input_sources)) if models is not None else None,
+        visualization_images=create_visualization_frames(next(input_sources))
+        if (enable_2d or enable_3d)
+        else None,
     )
-
-    if compute_force_synthesis_order(
-        force_optimize_synthesis_order, len(models.model_indices) if models is not None else None
-    ):
-        LOGGER.info("Will synthesis order will be optimized")
-
-        efficient_rendering_order = (
-            sorted(frame_inputs, key=lambda frame_input: frame_input.model_index)
-            if models is not None
-            else frame_inputs
-        )
-
-        files_on_disk: Iterator[_FrameInputPath] = (
-            serialize_frame(frame_input, index)
-            for index, frame_input in enumerate(efficient_rendering_order)
-        )
-
-        # The `sorted` operation here is what causes the frames to render.
-        rendered_frames = map(
-            load_and_delete, sorted(files_on_disk, key=lambda frame_path: frame_path[0].frame_index)
-        )
-
-    else:
-        LOGGER.info("Will synthesis order will not be optimized")
-        rendered_frames = map(render_frame_in_memory, frame_inputs)
-
-    return ModelOutput(*transpose(rendered_frames))
 
 
 def _y_bounds(data: np.ndarray, y_range: Optional[Tuple[int, int]] = None) -> Tuple[int, int]:
