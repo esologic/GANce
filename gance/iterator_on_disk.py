@@ -135,7 +135,7 @@ def iterator_on_disk(
     iterator: Iterator[IterationItem],
     copies: int,
     serializer: Serializer = PICKLE_SERIALIZER,
-) -> Tuple[Iterator[IterationItem], Tuple[Iterator[IterationItem], ...]]:
+) -> Tuple[Iterator[IterationItem], ...]:
     """
     Caches the results from an input iterator onto disk rather than into memory for re-iteration
     later. Kind of like `itertools.tee`, but instead of going into memory with the copies, the
@@ -148,7 +148,7 @@ def iterator_on_disk(
         (
             The primary iterator. Consume this one to populate the values in the secondary
             iterators.,
-            A tuple of secondary iterators. When one of these is incremented, it's next object
+            The secondary iterators. When one of these is incremented, it's next object
             is loaded from disk and yielded. Note that if you iterate on these past the head of
             `primary`, then the iteration will block.
         )
@@ -183,6 +183,6 @@ def iterator_on_disk(
         for queue in path_queues:
             queue.put(NOTHING)
 
-    return forward_iterator(), tuple(
+    return (forward_iterator(),) + tuple(
         load_queue_items(queue, deserialize=serializer.deserialize) for queue in path_queues
     )

@@ -34,7 +34,9 @@ def test_iterator_on_disk(to_duplicate: List[Any], copies: int) -> None:
     :return: None
     """
 
-    primary, secondaries = iterator_on_disk(iterator=iter(to_duplicate), copies=copies)
+    result = iterator_on_disk(iterator=iter(to_duplicate), copies=copies)
+    primary = result[0]
+    secondaries = result[1:]
     assert len(secondaries) == copies
     assert np.array_equal(to_duplicate, list(primary))
     for secondary in secondaries:

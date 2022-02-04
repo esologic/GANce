@@ -74,9 +74,9 @@ def read_wav_scale_for_video(
         LOGGER.debug("Looking for cached audio.")
         if cache_path.exists():
             with open(str(cache_path), "rb") as read_file:
-                LOGGER.debug("Cached audio found. Loading.")
+                LOGGER.info("Cached audio found. Loading.")
                 output: WavFileProperties = pickle.load(read_file)
-                LOGGER.debug("Audio loaded.")
+                LOGGER.info("Audio loaded.")
                 return output
         else:
             LOGGER.warning("No audio cache found, will be created.")

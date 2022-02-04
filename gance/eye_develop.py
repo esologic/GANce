@@ -70,7 +70,7 @@ def main() -> None:  # pylint: disable=too-many-locals
                 window_length=video_fps * 1,
             )
 
-            skip_mask: List[bool] = list(pd.Series(overlay_mask.result.data).fillna(np.inf) > 75)
+            skip_mask: List[bool] = list(pd.Series(overlay_mask.result.data).fillna(np.inf) > 100)
 
             # Variable here is to avoid long line.
             final_latents = projection_file_reader.final_latents_matrices_label(reader)
@@ -94,27 +94,31 @@ def main() -> None:  # pylint: disable=too-many-locals
                 model_index_window_width=context_windows_length,
             )
 
-            foreground_images, (foreground_duplicate,) = iterator_on_disk(
-                iterator=more_itertools.repeat_each(
-                    reader.target_images,
-                    divisor.divide_no_remainder(
-                        numerator=video_fps,
-                        denominator=reader.projection_attributes.projection_fps,
+            foreground_iterators = iter(
+                iterator_on_disk(
+                    iterator=more_itertools.repeat_each(
+                        reader.target_images,
+                        divisor.divide_no_remainder(
+                            numerator=video_fps,
+                            denominator=reader.projection_attributes.projection_fps,
+                        ),
                     ),
-                ),
-                copies=1,
-                serializer=HDF5_SERIALIZER,
+                    copies=1,
+                    serializer=HDF5_SERIALIZER,
+                )
             )
 
-            background_images, (background_duplicate,) = iterator_on_disk(
-                iterator=model_output.model_images,
-                copies=1,
-                serializer=HDF5_SERIALIZER,
+            background_iterators = iter(
+                iterator_on_disk(
+                    iterator=model_output.model_images,
+                    copies=1,
+                    serializer=HDF5_SERIALIZER,
+                )
             )
 
             overlay_results = overlay.compute_eye_tracking_overlay(
-                foreground_images=foreground_images,
-                background_images=background_images,
+                foreground_images=next(foreground_iterators),
+                background_images=next(background_iterators),
                 skip_mask=skip_mask,
             )
 
@@ -128,7 +132,7 @@ def main() -> None:  # pylint: disable=too-many-locals
                 bool_tracks=(
                     ~pd.Series(skip_mask) & pd.Series((box is not None for box in boxes_list))
                 ),
-                track_length=10,
+                track_length=20,
             )
 
             final_frames: Iterator[Tuple[RGBInt8ImageType, RGBInt8ImageType, RGBInt8ImageType]] = (
@@ -145,8 +149,8 @@ def main() -> None:  # pylint: disable=too-many-locals
                 )
                 for (bounding_boxes, foreground, background, in_long_track) in zip(
                     boxes_list,
-                    foreground_duplicate,
-                    background_duplicate,
+                    next(foreground_iterators),
+                    next(background_iterators),
                     long_tracks_mask,
                 )
             )

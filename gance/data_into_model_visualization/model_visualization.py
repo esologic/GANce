@@ -522,7 +522,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals # <------- pain
                 ),
                 frames_to_visualize,
             ),
-            sum([enable_3d and not enable_2d, models is not None]),
+            sum([enable_3d or enable_2d, models is not None]),
         )
     )
 
