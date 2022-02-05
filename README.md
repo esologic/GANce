@@ -2,9 +2,19 @@
 
 ![Sample network output](./gance_sample.png)
 
-Maps music and video into the latent space of StyleGAN networks.
+Maps music and video into the latent space of StyleGAN (mostly focused on StyleGAN2) networks.
 
 See [esologic.com/gance](https://www.esologic.com/gance) for more information.
+
+## Usage
+
+The functionality available in the libraries are exposed through a series of command line 
+interfaces. The following is a listing of the commands that are stable and mostly usable at this
+point.
+
+| **Script**             | **Description**                                                                                                                    |
+|------------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| `music_into_models.py` | Feed inputs (music, videos) into a network and record the output. Also tools to visualize these vectors against the model outputs. |
 
 ## Getting Started
 

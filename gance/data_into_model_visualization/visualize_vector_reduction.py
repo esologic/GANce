@@ -2,7 +2,6 @@
 Functions to visualize the vector reduction process.
 """
 import itertools
-import time
 from pathlib import Path
 from typing import Optional
 
@@ -11,7 +10,6 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from gance.assets import NOVA_PATH, OUTPUT_DIRECTORY
 from gance.data_into_model_visualization import visualization_common
 from gance.data_into_model_visualization.visualization_common import (
     VectorsReducer,
@@ -19,7 +17,6 @@ from gance.data_into_model_visualization.visualization_common import (
     standard_matplotlib_figure,
 )
 from gance.gance_types import ImageSourceType
-from gance.image_sources.video_common import write_source_to_disk_consume
 from gance.logger_common import LOGGER
 from gance.vector_sources import vector_reduction
 from gance.vector_sources.music import read_wav_scale_for_video
@@ -93,12 +90,14 @@ def visualize_result_layers(  # pylint: disable=too-many-locals
     horizontal_line: Optional[float] = None,
 ) -> ImageSourceType:
     """
-
-    :param result_layers:
-    :param video_height:
-    :param frames_per_context:
-    :param title:
-    :return:
+    Create a stream of images that visualize a `ResultLayers` object. Useful for understanding
+    how the resulting data was created.
+    :param result_layers: To visualize.
+    :param video_height: Side length in pixels.
+    :param frames_per_context: Number of time-series points to display at once.
+    :param title: To be written on the top of the figure.
+    :param horizontal_line: Arbitrary line to represent something.
+    :return: The video.
     """
 
     fig = standard_matplotlib_figure()
@@ -178,42 +177,3 @@ def visualize_result_layers(  # pylint: disable=too-many-locals
 
         for axes in fig.axes:
             axes.clear()
-
-
-if __name__ == "__main__":
-
-    time_series_audio_vectors = read_wav_scale_for_video(
-        wav=NOVA_PATH,
-        vector_length=512,
-        frames_per_second=30.0,
-    )
-
-    gzip_results = vector_reduction.reduce_vector_gzip_compression_rolling_average(
-        time_series_audio_vectors=time_series_audio_vectors.wav_data,
-        vector_length=512,
-    )
-
-    overlay_mask = vector_reduction.rolling_sum_results_layers(
-        vector_reduction.absolute_value_results_layers(
-            vector_reduction.derive_results_layers(
-                gzip_results,
-                order=1,
-            )
-        ),
-        window_length=10,
-    )
-
-    music_overlay_mask_visualization = visualize_result_layers(
-        result_layers=gzip_results,
-        frames_per_context=250,
-        video_height=1024,
-        title="Overlay binary mask",
-    )
-
-    video_path = OUTPUT_DIRECTORY.joinpath(f"{int(time.time())}_overlay_test.mp4")
-
-    write_source_to_disk_consume(
-        source=itertools.islice(music_overlay_mask_visualization, 250),
-        video_path=video_path,
-        video_fps=30.0,
-    )

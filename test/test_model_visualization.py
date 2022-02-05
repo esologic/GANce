@@ -8,7 +8,7 @@ from typing import Tuple
 import pytest
 
 from gance.data_into_model_visualization import model_visualization
-from gance.data_into_model_visualization.model_visualization import ModelOutput
+from gance.data_into_model_visualization.model_visualization import SynthesisOutput
 from gance.data_into_model_visualization.visualization_inputs import (
     alpha_blend_vectors_max_rms_power_audio,
 )
@@ -21,7 +21,7 @@ from gance.vector_sources.vector_sources_common import sub_vectors
 
 def get_model_output(
     enable_3d: bool, enable_2d: bool, video_fps: float, model_enabled: bool, video_side_length: int
-) -> Tuple[int, ModelOutput]:
+) -> Tuple[int, SynthesisOutput]:
     """
     Modify only the test-relevant components of the visualization run.
     :param enable_3d: 3D model panel will be added.

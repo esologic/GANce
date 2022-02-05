@@ -1,14 +1,13 @@
 """
-Functions to feed vectors into a model and record the output.
+Feed inputs (music, videos) into a network and record the output.
 Also tools to visualize these vectors against the model outputs.
 """
 
 import logging
 from pathlib import Path
-from typing import Any, Callable, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Iterator, List, Optional, Tuple, cast
 
 import click
-import cv2
 import more_itertools
 import numpy as np
 import pandas as pd
@@ -31,8 +30,8 @@ from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import MultiModel, sorted_models_in_directory
 from gance.projection import projection_file_reader
 from gance.vector_sources import music, vector_reduction
-from gance.vector_sources.music import read_wav_scale_for_video
 from gance.vector_sources.vector_reduction import DataLabel, ResultLayers
+from gance.vector_sources.vector_types import ConcatenatedVectors
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("numba").setLevel(logging.WARNING)
@@ -69,7 +68,7 @@ def _parse_model_paths(models_directory: Optional[str], models: Optional[List[st
         all_models += sorted_models_in_directory(models_directory=models_directory_path)
 
     if models is not None:
-        all_models += models
+        all_models += list(map(Path, models))
 
     if not all_models:
         raise ValueError("No models given, cannot continue.")
@@ -266,27 +265,30 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 
     with MultiModel(
         model_paths=_parse_model_paths(models_directory=models_directory, models=model_path)
-    ) as model:
+    ) as multi_models:
 
         LOGGER.info(f"Writing video: {output_path}")
 
-        time_series_audio_vectors = read_wav_scale_for_video(
-            wav=audio_path,
-            vector_length=model.expected_vector_length,
-            frames_per_second=output_fps,
-        ).wav_data
+        time_series_audio_vectors = cast(
+            ConcatenatedVectors,
+            music.read_wav_scale_for_video(
+                wav=audio_path,
+                vector_length=multi_models.expected_vector_length,
+                frames_per_second=output_fps,
+            ).wav_data,
+        )
 
         synthesis_output = vector_synthesis(
-            models=model,
+            models=multi_models,
             data=alpha_blend_vectors_max_rms_power_audio(
                 alpha=alpha,
                 fft_roll_enabled=fft_roll_enabled,
                 fft_amplitude_range=fft_amplitude_range,
                 time_series_audio_vectors=time_series_audio_vectors,
-                vector_length=model.expected_vector_length,
-                model_indices=model.model_indices,
+                vector_length=multi_models.expected_vector_length,
+                model_indices=multi_models.model_indices,
             ),
-            default_vector_length=model.expected_vector_length,
+            default_vector_length=multi_models.expected_vector_length,
             enable_3d=False,
             enable_2d=debug_path is not None,
             frames_to_visualize=frames_to_visualize,
@@ -318,7 +320,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
             more_itertools.consume(forwarded_hero_frames)
 
 
-@cli.command()  # type: ignore   # pylint: disable=too-many-arguments
+@cli.command()  # pylint: disable=too-many-arguments
 @common_command_options
 @click.option(
     "--projection_file_path",
@@ -357,7 +359,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     "-t",
     "--complexity_change_threshold",
     type=click.IntRange(min=0),
-    help="If complexity is under this value, an overlay computation is enabled. ",
+    help="If complexity is under this value, an overlay computation is enabled.",
     default=100,
     show_default=True,
 )
@@ -455,11 +457,14 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
         Path(projection_file_path)
     ) as reader:
 
-        time_series_audio_vectors = music.read_wav_scale_for_video(
-            wav=audio_path,
-            vector_length=multi_models.expected_vector_length,
-            frames_per_second=output_fps,
-        ).wav_data
+        time_series_audio_vectors = cast(
+            ConcatenatedVectors,
+            music.read_wav_scale_for_video(
+                wav=audio_path,
+                vector_length=multi_models.expected_vector_length,
+                frames_per_second=output_fps,
+            ).wav_data,
+        )
 
         synthesis_output = vector_synthesis(
             models=multi_models,
@@ -528,7 +533,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
             )
         )
 
-        overlay_results = overlay.compute_eye_tracking_overlay(
+        overlay_results = overlay.overlay_eye_tracking.compute_eye_tracking_overlay(
             foreground_images=next(foreground_iterators),
             background_images=next(background_iterators),
             min_phash_distance=phash_distance,
@@ -549,7 +554,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
 
         final_frames: Iterator[Tuple[RGBInt8ImageType, RGBInt8ImageType, RGBInt8ImageType]] = (
             (
-                overlay.write_boxes_onto_image(
+                overlay.overlay_common.write_boxes_onto_image(
                     foreground_image=foreground,
                     background_image=background,
                     bounding_boxes=bounding_boxes,
@@ -578,7 +583,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
 
         if create_debug_visualization:
 
-            overlay_visualization = overlay.visualize_overlay_computation(
+            visualization = overlay.overlay_visualization.visualize_overlay_computation(
                 overlay=overlay_results.contexts,
                 frames_per_context=debug_window,
                 video_square_side_length=output_side_length,
@@ -623,7 +628,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
                         finals,
                         foregrounds,
                         backgrounds,
-                        overlay_visualization,
+                        visualization,
                         synthesis_output.visualization_images,
                         music_overlay_mask_visualization,
                     )

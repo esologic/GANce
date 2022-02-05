@@ -206,7 +206,6 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
     :param vector_length: See docs in the protocol.
     :param model_indices: See docs in the protocol.
     :return: The vector sources to be passed to the visualization functions.
-    :return:
     """
 
     spectrogram = _create_spectrogram(
@@ -220,7 +219,7 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
 
     projected_vectors: ConcatenatedMatrices = vector_sources_common.promote_to_matrix_duplicate(
         data=vector_sources_common.duplicate_to_vector_count(
-            # TODO: This is a shortcut that we can take because we know the vectors within the
+            # Note: This is a shortcut that we can take because we know the vectors within the
             # matrix are identical.
             data=vector_sources_common.demote_to_vector_select(
                 final_latents_matrices_label.data, index_to_take=0

@@ -169,6 +169,8 @@ def _frame_inputs(
     inputs to the data visualization.
     :param vector_length: The length of the expected output vectors. This will determine
     how many `FrameInput`s are created.
+    :param model_index_window_width: For visualization of the model index, how many indicies
+    should be displayed at once on the time series plot.
     :return: One `FrameInput` per possible frames in `visualization_input`.
     """
 
@@ -398,7 +400,7 @@ def _write_data_to_axes(
     )
 
 
-class ModelOutput(NamedTuple):
+class SynthesisOutput(NamedTuple):
     """
     Describes the two image sources that can result from a synthesis run.
     """
@@ -430,16 +432,18 @@ def compute_force_synthesis_order(
     force_optimize_synthesis_order: bool, num_model_indices: Optional[int]
 ) -> bool:
     """
-
-    :param force_optimize_synthesis_order:
-    :param num_model_indices:
-    :return:
+    Read user input, and the state of the models to determine if synthesis ordering
+    should be used.
+    :param force_optimize_synthesis_order: From user.
+    :param num_model_indices: From model discovery process.
+    :return: The flag.
     """
 
-    if num_model_indices is not None and num_model_indices > 1:
-        return force_optimize_synthesis_order
-
-    return False
+    return (
+        force_optimize_synthesis_order
+        if num_model_indices is not None and num_model_indices > 1
+        else False
+    )
 
 
 def load_model_image_and_delete(frame_input_path: _FrameInputPath) -> RGBInt8ImageType:
@@ -460,12 +464,12 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
     models: Optional[MultiModel],
     default_vector_length: Optional[int] = 1024,
     video_height: Optional[int] = 1024,
-    enable_3d: bool = True,
+    enable_3d: bool = False,
     enable_2d: bool = True,
     frames_to_visualize: Optional[int] = None,
     model_index_window_width: Optional[int] = None,
     force_optimize_synthesis_order: bool = True,
-) -> ModelOutput:
+) -> SynthesisOutput:
     """
     Given an input array, for each possible input vector in the array, feed these vectors into
     the model. Take the output image and combine it with a matplotlib visualization of the entire
@@ -495,6 +499,10 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
     will be created alongside the output of the model.
     :param frames_to_visualize: The number of frames in the input to visualize. Starts from the
     first index, goes to this value. Ex. 10 is given, the first 10 frames will be visualized.
+    :param model_index_window_width: For the time-series visualization of the model index, this is
+    how many indices should be displayed at once.
+    :param force_optimize_synthesis_order: If the snythesis order optimization should
+    be done or not.
     :return: `output_video_path`, but now the video will actually be there.
     """
 
@@ -660,7 +668,7 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
             LOGGER.info("Will synthesis order will not be optimized")
             return map(render_model_frame_in_memory, frame_inputs)
 
-    return ModelOutput(
+    return SynthesisOutput(
         synthesized_images=create_model_frames(next(input_sources)) if models is not None else None,
         visualization_images=create_visualization_frames(next(input_sources))
         if (enable_2d or enable_3d)

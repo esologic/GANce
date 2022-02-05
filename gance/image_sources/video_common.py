@@ -230,7 +230,7 @@ def write_source_to_disk_forward(
     Consume an image source, write it out to disk.
     :param source: To write to disk.
     :param video_path: Output video path.
-    :param video_fps: FPS of the output video.
+    :param video_fps: Frames/Second of the output video.
     :param audio_path: If given, the audio file at this path will be written to the output video.
     :return: None
     """
