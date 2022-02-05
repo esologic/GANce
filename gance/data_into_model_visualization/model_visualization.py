@@ -403,7 +403,7 @@ class ModelOutput(NamedTuple):
     Describes the two image sources that can result from a synthesis run.
     """
 
-    model_images: Optional[ImageSourceType]
+    synthesized_images: Optional[ImageSourceType]
     visualization_images: Optional[ImageSourceType]
 
 
@@ -412,7 +412,7 @@ class _RenderedFrame(NamedTuple):
     Intermediate Type, unpacks the results from a synthesis run into their component parts.
     """
 
-    model_frame: Optional[RGBInt8ImageType]
+    synthesized_frame: Optional[RGBInt8ImageType]
     visualization_frame: Optional[RGBInt8ImageType]
 
 
@@ -455,7 +455,7 @@ def load_model_image_and_delete(frame_input_path: _FrameInputPath) -> RGBInt8Ima
     return output
 
 
-def viz_model_ins_outs(  # pylint: disable=too-many-locals # <------- pain
+def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
     data: VisualizationInput,
     models: Optional[MultiModel],
     default_vector_length: Optional[int] = 1024,
@@ -661,7 +661,7 @@ def viz_model_ins_outs(  # pylint: disable=too-many-locals # <------- pain
             return map(render_model_frame_in_memory, frame_inputs)
 
     return ModelOutput(
-        model_images=create_model_frames(next(input_sources)) if models is not None else None,
+        synthesized_images=create_model_frames(next(input_sources)) if models is not None else None,
         visualization_images=create_visualization_frames(next(input_sources))
         if (enable_2d or enable_3d)
         else None,

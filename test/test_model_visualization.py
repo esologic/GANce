@@ -53,7 +53,7 @@ def get_model_output(
 
         return len(
             sub_vectors(data.combined.data, vector_length=multi_models.expected_vector_length)
-        ), model_visualization.viz_model_ins_outs(
+        ), model_visualization.vector_synthesis(
             data=data,
             models=multi_models if model_enabled else None,
             default_vector_length=multi_models.expected_vector_length,
@@ -95,7 +95,7 @@ def assert_all_none(frames: OptionalImageSourceType) -> int:
     "video_side_length",
     [100, 300, 512, 1024],
 )
-def test_viz_model_ins_outs_integration(
+def test_vector_synthesis_integration(
     enable_3d: bool, enable_2d: bool, video_fps: float, model_enabled: bool, video_side_length: int
 ) -> None:
     """
@@ -134,14 +134,14 @@ def test_viz_model_ins_outs_integration(
                 assert resolution.width == video_side_length * (enable_2d + enable_3d)
             assert expected_num_frames == len(visualization_frames)
         else:
-            assert assert_all_none(model_output.visualization_images) == expected_num_frames
+            assert model_output.visualization_images is None
 
         if model_enabled:
-            model_frames = list(model_output.model_images)
+            model_frames = list(model_output.synthesized_images)
             for frame in model_frames:
                 resolution = image_sources_common.image_resolution(frame)
                 assert resolution.height == video_side_length
                 assert resolution.width == video_side_length
             assert expected_num_frames == len(model_frames)
         else:
-            assert assert_all_none(model_output.model_images) == expected_num_frames
+            assert model_output.synthesized_images is None

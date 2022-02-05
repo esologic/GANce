@@ -17,7 +17,7 @@ from gance.iterator_on_disk import iterator_on_disk
     "to_duplicate",
     [
         ["a", "screaming", "across", "the", "sky"],
-        [1, 2, 3],
+        [0, 1, 2, 3],
         list(
             video_common.frames_in_video(
                 video_path=SAMPLE_FACE_VIDEO_PATH, width_height=(10, 10)

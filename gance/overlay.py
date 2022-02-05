@@ -203,8 +203,8 @@ class _FrameOverlayResult(NamedTuple):
 def compute_eye_tracking_overlay(
     foreground_images: ImageSourceType,
     background_images: ImageSourceType,
-    min_phash_distance: int = 30,
-    min_bbox_distance: float = 50.0,
+    min_phash_distance: int,
+    min_bbox_distance: float,
     skip_mask: Optional[List[bool]] = None,
 ) -> EyeTrackingOverlay:
     """

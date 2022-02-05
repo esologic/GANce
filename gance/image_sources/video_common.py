@@ -3,10 +3,9 @@ Common functionality for dealing with video files.
 """
 
 import itertools
-import math
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Iterable, Iterator, List, NamedTuple, Optional, Tuple
+from typing import Iterator, List, NamedTuple, Optional, Tuple
 
 import ffmpeg
 import more_itertools
@@ -15,7 +14,7 @@ from cv2 import cv2
 from ffmpeg.nodes import FilterableStream
 
 from gance import divisor
-from gance.gance_types import ImageSourceType, OptionalImageSourceType, RGBInt8ImageType
+from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.image_sources.image_sources_common import ImageResolution, image_resolution
 from gance.logger_common import LOGGER
 
@@ -297,20 +296,4 @@ def write_source_to_disk_consume(
         write_source_to_disk_forward(
             source=source, video_path=video_path, video_fps=video_fps, audio_path=audio_path
         )
-    )
-
-
-def horizontal_concat_optional_sources(
-    sources: Iterable[OptionalImageSourceType],
-) -> ImageSourceType:
-    """
-    For each frame in each frame source in `sources`, concatenate frames at the same
-    index, and emit the result.
-    :param sources: An iterable of frame sources.
-    :return: An iterator of the newly combined frames.
-    """
-
-    yield from (
-        cv2.hconcat(list(filter(lambda frame: frame is not None, frames)))
-        for frames in zip(*sources)
     )
