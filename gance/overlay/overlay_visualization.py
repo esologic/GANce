@@ -4,11 +4,12 @@ is going on during an overlay computation.
 """
 
 import itertools
-from typing import Iterator, NamedTuple, Optional
+from typing import Iterator, List, NamedTuple, Optional, Tuple, cast
 
 import more_itertools
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
 
 from gance.data_into_model_visualization import visualization_common
 from gance.gance_types import ImageSourceType
@@ -34,10 +35,86 @@ class OverlayContext(NamedTuple):
     bbox_distance: Optional[float] = None
 
 
+class VisualizeOverlayThresholds(NamedTuple):
+    """
+    Set of threshold values to label on an overlay.
+    """
+
+    phash_line: float
+    bbox_distance_line: float
+
+
+class YValues(NamedTuple):
+    """
+    Defines a scatter plot on an axes.
+    """
+
+    values: List[float]
+    color: str
+    label: str
+
+
+def _setup_axis(
+    axis: Axes,
+    x_values: np.ndarray,
+    y_values: List[YValues],
+    title: str,
+    horizontal_line_location: Optional[float],
+    y_label: str = "Values",
+    x_label: str = "Frame #",
+) -> Tuple[float, float]:
+    """
+    Helper function to set up axes for plotting.
+    :param axis: To configure.
+    :param x_values: X values of sub-scatter plots.
+    :param y_values: List of y values, and data about the values to plot.
+    :param title: Axes title.
+    :param horizontal_line_location: If given, a horizontal line will be drawn at this location.
+    :param y_label: Y label of axes.
+    :param x_label: X label of axes.
+    :return: Tuple, (min, max) values given in `y_values`.
+    """
+
+    for values in y_values:
+
+        axis.scatter(
+            x_values,
+            values.values,
+            color=values.color,
+            label=values.label,
+            marker="x",
+            alpha=0.5,
+        )
+
+    axis.set_title(title)
+    axis.set_ylabel(y_label)
+    axis.set_xlabel(x_label)
+    axis.grid()
+    axis.legend(loc="upper right")
+
+    all_y_values = list(
+        filter(None, itertools.chain.from_iterable(values.values for values in y_values))
+    )
+    axis_min = min(all_y_values) - 5 if all_y_values else -5
+    axis_max = max(all_y_values) + 5 if all_y_values else 5
+    axis.set_ylim(axis_min, axis_max)
+
+    axis.hlines(
+        y=horizontal_line_location,
+        xmin=min(x_values) - 5,
+        xmax=max(x_values) + 5,
+        linestyles="dotted",
+        color="purple",
+    )
+
+    return axis_min, axis_max
+
+
 def visualize_overlay_computation(  # pylint: disable=too-many-locals
     overlay: Iterator[OverlayContext],
     frames_per_context: int,
     video_square_side_length: Optional[int],
+    horizontal_lines: Optional[VisualizeOverlayThresholds] = None,
 ) -> ImageSourceType:
     """
     Consumes the contexts from an overlay computation and produces a visualization of the
@@ -46,6 +123,7 @@ def visualize_overlay_computation(  # pylint: disable=too-many-locals
     :param frames_per_context: The number of adjacent frames to visualize in each frame.
     :param video_square_side_length: Video is composed of a 3x2 grid of square sub-videos,
     each with a side length of this many pixels.
+    :param horizontal_lines: Labeled lines to help understand computations.
     :return: The frames of the visualization.
     """
 
@@ -64,84 +142,41 @@ def visualize_overlay_computation(  # pylint: disable=too-many-locals
         (
             flags,
             perceptual_hash_distances,
-            average_hash_distances,
-            difference_hash_distances,
-            wavelet_hash_distance,
-            hashes_average_distance,
             bounding_box_distances,
         ) = zip(*current)
 
         num_frames = len(flags)
         x_axis = np.arange(num_frames)
 
-        hash_axis.scatter(
-            x_axis,
-            perceptual_hash_distances,
-            color="red",
-            label="P Hash Distance",
-            marker="x",
-            alpha=0.5,
+        hash_axis_min, hash_axis_max = _setup_axis(
+            axis=hash_axis,
+            x_values=x_axis,
+            y_values=[
+                YValues(
+                    values=cast(List[float], perceptual_hash_distances),
+                    color="red",
+                    label="Perceptual Hash Distance",
+                )
+            ],
+            title="Overlay Discriminator (Image Hashing)",
+            horizontal_line_location=horizontal_lines.phash_line if horizontal_lines else None,
         )
 
-        hash_axis.scatter(
-            x_axis,
-            average_hash_distances,
-            color="purple",
-            label="A Hash Distance",
-            marker="x",
-            alpha=0.5,
+        bbox_axis_min, bbox_axis_max = _setup_axis(
+            axis=bbox_distance_axis,
+            x_values=x_axis,
+            y_values=[
+                YValues(
+                    values=cast(List[float], bounding_box_distances),
+                    color="green",
+                    label="Bounding Box Distance",
+                )
+            ],
+            title="Overlay Discriminator (Face Tracking)",
+            horizontal_line_location=horizontal_lines.bbox_distance_line
+            if horizontal_lines
+            else None,
         )
-
-        hash_axis.scatter(
-            x_axis,
-            difference_hash_distances,
-            color="blue",
-            label="D Hash Distance",
-            marker="x",
-            alpha=0.5,
-        )
-
-        hash_axis.scatter(
-            x_axis,
-            wavelet_hash_distance,
-            color="brown",
-            label="W Hash Distance",
-            marker="x",
-            alpha=0.5,
-        )
-
-        hash_axis.scatter(
-            x_axis, hashes_average_distance, color="green", label="Hashes Average Distance"
-        )
-
-        hash_axis.set_title("Overlay Discriminator (Image Hashing)")
-        hash_axis.set_ylabel("Values")
-        hash_axis.set_xlabel("Frame #")
-        hash_axis.grid()
-        hash_axis.legend(loc="upper right")
-
-        hash_all_y_values = [value for value in perceptual_hash_distances if value is not None]
-        hash_axis_min = min(hash_all_y_values) - 5 if hash_all_y_values else -5
-        hash_axis_max = max(hash_all_y_values) + 5 if hash_all_y_values else 5
-
-        hash_axis.set_ylim(hash_axis_min, hash_axis_max)
-
-        bbox_distance_axis.scatter(
-            x_axis, bounding_box_distances, color="green", label="Bounding Box Distance"
-        )
-
-        bbox_distance_axis.set_title("Overlay Discriminator (Face Tracking)")
-        bbox_distance_axis.set_ylabel("Distance (Pixels)")
-        bbox_distance_axis.set_xlabel("Frame #")
-        bbox_distance_axis.grid()
-        bbox_distance_axis.legend(loc="upper right")
-
-        bbox_all_y_values = [value for value in bounding_box_distances if value is not None]
-
-        if bbox_all_y_values:
-            bbox_axis_min = min(bbox_all_y_values) - 5
-            bbox_axis_max = max(bbox_all_y_values) + 5
-            bbox_distance_axis.set_ylim(bbox_axis_min, bbox_axis_max)
 
         plt.tight_layout()
 
@@ -157,19 +192,16 @@ def visualize_overlay_computation(  # pylint: disable=too-many-locals
                 x=inter_group_index, ymin=hash_axis_min, ymax=hash_axis_max, color=line_color
             )
 
-            if bbox_all_y_values:
-                bbox_line = bbox_distance_axis.vlines(
-                    x=inter_group_index, ymin=bbox_axis_min, ymax=bbox_axis_max, color=line_color
-                )
+            bbox_line = bbox_distance_axis.vlines(
+                x=inter_group_index, ymin=bbox_axis_min, ymax=bbox_axis_max, color=line_color
+            )
 
             yield visualization_common.render_current_matplotlib_frame(
                 fig=fig, resolution=video_half_resolution
             )
 
             hash_line.remove()
-
-            if bbox_all_y_values:
-                bbox_line.remove()
+            bbox_line.remove()
 
         for axes in fig.axes:
             axes.clear()

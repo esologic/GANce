@@ -160,12 +160,13 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 show_default=True,
             ),
             click.option(
-                "-s" "--output_side_length",
+                "-s",
+                "--output_side_length",
                 help=(
                     "Both the synthesized output from the network, and the individual elements of "
                     "the debug visualizations are squares. This sets their side lengths in pixels."
                 ),
-                type=click.FloatRange(min=1),
+                type=click.IntRange(min=1),
                 required=False,
                 default=1024,
                 show_default=True,
@@ -173,7 +174,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
             optgroup.group(
                 "Debug Visualization Parameters",
                 cls=AllOptionGroup,
-                help=("Control the visualization produced alongside the output video."),
+                help="Control the visualization produced alongside the output video.",
             ),
             optgroup.option(
                 "--debug_path",
@@ -199,7 +200,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 help="Alpha blending coefficient.",
                 type=click.FloatRange(min=0),
                 required=False,
-                default=0.5,
+                default=0.25,
                 show_default=True,
             ),
             click.option(
@@ -207,7 +208,6 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 help="If true, the FFT vectors move over time.",
                 is_flag=True,
                 required=False,
-                default=False,
                 show_default=True,
             ),
             click.option(
@@ -215,7 +215,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 help="Values in FFT are scaled to this range.",
                 type=click.Tuple(types=(float, float)),
                 required=False,
-                default=(-4, 4),
+                default=(-1, 1),
                 show_default=True,
             ),
         ]
@@ -336,7 +336,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     ),
     type=click.IntRange(min=0, max=18),
     required=False,
-    default=0.5,
+    default=10,
     show_default=True,
 )
 @optgroup.group(
@@ -383,7 +383,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
         "bounding boxes, this value is the minimum distance in pixels between "
         "the origins of those bounding boxes to enable an overlay computation."
     ),
-    default=50.0,
+    default=100,
     show_default=True,
 )
 @optgroup.option(
@@ -587,6 +587,9 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
                 overlay=overlay_results.contexts,
                 frames_per_context=debug_window,
                 video_square_side_length=output_side_length,
+                horizontal_lines=overlay.overlay_visualization.VisualizeOverlayThresholds(
+                    phash_line=phash_distance, bbox_distance_line=bbox_distance
+                ),
             )
 
             music_overlay_mask_visualization = visualize_vector_reduction.visualize_result_layers(

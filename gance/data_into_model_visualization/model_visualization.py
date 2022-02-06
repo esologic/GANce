@@ -568,13 +568,15 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
             video_height,
         )
 
-        for frame_input in frame_inputs:
+        for index, frame_input in enumerate(frame_inputs):
 
             drawn_elements = _write_data_to_axes(
                 axes=configured_axes,
                 frame_input=frame_input,
                 vector_length=vector_length,
             )
+
+            LOGGER.info(f"Visualizing synthesis input #{index}")
 
             yield render_current_matplotlib_frame(
                 fig=fig, resolution=data_visualizations_resolution
