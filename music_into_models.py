@@ -544,14 +544,16 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
             > complexity_change_threshold
         )
 
+        frame_multiplier = divisor.divide_no_remainder(
+            numerator=output_fps,
+            denominator=reader.projection_attributes.projection_fps,
+        )
+
         foreground_iterators = iter(
             iterator_on_disk(
                 iterator=more_itertools.repeat_each(
                     reader.target_images,
-                    divisor.divide_no_remainder(
-                        numerator=output_fps,
-                        denominator=reader.projection_attributes.projection_fps,
-                    ),
+                    frame_multiplier,
                 ),
                 copies=1,
                 serializer=HDF5_SERIALIZER,
@@ -585,7 +587,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
             track_length=track_length,
         )
 
-        final_frames: Iterator[Tuple[RGBInt8ImageType, RGBInt8ImageType, RGBInt8ImageType]] = (
+        final_frames: Iterator[Tuple[RGBInt8ImageType, RGBInt8ImageType]] = (
             (
                 overlay.overlay_common.write_boxes_onto_image(
                     foreground_image=foreground,
@@ -595,7 +597,6 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
                 if in_long_track
                 else background,
                 foreground,
-                background,
             )
             for (bounding_boxes, foreground, background, in_long_track) in zip(
                 boxes_list,
@@ -605,7 +606,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
             )
         )
 
-        finals, foregrounds, backgrounds = transpose(final_frames)
+        finals, foregrounds = transpose(final_frames)
 
         finals = video_common.write_source_to_disk_forward(
             source=finals,
@@ -663,7 +664,10 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
                     ) in zip(
                         finals,
                         foregrounds,
-                        backgrounds,
+                        more_itertools.repeat_each(
+                            reader.final_images,
+                            frame_multiplier,
+                        ),
                         visualization,
                         synthesis_output.visualization_images,
                         music_overlay_mask_visualization,
