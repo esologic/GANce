@@ -3,9 +3,10 @@ Feed inputs (music, videos) into a network and record the output.
 Also tools to visualize these vectors against the model outputs.
 """
 
+import json
 import logging
 from pathlib import Path
-from typing import Any, Callable, Iterator, List, Optional, Tuple, cast
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, cast
 
 import click
 import more_itertools
@@ -218,11 +219,35 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 default=(-1, 1),
                 show_default=True,
             ),
+            click.option(
+                "--run_config",
+                help="If given, a JSON file containing input parameters, and metadata about the "
+                "output videos is written to this path after the run has finished.",
+                type=click.Path(
+                    exists=False, file_okay=True, writable=True, dir_okay=False, resolve_path=True
+                ),
+                required=False,
+                default=None,
+                show_default=True,
+            ),
         ]
     ):
         func = option(func)
 
     return func
+
+
+def write_input_args(output_path: Optional[str], current_locals: Dict[str, Any]) -> None:
+    """
+    Function to dump input args to CLI function to a file.
+    :param output_path: Path to the file to write, don't do anything if this value is None.
+    :param current_locals: The `locals()` call right after the CLI is invoked.
+    :return: None
+    """
+
+    if output_path is not None:
+        with open(output_path, "w") as f:
+            json.dump(current_locals, f, indent=4)
 
 
 @cli.command()  # type: ignore
@@ -240,6 +265,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     alpha: float,
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
+    run_config: Optional[str],
 ) -> None:
     """
     Transform audio data, combine it with smoothed random noise, and feed the result into a network
@@ -258,8 +284,11 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :param alpha: See click help.
     :param fft_roll_enabled: See click help.
     :param fft_amplitude_range: See click help.
+    :param run_config: See click help.
     :return: None
     """
+
+    write_input_args(output_path=run_config, current_locals=locals())
 
     audio_path = Path(wav)
 
@@ -411,6 +440,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     alpha: float,
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
+    run_config: Optional[str],
     projection_file_path: str,
     blend_depth: int,
     complexity_change_rolling_sum_window: int,
@@ -437,6 +467,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :param alpha: See click help.
     :param fft_roll_enabled: See click help.
     :param fft_amplitude_range: See click help.
+    :param run_config: See click help.
     :param projection_file_path: See click help.
     :param blend_depth: See click help.
     :param complexity_change_rolling_sum_window: See click help.
@@ -446,6 +477,8 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :param track_length: See click help.
     :return: None
     """
+
+    write_input_args(output_path=run_config, current_locals=locals())
 
     create_debug_visualization = debug_path is not None
 
