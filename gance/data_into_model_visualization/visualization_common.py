@@ -1,12 +1,14 @@
 """
 Common types, constants, functions used in visualization, to avoid cyclic imports.
 """
-
-from typing import List, NamedTuple, Optional, Tuple, Union
+import itertools
+from typing import Iterator, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import PIL
 from cv2 import cv2
+from matplotlib import colors as mcolors
+from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from typing_extensions import Protocol
@@ -22,6 +24,8 @@ from gance.vector_sources.vector_types import (
 STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE = 10
 STANDARD_MATPLOTLIB_DPI = 100
 
+DataLabelDataType = Union[np.ndarray, SingleVector, SingleMatrix]
+
 
 class DataLabel(NamedTuple):
     """
@@ -29,7 +33,7 @@ class DataLabel(NamedTuple):
     Label is only consumed by visualizations.
     """
 
-    data: Union[np.ndarray, SingleVector, SingleMatrix]
+    data: DataLabelDataType
     label: str
 
 
@@ -40,7 +44,7 @@ class ResultLayers(NamedTuple):
     """
 
     result: DataLabel
-    layers: List[DataLabel]
+    layers: List[DataLabel] = []
 
 
 class VectorsReducer(Protocol):  # pylint: disable=too-few-public-methods
@@ -74,13 +78,11 @@ class VisualizationInput(NamedTuple):
     # to create images.
     combined: Union[VectorsLabel, MatricesLabel]
 
-    # Should be one integer per vector, this contains which model should be used per frame.
-    model_indices: DataLabel
-
-    # Consumed only by data visualization, not actually fed into the synthesis.
+    # Results should be one integer per vector, this contains which model should be used per frame.
+    # Layers are only consumed by data visualization, not actually fed into the synthesis.
     # A list of `DataLabel` NTs that represent the different transformations on the input
     # vectors that led to the output values stored in `model_index`.
-    model_index_layers: List[DataLabel]
+    model_indices: ResultLayers
 
 
 class FrameInput(NamedTuple):
@@ -111,27 +113,6 @@ class FrameInput(NamedTuple):
     # Exactly like in `VisualizationInput`, but in the same range of indices as
     # `surrounding_model_indices`, so you can see the same context.
     model_index_layers: List[DataLabel]
-
-
-class CreateVisualizationInput(Protocol):  # pylint: disable=too-few-public-methods
-    """
-    Defines the standard shape of a visualization input function.
-    """
-
-    def __call__(
-        self: "CreateVisualizationInput",
-        time_series_audio_vectors: np.ndarray,
-        vector_length: int,
-        model_indices: List[int],
-    ) -> VisualizationInput:
-        """
-        :param time_series_audio_vectors: The input audio file in time series form. Shouldn't
-        be a spectrogram etc.
-        :param vector_length: The length of the input vector to the model.
-        :param model_indices: The indices of the candidate models to be chosen from to render
-        an image.
-        :return: A NamedTuple for holding the result, each part is consumed in a different way.
-        """
 
 
 class ConfiguredAxes(NamedTuple):
@@ -169,3 +150,26 @@ def render_current_matplotlib_frame(fig: Figure, resolution: Tuple[int, int]) ->
             resolution,
         )
     )
+
+
+def standard_matplotlib_figure() -> Figure:
+    """
+    Standard square aspect ratio matplotlib figure used in a few places in this repo.
+    :return: The configured figure.
+    """
+
+    return plt.figure(
+        figsize=(STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE, STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE),
+        dpi=STANDARD_MATPLOTLIB_DPI,
+        constrained_layout=False,  # Lets us use `.tight_layout()` later.
+    )
+
+
+def infinite_colors() -> Iterator[str]:
+    """
+    This is a deterministic way to get the same sequence of colors over and over again
+    for eternity. Probably a better way to do this.
+    :return: Iterator of strings to be input to matplotlib color arguments.
+    """
+
+    return itertools.cycle(list(mcolors.BASE_COLORS.keys()) + list(mcolors.TABLEAU_COLORS.keys()))

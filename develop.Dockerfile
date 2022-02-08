@@ -5,11 +5,15 @@ FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu18.04
 ENV TZ=America/New_York
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
+# Requirements to get the container set up, requirements for running the application are installed
+# with `create_venv.sh`.
 RUN apt-get update && apt-get install openssh-server sudo -y
 
-# SSH Config
+# User Config
 RUN useradd -rm -d /home/gpu -s /bin/bash -g root -G sudo -u 1000 gpu
 RUN  echo 'gpu:password' | chpasswd
+
+# SSH Config
 RUN service ssh start
 EXPOSE 22
 

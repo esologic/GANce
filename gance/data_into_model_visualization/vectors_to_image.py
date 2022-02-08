@@ -1,7 +1,7 @@
 """
 Functions around visualizing sets of vectors, resulting in images.
 """
-import itertools
+
 from contextlib import _GeneratorContextManager  # pylint: disable=unused-import
 from contextlib import contextmanager
 from pathlib import Path
@@ -9,7 +9,6 @@ from typing import Iterator, List, Optional, Tuple, Union
 
 import numpy as np
 from cv2 import cv2
-from matplotlib import colors as mcolors
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from typing_extensions import Protocol
@@ -17,11 +16,12 @@ from typing_extensions import Protocol
 from gance.apply_spectrogram import compute_spectrogram, reshape_spectrogram_to_vectors
 from gance.data_into_model_visualization.vectors_3d import plot_vectors_3d
 from gance.data_into_model_visualization.visualization_common import (
-    STANDARD_MATPLOTLIB_DPI,
-    STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE,
+    infinite_colors,
     render_current_matplotlib_frame,
+    standard_matplotlib_figure,
 )
 from gance.gance_types import RGBInt8ImageType
+from gance.image_sources.video_common import create_video_writer
 from gance.vector_sources.vector_sources_common import is_vector, sub_vectors
 from gance.vector_sources.vector_types import (
     MatricesLabel,
@@ -29,7 +29,6 @@ from gance.vector_sources.vector_types import (
     SingleVector,
     VectorsLabel,
 )
-from gance.video_common import create_video_writer
 
 
 def multi_plot_vectors(
@@ -180,11 +179,7 @@ def vector_visualizer(
     """
 
     # Needs to be this aspect ratio, would be easy to pass these in if needed later on.
-    fig = plt.figure(
-        figsize=(STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE, STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE),
-        dpi=STANDARD_MATPLOTLIB_DPI,
-        constrained_layout=False,  # Lets us use `.tight_layout()` later.
-    )
+    fig = standard_matplotlib_figure()
 
     axis = fig.add_subplot(1, 1, 1)
     axis.set_ylim([y_min - 1, y_max + 1])
@@ -211,12 +206,7 @@ def vector_visualizer(
             axis.scatter(x_values, sub_vector, color=color)
             for sub_vector, color in zip(
                 plotting_y,
-                itertools.cycle(
-                    # This is a deterministic way to get the same sequence of colors frame after
-                    # frame. There might be a cleaner way to do this.
-                    list(mcolors.BASE_COLORS.keys())
-                    + list(mcolors.TABLEAU_COLORS.keys())
-                ),
+                infinite_colors(),
             )
         ]
 
@@ -255,7 +245,7 @@ def vectors_to_video(
 
     video = create_video_writer(
         video_path=output_path,
-        num_squares=1,
+        num_squares_width=1,
         video_fps=video_fps,
         video_height=video_height,
     )

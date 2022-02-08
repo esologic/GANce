@@ -13,12 +13,10 @@ from matplotlib import colors as mcolors
 from matplotlib import pyplot as plt
 from scipy.interpolate import UnivariateSpline
 
+from gance.data_into_model_visualization import visualization_common
 from gance.data_into_model_visualization.vectors_to_image import SingleVectorViz, vector_visualizer
-from gance.data_into_model_visualization.visualization_common import (
-    STANDARD_MATPLOTLIB_DPI,
-    STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE,
-)
 from gance.hash_file import hash_file
+from gance.image_sources.video_common import create_video_writer
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import (
     ModelInterfaceInProcess,
@@ -31,7 +29,6 @@ from gance.projection.projection_file_reader import (
 )
 from gance.vector_sources.vector_sources_common import sub_vectors
 from gance.vector_sources.vector_types import MatricesLabel, SingleMatrix
-from gance.video_common import create_video_writer
 
 
 def _spline_to_points(splines: List[UnivariateSpline], x_values: np.ndarray) -> List[List[float]]:
@@ -106,11 +103,7 @@ def visualize_projection_convergence(  # pylint: disable=too-many-locals
     standard_deviation = int(np.std(points_of_interest))
 
     # Needs to be this aspect ratio, would be easy to pass these in if needed later on.
-    fig = plt.figure(
-        figsize=(STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE, STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE),
-        dpi=STANDARD_MATPLOTLIB_DPI,
-        constrained_layout=False,  # Lets us use `.tight_layout()` later.
-    )
+    fig = visualization_common.standard_matplotlib_figure()
 
     fig.suptitle(
         os.linesep.join(
@@ -243,7 +236,7 @@ def visualize_final_latents(
 
         video = create_video_writer(
             video_path=output_video_path,
-            num_squares=3,
+            num_squares_width=3,
             video_fps=reader.projection_attributes.projection_fps,
             video_height=video_height,
         )
@@ -345,7 +338,7 @@ def visualize_projection_history(  # pylint: disable=too-many-locals
 
         video = create_video_writer(
             video_path=output_video_path,
-            num_squares=3,
+            num_squares_width=3,
             video_fps=reader.projection_attributes.projection_fps,
             video_height=video_height,
         )
@@ -423,7 +416,7 @@ def visualize_partial_projection_history(  # pylint: disable=too-many-locals
 
         video = create_video_writer(
             video_path=output_video_path,
-            num_squares=4,
+            num_squares_width=4,
             video_fps=1,
             video_height=video_height,
         )

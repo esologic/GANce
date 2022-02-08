@@ -1,17 +1,32 @@
 # Changelog
 
-0.XX.0 - (202X-XX-XX)
+0.18.0 - (2022-02-08)
 ------------------
 
-* The `visualize_final_latents` command in `read_projection_file.py` can now accept multiple input audio 
-files that will be appended to each other and then added to the resulting video.
+* For music/video synthesis, introduced concept of the overlay, which is taking regions of the
+target images from a projection file, and displaying them over the synthesized output from the
+network. This gives the viewer a clue as to how the video was generated, and creates another
+interesting dimension of the resulting videos.
+* Refactored synthesis pipeline invoked in `music_into_models.py` as a series of iterators. This
+enabled introducing the overlay concept while still being able to efficiently use memory. This
+stream processing approach required a few modifications to existing concepts to be able to handle
+streams rather than complete lists etc.
+* Introduced video writers that can write video/audio to a file, and then forward the resulting 
+stream of frames to be re-used. 
+* Broke out some more standard functionality for dealing with images and videos. Introduced
+a set of types for single frames, and streams of frames (videos) as well as resolutions etc.
+* The `visualize_final_latents` command in `read_projection_file.py` can now accept multiple input 
+audio files that will be appended to each other and then added to the resulting video.
+* Finally, resolved the dlib import problem by creating `faces.py`, which enables the import of the
+offending library right before use, rather than on loading.
 
 
 0.17.0 - (2021-11-22)
 ------------------
 
 * Breaking up project and renaming it `GANce` for publication on GitHub.
-* Added a number of examples for a blog post explaining this project [here](https://www.esologic.com/gance/).
+* Added a number of examples for a blog post explaining this 
+project [here](https://www.esologic.com/gance/).
 
 
 0.16.1 - (2021-10-28)
@@ -104,7 +119,7 @@ data in each of the visualizations, and to add visualizations for the dynamic mo
 * Added audio compression that uses gzip as the basis for reduction.
 * Created a CLI, `music_into_models.py` to select `.wav` files and directories of models for 
 visualization.
-* Added standalone visualization for audio reducers to aide in development.
+* Added standalone visualization for audio reducers to aid in development.
 * Switched local version of `stylegan2` to a fork where resuming from a crashed job is possible.
 
 

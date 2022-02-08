@@ -10,10 +10,10 @@ from click_option_group import RequiredAnyOptionGroup, optgroup
 from PIL import Image
 
 from gance.hash_file import hash_file
+from gance.image_sources.still_image_common import PNG
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import MODEL_SUFFIX, MultiModel
 from gance.synthesis_file import SYNTHESIS_FILE_SUFFIX, read_vector_in_file, write_synthesis_file
-from gance.video_common import PNG
 
 
 def all_paths(

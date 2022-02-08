@@ -16,7 +16,7 @@ from gance.apply_spectrogram import (
     reshape_spectrogram_to_vectors,
 )
 from gance.assets import WAV_CLAPS_PATH
-from gance.data_into_model_visualization import model_visualization
+from gance.data_into_model_visualization import model_visualization, visualization_common
 from gance.data_into_model_visualization.model_visualization import (
     _configure_axes,
     _frame_inputs,
@@ -27,26 +27,22 @@ from gance.data_into_model_visualization.vectors_to_image import (
     vectors_to_video,
     visualize_data_with_spectrogram_and_3d_vectors,
 )
-from gance.data_into_model_visualization.visualization_common import (
-    STANDARD_MATPLOTLIB_DPI,
-    STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE,
-)
 from gance.data_into_model_visualization.visualization_inputs import (
     alpha_blend_vectors_max_rms_power_audio,
 )
-from gance.data_into_model_visualization.visualize_audio_reducer import visualize_reducer_output
-from gance.dynamic_model_switching import reduce_vector_gzip_compression_rolling_average
+from gance.data_into_model_visualization.visualize_vector_reduction import visualize_reducer_output
+from gance.image_sources.video_common import add_wav_to_video
 from gance.model_interface.model_functions import create_model_interface
 from gance.projection import projection_file_reader
 from gance.projection.projection_visualization import visualize_projection_history
 from gance.vector_sources import music, primatives, vector_sources_common
 from gance.vector_sources.music import read_wav_scale_for_video
+from gance.vector_sources.vector_reduction import reduce_vector_gzip_compression_rolling_average
 from gance.vector_sources.vector_sources_common import (
     rotate_vectors_over_time,
     smooth_across_vectors,
 )
 from gance.vector_sources.vector_types import ConcatenatedVectors, SingleVector, VectorsLabel
-from gance.video_common import add_wav_to_video
 
 
 def demo_smoothing() -> None:
@@ -99,15 +95,11 @@ def data_visualizations_single_frame() -> None:
     vector_length = 1000
 
     # Needs to be this aspect ratio
-    fig = plt.figure(
-        figsize=(STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE, STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE),
-        dpi=STANDARD_MATPLOTLIB_DPI,
-        constrained_layout=False,
-    )
+    fig = visualization_common.standard_matplotlib_figure()
 
     data = alpha_blend_vectors_max_rms_power_audio(
         time_series_audio_vectors=read_wav_scale_for_video(
-            WAV_CLAPS_PATH, vector_length, 60.0
+            wav=WAV_CLAPS_PATH, vector_length=vector_length, frames_per_second=60.0
         ).wav_data,
         vector_length=vector_length,
         model_indices=list(np.arange(20)),
@@ -147,7 +139,7 @@ def demo_rotation() -> None:
     vector_length = 512
 
     time_series_audio_vectors = read_wav_scale_for_video(
-        WAV_CLAPS_PATH, vector_length, 60.0
+        wav=WAV_CLAPS_PATH, vector_length=vector_length, frames_per_second=60.0
     ).wav_data
 
     spectrogram = compute_spectrogram_smooth_scale(
@@ -322,7 +314,7 @@ def blog_post_media() -> None:
         model_visualization.vectors_single_model_visualization(
             vectors_label=VectorsLabel(
                 data=music.read_wav_scale_for_video(
-                    wav_path=assets.NOVA_SNIPPET_PATH,
+                    wav=assets.NOVA_SNIPPET_PATH,
                     vector_length=model_interface.expected_vector_length,
                     frames_per_second=60.0,
                 ).wav_data,
@@ -353,4 +345,4 @@ def blog_post_media() -> None:
 
 
 if __name__ == "__main__":
-    blog_post_media()
+    data_visualizations_single_frame()

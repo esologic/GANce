@@ -10,17 +10,16 @@ from typing import Callable, Iterator, NamedTuple
 
 import click
 import numpy as np
-from skimage import data
-from skimage.feature import Cascade
 
+from gance import faces
 from gance.gance_types import RGBInt8ImageType
 from gance.hash_file import hash_file
+from gance.image_sources.still_image_common import PNG, write_image
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import MODEL_SUFFIX, MultiModel
 from gance.synthesis_file import write_synthesis_file
 from gance.vector_sources.primatives import DEFAULT_RANDOM_SEED, gaussian_data
 from gance.vector_sources.vector_types import SingleVector
-from gance.video_common import PNG, write_image
 
 
 class _ContainsFaceVectorImage(NamedTuple):
@@ -48,15 +47,9 @@ def create_images(
     :return: Info about the image and how it was generated.
     """
 
-    # One of the greatest evils in this whole repo.
-    # Under the hood, `face_recognition` uses dnnlib, which stylegan also uses.
-    # An init function is called upon import, which makes the loading of models within the
-    # subprocesses impossible. There's probably a better way around this but this was expedient.
-    # import face_recognition
-
     num_images = count()
 
-    face_detector = Cascade(data.lbp_frontal_face_cascade_filename())
+    face_finder = faces.FaceFinderProxy()
 
     while True:
         # Random noise vector.
@@ -73,13 +66,7 @@ def create_images(
         if (
             any(
                 # Constants determined experimentally.
-                face_detector.detect_multi_scale(
-                    img=image,
-                    scale_factor=1.9,
-                    step_ratio=1,
-                    min_size=(1, 1),
-                    max_size=tuple(image.shape[:2]),
-                )
+                face_finder.face_locations(image)
             )
             == contains_face
         ):
@@ -141,7 +128,7 @@ def write_images(
     "contain the desired images.",
 )
 @click.option(
-    "--faces",
+    "--num_faces",
     type=click.IntRange(min=0),
     help="For each model, this number of images that contain faces will be created",
 )
@@ -158,7 +145,7 @@ def write_images(
     show_default=True,
 )
 def images_from_model(  # pylint: disable=too-many-locals
-    models_directory: str, output_directory: str, faces: int, no_faces: int, random_seed: int
+    models_directory: str, output_directory: str, num_faces: int, no_faces: int, random_seed: int
 ) -> None:
     """
     Given a directory of models, create random images from them. Set how many images you want
@@ -170,7 +157,7 @@ def images_from_model(  # pylint: disable=too-many-locals
 
     :param models_directory: See click help.
     :param output_directory: See click help.
-    :param faces: See click help.
+    :param num_faces: See click help.
     :param no_faces: See click help.
     :param random_seed: See click help.
     :return: None
@@ -205,7 +192,7 @@ def images_from_model(  # pylint: disable=too-many-locals
             current_output_directory = top_level_output_directory.joinpath(model_name)
             current_output_directory.mkdir(exist_ok=True)
 
-            for contains_face, num_images in [(True, faces), (False, no_faces)]:
+            for contains_face, num_images in [(True, num_faces), (False, no_faces)]:
                 write_images(
                     images=itertools.islice(
                         create_images(

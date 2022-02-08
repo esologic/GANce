@@ -7,7 +7,7 @@ but can produce deceptively different results. The resample function I think doe
 but linspace is more literal.
 """
 
-import math
+import multiprocessing
 from typing import Callable, Iterable, Iterator, Tuple, Union, overload
 
 import numpy as np
@@ -15,6 +15,7 @@ from scipy import interpolate
 from scipy.interpolate import interp1d
 from scipy.signal import resample, savgol_filter
 
+from gance import divisor
 from gance.vector_sources.vector_types import (
     ConcatenatedMatrices,
     ConcatenatedVectors,
@@ -33,7 +34,8 @@ def pad_array(array: np.ndarray, size: int) -> np.ndarray:
     :param size: The target length of the array.
     :return: The padded array.
     """
-    return np.pad(array, pad_width=(0, size - len(array)), mode="constant")
+
+    return np.pad(array, pad_width=(0, size - len(array)), mode="constant", constant_values=0)
 
 
 def remap_values_into_range(
@@ -52,7 +54,8 @@ def remap_values_into_range(
     :return: The result as an iterator.
     """
     scale = interp1d(list(input_range), list(output_range))
-    return list(map(scale, list(data)))
+    with multiprocessing.Pool() as p:
+        return list(p.map(scale, data))
 
 
 def smooth_vector(vector: SingleVector, window_length: int, polyorder: int) -> SingleVector:
@@ -296,12 +299,19 @@ def duplicate_to_vector_count(
     # Each sub array here is the point in the vector across the set of vectors.
     points_over_time = split.swapaxes(1, 0)
 
-    frac, repeats = math.modf(target_vector_count / len(split))
+    duplication_factor = divisor.divide_no_remainder(
+        numerator=target_vector_count, denominator=len(split)
+    )
 
-    if frac != 0:
-        raise ValueError("Cannot repeat values in input to evenly get desired output length")
-
-    scaled_points_over_time = np.array([np.repeat(points, repeats) for points in points_over_time])
+    scaled_points_over_time = np.array(
+        [
+            np.repeat(
+                points,
+                duplication_factor,
+            )
+            for points in points_over_time
+        ]
+    )
 
     by_vector = np.array(scaled_points_over_time).swapaxes(1, 0)
 

@@ -1,22 +1,22 @@
 """
-Common functionality for dealing with video files
+Common functionality for dealing with video files.
 """
 
 import itertools
-import math
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Iterator, List, NamedTuple, Optional, Tuple
 
 import ffmpeg
+import more_itertools
 import numpy as np
 from cv2 import cv2
 from ffmpeg.nodes import FilterableStream
-from PIL import Image
 
-from gance.gance_types import RGBInt8ImageType
+from gance import divisor
+from gance.gance_types import ImageSourceType, RGBInt8ImageType
+from gance.image_sources.image_sources_common import ImageResolution, image_resolution
 from gance.logger_common import LOGGER
-
-PNG = "png"
 
 
 def _write_video(video_path: Path, audio: FilterableStream, output_path: Path) -> None:
@@ -76,25 +76,51 @@ def add_wavs_to_video(video_path: Path, audio_paths: List[Path], output_path: Pa
     )
 
 
-def create_video_writer(
-    video_path: Path, video_fps: float, video_height: int, num_squares: int
+def _create_video_writer_resolution(
+    video_path: Path, video_fps: float, resolution: ImageResolution
 ) -> cv2.VideoWriter:
     """
-    Helper function to configure the VideoWriter which writes frames to a video file.
-    :param video_path: Path to the file on disk.
-    :param video_fps: Desired FPS of the video.
-    :param video_height: Height of the video in pixels.
-    :param num_squares: Since each section of the video is a `video_height` x `video_height` square
-    this parameter sets the width for the video in pixels, with the number of these squares that
-    will be written in each frame.
-    :return: The openCV `VideoWriter` object.
+    Create a video writer of a given FPS and resolution.
+    :param video_path: Resulting file path.
+    :param video_fps: FPS of the video.
+    :param resolution: Size of the resulting video.
+    :return: The writer.
     """
 
     return cv2.VideoWriter(
         str(video_path),
         cv2.VideoWriter_fourcc(*"mp4v"),
         video_fps,
-        (video_height * num_squares, video_height),
+        (resolution.width, resolution.height),
+    )
+
+
+def create_video_writer(
+    video_path: Path,
+    video_fps: float,
+    video_height: int,
+    num_squares_width: int,
+    num_squares_height: int = 1,
+) -> cv2.VideoWriter:
+    """
+    Helper function to configure the VideoWriter which writes frames to a video file.
+    :param video_path: Path to the file on disk.
+    :param video_fps: Desired FPS of the video.
+    :param video_height: Height of the video in pixels.
+    :param num_squares_width: Since each section of the video is a `video_height` x `video_height`
+    square this parameter sets the width for the video in pixels, with the number of these squares
+    that will be written in each frame.
+    :param num_squares_height: Like `num_squares_width`, but for height. Sets the height of
+    the video in units of `video_height`.
+    :return: The openCV `VideoWriter` object.
+    """
+
+    return _create_video_writer_resolution(
+        video_path=video_path,
+        video_fps=video_fps,
+        resolution=ImageResolution(
+            width=video_height * num_squares_width, height=video_height * num_squares_height
+        ),
     )
 
 
@@ -120,9 +146,8 @@ def reduce_fps_take_every(original_fps: float, new_fps: float) -> Optional[int]:
     """
 
     if new_fps is not None:
-        frac, whole = math.modf(original_fps / new_fps)
-        if frac != 0:
-            raise ValueError(f"Cannot evenly get {new_fps} out of {original_fps}.")
+
+        whole = divisor.divide_no_remainder(numerator=original_fps, denominator=new_fps)
 
         if whole != 1:
             return int(whole)
@@ -198,23 +223,77 @@ def frames_in_video(
     )
 
 
-def read_image(image_path: Path) -> RGBInt8ImageType:
+def write_source_to_disk_forward(
+    source: ImageSourceType, video_path: Path, video_fps: float, audio_path: Optional[Path] = None
+) -> ImageSourceType:
     """
-    Read an image from disk into the canonical, in-memory format.
-    :param image_path: Path to the image file on disk.
-    :return: The image
-    """
-    # Verified by hand that this cast is valid
-    return RGBInt8ImageType(np.asarray(Image.open(str(image_path))))
-
-
-def write_image(image: RGBInt8ImageType, path: Path) -> None:
-    """
-    Writes a given image to the path.
-    Uses PNG by default.
-    :param image: Image in memory.
-    :param path: Destination.
+    Consume an image source, write it out to disk.
+    :param source: To write to disk.
+    :param video_path: Output video path.
+    :param video_fps: Frames/Second of the output video.
+    :param audio_path: If given, the audio file at this path will be written to the output video.
     :return: None
     """
 
-    Image.fromarray(image).save(fp=str(path), format=PNG.upper())
+    def setup_iteration(output_path: Path) -> ImageSourceType:
+        """
+        Helper function to set up the output and forwarding operation.
+        :param output_path: Intermediate video path.
+        :return: The frames to yield.
+        """
+
+        try:
+            first_frame = next(source)
+        except StopIteration:
+            LOGGER.error("Frame source was empty, nothing to write to disk.")
+            raise
+
+        writer = _create_video_writer_resolution(
+            video_path=output_path, video_fps=video_fps, resolution=image_resolution(first_frame)
+        )
+
+        def write_frame(frame: RGBInt8ImageType) -> None:
+            """
+            Write the given frame to the file.
+            :param frame: To write.
+            :return: None
+            """
+            writer.write(cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB))
+
+        for index, image in enumerate(itertools.chain([first_frame], source)):
+            LOGGER.info(f"Writing frame #{index} to file: {video_path}")
+            write_frame(image)
+            yield image
+
+        writer.release()
+
+    if audio_path is None:
+        yield from setup_iteration(video_path)
+    else:
+        # Don't write the video-only file to disk at the output path, instead
+        with NamedTemporaryFile(suffix=video_path.suffix) as file:
+            temp_video_path = Path(file.name)
+            yield from setup_iteration(temp_video_path)
+            file.flush()
+            add_wav_to_video(
+                video_path=temp_video_path, audio_path=audio_path, output_path=video_path
+            )
+
+
+def write_source_to_disk_consume(
+    source: ImageSourceType, video_path: Path, video_fps: float, audio_path: Optional[Path] = None
+) -> None:
+    """
+    Consume an image source, write it out to disk.
+    :param source: To write to disk.
+    :param video_path: Output video path.
+    :param video_fps: FPS of the output video.
+    :param audio_path: If given, the audio file at this path will be written to the output video.
+    :return: None
+    """
+
+    more_itertools.consume(
+        write_source_to_disk_forward(
+            source=source, video_path=video_path, video_fps=video_fps, audio_path=audio_path
+        )
+    )
