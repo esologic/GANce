@@ -1,6 +1,6 @@
 # Changelog
 
-0.18.0 - (2022-02-05)
+0.18.0 - (2022-02-08)
 ------------------
 
 * For music/video synthesis, introduced concept of the overlay, which is taking regions of the
