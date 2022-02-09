@@ -12,12 +12,14 @@ import click
 import more_itertools
 import numpy as np
 import pandas as pd
+import pydantic
 from click_option_group import AllOptionGroup, RequiredAnyOptionGroup, optgroup
 from cv2 import cv2
 from lz.transposition import transpose
 
 from gance import divisor, overlay
 from gance.assets import OUTPUT_DIRECTORY
+from gance.cli_common import NetworksFile
 from gance.data_into_model_visualization import visualize_vector_reduction
 from gance.data_into_model_visualization.model_visualization import vector_synthesis
 from gance.data_into_model_visualization.visualization_inputs import (
@@ -53,13 +55,17 @@ def cli() -> None:
     """
 
 
-def _parse_model_paths(models_directory: Optional[str], models: Optional[List[str]]) -> List[Path]:
+def _parse_model_paths(
+    models_directory: Optional[str], models: Optional[List[str]], models_json: Optional[str]
+) -> List[Path]:
     """
     Given the user's input from the CLI, get a list of the models to be used in the run.
     :param models_directory: A string representing a path to a directory that contains model
     files. Optionally given.
     :param models: Paths (as strings) leading directly to models. Optionally given.
+    :param models_json: Path to a json file with a list of model paths.
     :return: Path objects leading to the models. Sorted by filename.
+    :raises ValueError: If something goes wrong with a parse.
     """
 
     all_models = []
@@ -71,10 +77,23 @@ def _parse_model_paths(models_directory: Optional[str], models: Optional[List[st
     if models is not None:
         all_models += list(map(Path, models))
 
+    if models_json is not None:
+        try:
+            with open(models_json) as f:
+                all_models += list(map(Path, NetworksFile(**json.load(f)).models))
+        except pydantic.error_wrappers.ValidationError as e:
+            raise ValueError("Ran into formatting problem with models JSON.") from e
+        except Exception as e:
+            raise ValueError("Couldn't open models JSON.") from e
+
     if not all_models:
         raise ValueError("No models given, cannot continue.")
 
-    return sorted(all_models)
+    LOGGER.info("Discovered Models: ")
+    for path in all_models:
+        LOGGER.info(f"\t{path}")
+
+    return all_models
 
 
 def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -119,7 +138,10 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
             optgroup.option(
                 "-d",
                 "--models_directory",
-                help="Model `.pkl` files will be read from this directory.",
+                help=(
+                    "Model `.pkl` files will be read from this directory. "
+                    "These will be alphanumerically sorted."
+                ),
                 type=click.Path(
                     exists=True, file_okay=False, readable=True, dir_okay=True, resolve_path=True
                 ),
@@ -128,12 +150,27 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
             optgroup.option(
                 "-m",
                 "--model_path",
-                help="Paths to particular model files.",
+                help=(
+                    "Paths to particular model files. "
+                    "These will be used for synthesis in the order they're given."
+                ),
+                type=click.Path(
+                    exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True
+                ),
+                multiple=True,
+                default=None,
+            ),
+            optgroup.option(
+                "--models_json",
+                help=(
+                    'Path to a JSON file with a single key: "models" that maps to a list of paths '
+                    "to model pickle files. These will be used for synthesis in the order they "
+                    "appear in the file."
+                ),
                 type=click.Path(
                     exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True
                 ),
                 default=None,
-                multiple=True,
             ),
             click.option(
                 "-n",
@@ -257,6 +294,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     output_path: str,
     models_directory: Optional[str],
     model_path: Optional[List[str]],
+    models_json: Optional[str],
     frames_to_visualize: Optional[int],
     output_fps: float,
     output_side_length: int,
@@ -276,6 +314,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :param output_path: See click help.
     :param models_directory: See click help.
     :param model_path: See click help.
+    :param models_json: See click help.
     :param frames_to_visualize: See click help.
     :param output_fps: See click help.
     :param output_side_length: See click help.
@@ -293,7 +332,9 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     audio_path = Path(wav)
 
     with MultiModel(
-        model_paths=_parse_model_paths(models_directory=models_directory, models=model_path)
+        model_paths=_parse_model_paths(
+            models_directory=models_directory, models=model_path, models_json=models_json
+        )
     ) as multi_models:
 
         LOGGER.info(f"Writing video: {output_path}")
@@ -432,6 +473,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     output_path: str,
     models_directory: Optional[str],
     model_path: Optional[List[str]],
+    models_json: Optional[str],
     frames_to_visualize: Optional[int],
     output_fps: float,
     output_side_length: int,
@@ -459,6 +501,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :param output_path: See click help.
     :param models_directory: See click help.
     :param model_path: See click help.
+    :param models_json: See click help.
     :param frames_to_visualize: See click help.
     :param output_fps: See click help.
     :param output_side_length: See click help.
@@ -485,7 +528,9 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     audio_path = Path(wav)
 
     with MultiModel(
-        model_paths=_parse_model_paths(models_directory=models_directory, models=model_path)
+        model_paths=_parse_model_paths(
+            models_directory=models_directory, models=model_path, models_json=models_json
+        )
     ) as multi_models, projection_file_reader.load_projection_file(
         Path(projection_file_path)
     ) as reader:
