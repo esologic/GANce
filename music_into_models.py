@@ -16,10 +16,10 @@ import pydantic
 from click_option_group import AllOptionGroup, RequiredAnyOptionGroup, optgroup
 from cv2 import cv2
 from lz.transposition import transpose
+from pydantic import BaseModel, FilePath
 
 from gance import divisor, overlay
 from gance.assets import OUTPUT_DIRECTORY
-from gance.cli_common import NetworksFile
 from gance.data_into_model_visualization import visualize_vector_reduction
 from gance.data_into_model_visualization.model_visualization import vector_synthesis
 from gance.data_into_model_visualization.visualization_inputs import (
@@ -38,6 +38,14 @@ from gance.vector_sources.vector_types import ConcatenatedVectors
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("numba").setLevel(logging.WARNING)
+
+
+class NetworksFile(BaseModel):
+    """
+    Describes a `NetworksFile`, a .json file full paths to pickled StyleGAN models.
+    """
+
+    models: List[FilePath]
 
 
 @click.group()
@@ -78,6 +86,7 @@ def _parse_model_paths(
         all_models += list(map(Path, models))
 
     if models_json is not None:
+        LOGGER.info(f"Loading model JSON: {models_json}")
         try:
             with open(models_json) as f:
                 all_models += list(map(Path, NetworksFile(**json.load(f)).models))
@@ -274,17 +283,24 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
     return func
 
 
-def write_input_args(output_path: Optional[str], current_locals: Dict[str, Any]) -> None:
+def write_input_args(
+    output_path: Optional[str], input_locals: Dict[str, Any], model_paths: List[Path]
+) -> None:
     """
     Function to dump input args to CLI function to a file.
     :param output_path: Path to the file to write, don't do anything if this value is None.
-    :param current_locals: The `locals()` call right after the CLI is invoked.
+    :param input_locals: The `locals()` call right after the CLI is invoked.
+    :param model_paths: Paths to the models that will be used in the run.
     :return: None
     """
 
     if output_path is not None:
         with open(output_path, "w") as f:
-            json.dump(current_locals, f, indent=4)
+            json.dump(
+                {"current_locals": input_locals, "models_paths": [str(p) for p in model_paths]},
+                f,
+                indent=4,
+            )
 
 
 @cli.command()  # type: ignore
@@ -327,15 +343,16 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :return: None
     """
 
-    write_input_args(output_path=run_config, current_locals=locals())
+    input_locals = locals()
+    model_paths = _parse_model_paths(
+        models_directory=models_directory, models=model_path, models_json=models_json
+    )
+
+    write_input_args(output_path=run_config, input_locals=input_locals, model_paths=model_paths)
 
     audio_path = Path(wav)
 
-    with MultiModel(
-        model_paths=_parse_model_paths(
-            models_directory=models_directory, models=model_path, models_json=models_json
-        )
-    ) as multi_models:
+    with MultiModel(model_paths=model_paths) as multi_models:
 
         LOGGER.info(f"Writing video: {output_path}")
 
@@ -521,16 +538,19 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :return: None
     """
 
-    write_input_args(output_path=run_config, current_locals=locals())
+    input_locals = locals()
+    model_paths = _parse_model_paths(
+        models_directory=models_directory, models=model_path, models_json=models_json
+    )
+
+    write_input_args(output_path=run_config, input_locals=input_locals, model_paths=model_paths)
 
     create_debug_visualization = debug_path is not None
 
     audio_path = Path(wav)
 
     with MultiModel(
-        model_paths=_parse_model_paths(
-            models_directory=models_directory, models=model_path, models_json=models_json
-        )
+        model_paths=model_paths
     ) as multi_models, projection_file_reader.load_projection_file(
         Path(projection_file_path)
     ) as reader:

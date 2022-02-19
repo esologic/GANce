@@ -1,10 +1,7 @@
 """
 Constants, functions seen across CLIs.
 """
-from typing import List
-
 import click
-from pydantic import BaseModel, FilePath
 
 EXTENSION_HDF5 = "hdf5"
 EXTENSION_MP4 = "mp4"
@@ -44,11 +41,3 @@ video_height = click.option(
     default=1024,
     show_default=True,
 )
-
-
-class NetworksFile(BaseModel):
-    """
-    Describes a `NetworksFile`, a .json file full paths to pickled StyleGAN models.
-    """
-
-    models: List[FilePath]
