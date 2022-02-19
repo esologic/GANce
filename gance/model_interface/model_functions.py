@@ -533,7 +533,13 @@ class MultiModel:
         :param index: Model index to load.
         :return: None
         """
-        if index != self._currently_loaded_model_index:
+
+        # Check to actually make sure the new model is going to be a different model.
+        # The same path can get passed in via the model list more than once.
+        if (
+            index != self._currently_loaded_model_index
+            and self._model_paths[self._currently_loaded_model_index] != self._model_paths[index]
+        ):
             logging.info(
                 f"Unloading {self._model_paths[self._currently_loaded_model_index].name}, "
                 f"Loading {self._model_paths[index].name}"

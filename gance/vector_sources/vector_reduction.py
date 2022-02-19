@@ -100,18 +100,27 @@ def _smoothed_rolling_average(
 
 
 def reduce_vector_rms_rolling_average(
-    time_series_audio_vectors: ConcatenatedVectors, vector_length: int
+    time_series_audio_vectors: ConcatenatedVectors,
+    vector_length: int,
+    rolling_average_window: int = 3,
+    savgol_window_length: int = 7,
+    savgol_polyorder: int = 3,
 ) -> ResultLayers:
     """
     Takes a single time series audio vector and reduces it to it's RMS value over that vector.
     :param time_series_audio_vectors: The vectors to reduce.
     :param vector_length: The number of points in `time_series_audio_vectors` that make up a frame
     in the output video.
+    :param savgol_window_length: Passed into next call, see those docs.
+    :param savgol_polyorder: Passed into next call, see those docs.
     :return: The RMS power value as a float. See the library function `librosa.feature.rms` for
     more explanation.
     """
     return _smoothed_rolling_average(
-        DataLabel(_compute_raw_rms(time_series_audio_vectors, vector_length), "Raw RMS Power")
+        DataLabel(_compute_raw_rms(time_series_audio_vectors, vector_length), "Raw RMS Power"),
+        rolling_average_window=rolling_average_window,
+        savgol_window_length=savgol_window_length,
+        savgol_polyorder=savgol_polyorder,
     )
 
 
@@ -200,16 +209,16 @@ def _derive_data(data: np.ndarray, order: int) -> np.ndarray:
 
 def derive_results_layers(results_layers: ResultLayers, order: int) -> ResultLayers:
     """
-
-    :param results_layers:
-    :param order:
-    :return:
+    Take a derivative of the results in a `ResultLayers`, add this compute onto the layers.
+    :param results_layers: To derive.
+    :param order: nth order derivation.
+    :return: New NT with this compute added.
     """
 
     return ResultLayers(
         result=DataLabel(
             _derive_data(data=results_layers.result.data, order=order),
-            "First order derivation",
+            f"Derevation order={order}",
         ),
         layers=[results_layers.result] + results_layers.layers,
     )
@@ -217,10 +226,9 @@ def derive_results_layers(results_layers: ResultLayers, order: int) -> ResultLay
 
 def absolute_value_results_layers(results_layers: ResultLayers) -> ResultLayers:
     """
-
-    :param results_layers:
-    :param order:
-    :return:
+    Compute the absolute value of the results, add compute onto layers.
+    :param results_layers: To take abs value of.
+    :return: NT with this new compute added.
     """
 
     return ResultLayers(
@@ -234,10 +242,9 @@ def absolute_value_results_layers(results_layers: ResultLayers) -> ResultLayers:
 
 def rolling_sum_results_layers(results_layers: ResultLayers, window_length: int) -> ResultLayers:
     """
-
-    :param results_layers:
-    :param order:
-    :return:
+    Create new result that is a rolling sum of previous results.
+    :param results_layers: To sum.
+    :return: NT with this new compute added.
     """
 
     series = pd.Series(results_layers.result.data)
@@ -253,10 +260,10 @@ def rolling_sum_results_layers(results_layers: ResultLayers, window_length: int)
 
 def track_length_filter(bool_tracks: pd.Series, track_length: int) -> np.ndarray:
     """
-
+    For a list of booleans, reject periods of true that are less than the given length.
     :param bool_tracks: INCLUSIVE!
     :param track_length: INCLUSIVE!
-    :return:
+    :return: The input tracks with the shorter tracks replaced with all `False`.
     """
 
     df = pd.DataFrame({"bool_tracks": bool_tracks.astype(int)})

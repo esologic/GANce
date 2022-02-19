@@ -244,7 +244,10 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
 
     indices_layers: ResultLayers = quantize_results_layers(
         results_layers=reduce_vector_rms_rolling_average(
-            time_series_audio_vectors=time_series_audio_vectors, vector_length=vector_length
+            time_series_audio_vectors=time_series_audio_vectors,
+            vector_length=vector_length,
+            savgol_window_length=3,
+            savgol_polyorder=2,
         ),
         model_indices=model_indices,
     )

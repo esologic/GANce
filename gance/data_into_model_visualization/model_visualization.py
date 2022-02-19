@@ -631,7 +631,7 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
             """
 
             LOGGER.info(
-                "Serializing frame to file."
+                "Serializing frame to file. "
                 f"Model index: {frame_input.model_index}. "
                 f"Frame position: {frame_input.frame_index}. "
                 f"Frame count: {rendered_frame_count}/{total_num_frames}. "

@@ -20,6 +20,7 @@ Pillow==6.2.1
 pooch==1.5.1  # To prevent warnings from scikit-image
 pyocclient==0.6
 Pympler==1.0.1
+pydantic==1.9.0
 requests==2.22.0
 resampy==0.2.2
 scikit-image
