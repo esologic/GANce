@@ -221,7 +221,7 @@ def scale_vectors_to_length_linspace(
     """
     Given an array of vectors, scale each of those vectors to a new length using a 1d linear space
     interpolation.
-    Note: I'm not sure if this works correctly, but it has served it's purpose here and there.
+    Note: I'm not sure if this works correctly, but it has served its purpose here and there.
     :param data: The data to scale.
     :param original_vector_length: The vectors in `data` are all this long.
     :param output_vector_length: The vectors in the output will be this long.

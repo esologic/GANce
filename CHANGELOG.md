@@ -6,6 +6,8 @@
 * Added a few more arguments to `music_into_models.py` to be able to make selecting the production
 list of models easier. Now input args can be saved to file, and lists of models can be passed in
 as json.
+* Switch phash computation to only take place on the bounding box regions of the images. 
+This results to tighter looking overlays.
 
 
 0.18.0 - (2022-02-08)

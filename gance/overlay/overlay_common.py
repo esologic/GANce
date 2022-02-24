@@ -27,6 +27,22 @@ class BoundingBox(NamedTuple):
     height: int
 
 
+def convert_to_pil_box(bounding_box: BoundingBox) -> Tuple[int, int, int, int]:
+    """
+    PIL's crop function takes their bounding boxes in a different order. This function
+    converts the canonical representation to that order.
+    :param bounding_box: To convert.
+    :return: (left, upper, right, lower) -- This is the order PIL wants.
+    """
+
+    return (
+        bounding_box.x,
+        bounding_box.y,
+        bounding_box.x + bounding_box.width,
+        bounding_box.y + bounding_box.height,
+    )
+
+
 def landmarks_to_bounding_boxes(landmarks: List[Dict[str, Tuple[int, ...]]]) -> List[BoundingBox]:
     """
     For each of the sets of keypoints, pull out the interesting ones, and draw a bounding box
@@ -51,29 +67,43 @@ def bounding_box_center(bounding_box: BoundingBox) -> Tuple[float, float]:
     return (bounding_box.x + bounding_box.width / 2), (bounding_box.y + bounding_box.height / 2)
 
 
+class DistanceBoxes(NamedTuple):
+    """
+    Intermediate type.
+    Stores the distance in pixels between the centers of the two bounding boxes.
+    Allows the boxes themselves to be maintained for further use.
+    """
+
+    # Distance between the boxes in pixels.
+    distance: float
+
+    a_box: BoundingBox
+    b_box: BoundingBox
+
+
 def bounding_box_distance(
     a_boxes: List[BoundingBox], b_boxes: List[BoundingBox]
-) -> Optional[float]:
+) -> Optional[DistanceBoxes]:
     """
     Calculate the minimum distance between two sets of bounding boxes.
     :param a_boxes: Left side.
     :param b_boxes: Right side.
-    :return: Minimum distance between the origins of these boxes in pixels.
+    :return: Minimum distance between the centers of these boxes in pixels.
     """
-
-    if a_boxes and b_boxes:
-        # Only take the X,Y points here
-        a_origin = [bounding_box_center(box) for box in a_boxes]
-        b_origin = [bounding_box_center(box) for box in b_boxes]
-
-        return min(
-            [
-                float(distance.euclidean(target_point, final_point))
-                for target_point, final_point in itertools.product(a_origin, b_origin)
-            ]
-        )
-    else:
-        return None
+    return min(
+        [
+            DistanceBoxes(
+                distance=float(
+                    distance.euclidean(bounding_box_center(a_box), bounding_box_center(b_box))
+                ),
+                a_box=a_box,
+                b_box=b_box,
+            )
+            for a_box, b_box in itertools.product(a_boxes, b_boxes)
+        ],
+        key=lambda distance_box: distance_box.distance,
+        default=None,
+    )
 
 
 def _draw_mask(resolution: ImageResolution, bounding_boxes: List[BoundingBox]) -> "Image":
@@ -95,8 +125,8 @@ def _draw_mask(resolution: ImageResolution, bounding_boxes: List[BoundingBox]) -
         y_center = y + (h / 2)
         y_lower = y_center + 60
         y_upper = y_center - 60
-        x_left = x - 200
-        x_right = x + (w + 200)
+        x_left = x - 100
+        x_right = x + (w + 100)
 
         draw.polygon(
             [(x_left, y_lower), (x_right, y_lower), (x_right, y_upper), (x_left, y_upper)],

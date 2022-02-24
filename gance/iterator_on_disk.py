@@ -148,7 +148,7 @@ def iterator_on_disk(
         (
             The primary iterator. Consume this one to populate the values in the secondary
             iterators.,
-            The secondary iterators. When one of these is incremented, it's next object
+            The secondary iterators. When one of these is incremented, its next object
             is loaded from disk and yielded. Note that if you iterate on these past the head of
             `primary`, then the iteration will block.
         )

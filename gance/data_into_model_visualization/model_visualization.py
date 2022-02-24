@@ -258,7 +258,7 @@ def _write_data_to_axes(
 ]:
     """
     Given some data to visualize (in `frame_input`) and some axes to write the date to
-    (in `axes`), do the visualizations. If a given axis is `None` within `axes`, it's corresponding
+    (in `axes`), do the visualizations. If a given axis is `None` within `axes`, its corresponding
     visualization will not be created, even if the data is present in `frame_input`.
     :return: An iterator of the resulting matplotlib-related objects. It's important that for each
     of these objects, consumer calls `.remove()` on them before creating the next frame so the

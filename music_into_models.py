@@ -455,8 +455,8 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     "--phash_distance",
     type=click.IntRange(min=0),
     help=(
-        "Minimum distance between perceptual hashes of the synthesized image and it's "
-        "corresponding target frame to enable an overlay computation. "
+        "Minimum distance between perceptual hashes of the bounding box region of the synthesized "
+        "image and its corresponding target frame to enable an overlay computation. "
     ),
     default=30,
     show_default=True,

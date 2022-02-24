@@ -28,7 +28,10 @@ class OverlayContext(NamedTuple):
     # The following are params considered when computing the overlay.
 
     # How visually similar the foreground and background are.
-    perceptual_hash_distance: Optional[float] = None
+    image_perceptual_hash_distance: Optional[float] = None
+
+    # How visually similar the bounding box regions of the foreground and background are.
+    bbox_perceptual_hash_distance: Optional[float] = None
 
     # For eye-tracking, how close the eye bounding boxes in the fore/background images
     # are.
@@ -60,6 +63,7 @@ def _setup_axis(
     y_values: List[YValues],
     title: str,
     horizontal_line_location: Optional[float],
+    visualize_all_points: bool,
     y_label: str = "Values",
     x_label: str = "Frame #",
 ) -> Tuple[float, float]:
@@ -70,20 +74,19 @@ def _setup_axis(
     :param y_values: List of y values, and data about the values to plot.
     :param title: Axes title.
     :param horizontal_line_location: If given, a horizontal line will be drawn at this location.
+    :param visualize_all_points: If given, y axis will be set to show all points on each subplot.
+    If false, only +/- 2 standard deviations from the mean will be visualized.
     :param y_label: Y label of axes.
     :param x_label: X label of axes.
     :return: Tuple, (min, max) values given in `y_values`.
     """
 
     for values in y_values:
-
         axis.scatter(
             x_values,
             values.values,
             color=values.color,
             label=values.label,
-            marker="x",
-            alpha=0.5,
         )
 
     axis.set_title(title)
@@ -95,8 +98,20 @@ def _setup_axis(
     all_y_values = list(
         filter(None, itertools.chain.from_iterable(values.values for values in y_values))
     )
-    axis_min = min(all_y_values) - 5 if all_y_values else -5
-    axis_max = max(all_y_values) + 5 if all_y_values else 5
+
+    if all_y_values:
+        if visualize_all_points:
+            axis_min = min(all_y_values) - 5
+            axis_max = max(all_y_values) + 5
+        else:
+            mean = np.mean(all_y_values)
+            std = np.std(all_y_values)
+            axis_min = mean - 2 * std
+            axis_max = mean + 2 * std
+    else:
+        axis_min = -5
+        axis_max = 5
+
     axis.set_ylim(axis_min, axis_max)
 
     axis.hlines(
@@ -115,6 +130,7 @@ def visualize_overlay_computation(  # pylint: disable=too-many-locals
     frames_per_context: int,
     video_square_side_length: Optional[int],
     horizontal_lines: Optional[VisualizeOverlayThresholds] = None,
+    visualize_all_points: bool = True,
 ) -> ImageSourceType:
     """
     Consumes the contexts from an overlay computation and produces a visualization of the
@@ -124,6 +140,9 @@ def visualize_overlay_computation(  # pylint: disable=too-many-locals
     :param video_square_side_length: Video is composed of a 3x2 grid of square sub-videos,
     each with a side length of this many pixels.
     :param horizontal_lines: Labeled lines to help understand computations.
+    :param visualize_all_points: If True, the y axis of each subplot will be stretched such that
+    all points in the underlying will be visualized. If false, the y axis will be set to +/- 2
+    standard deviations from the mean.
     :return: The frames of the visualization.
     """
 
@@ -141,7 +160,8 @@ def visualize_overlay_computation(  # pylint: disable=too-many-locals
         # So it's okay to iterate over them more than once.
         (
             flags,
-            perceptual_hash_distances,
+            bbox_perceptual_hash_distances,
+            image_perceptual_hash_distances,
             bounding_box_distances,
         ) = zip(*current)
 
@@ -153,13 +173,19 @@ def visualize_overlay_computation(  # pylint: disable=too-many-locals
             x_values=x_axis,
             y_values=[
                 YValues(
-                    values=cast(List[float], perceptual_hash_distances),
+                    values=cast(List[float], bbox_perceptual_hash_distances),
                     color="red",
-                    label="Perceptual Hash Distance",
-                )
+                    label="Bounding Boxes",
+                ),
+                YValues(
+                    values=cast(List[float], image_perceptual_hash_distances),
+                    color="blue",
+                    label="Complete Image",
+                ),
             ],
             title="Overlay Discriminator (Image Hashing)",
             horizontal_line_location=horizontal_lines.phash_line if horizontal_lines else None,
+            visualize_all_points=visualize_all_points,
         )
 
         bbox_axis_min, bbox_axis_max = _setup_axis(
@@ -176,6 +202,7 @@ def visualize_overlay_computation(  # pylint: disable=too-many-locals
             horizontal_line_location=horizontal_lines.bbox_distance_line
             if horizontal_lines
             else None,
+            visualize_all_points=visualize_all_points,
         )
 
         plt.tight_layout()

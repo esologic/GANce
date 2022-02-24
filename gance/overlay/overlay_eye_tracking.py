@@ -15,8 +15,10 @@ from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.logger_common import LOGGER
 from gance.overlay.overlay_common import (
     BoundingBox,
+    DistanceBoxes,
     OverlayResult,
     bounding_box_distance,
+    convert_to_pil_box,
     landmarks_to_bounding_boxes,
 )
 from gance.overlay.overlay_visualization import OverlayContext
@@ -53,7 +55,7 @@ def compute_eye_tracking_overlay(
     for the overlay to be written.
     :param min_bbox_distance: Minimum distance between origins of eye bounding boxes between images
     in foreground and background for the overlay to be written.
-    :param skip_mask: List of flags, if the flag is `True`, it's corresponding frame in
+    :param skip_mask: List of flags, if the flag is `True`, its corresponding frame in
     `foreground_images` and `background_images` will not be computed to look for an overlay.
     :return: Series of NTs describing the operation, as well as containing the result.
     """
@@ -86,21 +88,30 @@ def compute_eye_tracking_overlay(
             face_finder.face_landmarks(face_image=foreground_image)
         )
 
-        bbox_dist = bounding_box_distance(
+        background_bounding_boxes = landmarks_to_bounding_boxes(
+            face_finder.face_landmarks(face_image=background_image)
+        )
+
+        distance_boxes: Optional[DistanceBoxes] = bounding_box_distance(
             a_boxes=foreground_bounding_boxes,
-            b_boxes=landmarks_to_bounding_boxes(
-                face_finder.face_landmarks(face_image=background_image)
-            ),
+            b_boxes=background_bounding_boxes,
         )
 
-        phash_dist = abs(
-            imagehash.phash(Image.fromarray(foreground_image))
-            - imagehash.phash(Image.fromarray(background_image))
+        box_flag = distance_boxes is not None and (distance_boxes.distance < min_bbox_distance)
+
+        foreground = Image.fromarray(foreground_image)
+        background = Image.fromarray(background_image)
+
+        bbox_phash_dist = (
+            abs(
+                imagehash.phash(foreground.crop(convert_to_pil_box(distance_boxes.a_box)))
+                - imagehash.phash(background.crop(convert_to_pil_box(distance_boxes.b_box)))
+            )
+            if box_flag
+            else None
         )
 
-        overlay_flag = phash_dist <= min_phash_distance and (
-            bbox_dist < min_bbox_distance if bbox_dist else False
-        )
+        overlay_flag = box_flag and bbox_phash_dist <= min_phash_distance
 
         LOGGER.info(
             f"Computed eye tracking overlay for "
@@ -111,8 +122,9 @@ def compute_eye_tracking_overlay(
         return _FrameOverlayResult(
             foreground_bounding_boxes=foreground_bounding_boxes if overlay_flag else None,
             context=OverlayContext(
-                perceptual_hash_distance=phash_dist,
-                bbox_distance=bbox_dist,
+                bbox_perceptual_hash_distance=bbox_phash_dist,
+                image_perceptual_hash_distance=None,
+                bbox_distance=distance_boxes.distance if distance_boxes else None,
                 overlay_written=overlay_flag,
             ),
         )
