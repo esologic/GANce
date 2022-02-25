@@ -122,6 +122,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                     exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True
                 ),
                 required=True,
+                multiple=True,
             ),
             click.option(
                 "-o",
@@ -306,7 +307,7 @@ def write_input_args(
 @cli.command()  # type: ignore
 @common_command_options
 def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
-    wav: str,
+    wav: List[str],
     output_path: str,
     models_directory: Optional[str],
     model_path: Optional[List[str]],
@@ -350,7 +351,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 
     write_input_args(output_path=run_config, input_locals=input_locals, model_paths=model_paths)
 
-    audio_path = Path(wav)
+    audio_paths = list(map(Path, wav))
 
     with MultiModel(model_paths=model_paths) as multi_models:
 
@@ -358,11 +359,11 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 
         time_series_audio_vectors = cast(
             ConcatenatedVectors,
-            music.read_wav_scale_for_video(
-                wav=audio_path,
+            music.read_wavs_scale_for_video(
+                wavs=audio_paths,
                 vector_length=multi_models.expected_vector_length,
                 frames_per_second=output_fps,
-            ).wav_data,
+            ),
         )
 
         synthesis_output = vector_synthesis(
@@ -387,7 +388,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
             source=synthesis_output.synthesized_images,
             video_path=Path(output_path),
             video_fps=output_fps,
-            audio_path=audio_path,
+            audio_paths=audio_paths,
         )
 
         if synthesis_output.visualization_images is not None and debug_path is not None:
@@ -400,7 +401,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
                 ),
                 video_path=Path(debug_path),
                 video_fps=output_fps,
-                audio_path=audio_path,
+                audio_paths=audio_paths,
             )
         else:
             # This causes the video to be written.
@@ -486,7 +487,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     show_default=True,
 )
 def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
-    wav: str,
+    wav: List[str],
     output_path: str,
     models_directory: Optional[str],
     model_path: Optional[List[str]],
@@ -547,7 +548,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
 
     create_debug_visualization = debug_path is not None
 
-    audio_path = Path(wav)
+    audio_paths = list(map(Path, wav))
 
     with MultiModel(
         model_paths=model_paths
@@ -557,11 +558,14 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
 
         time_series_audio_vectors = cast(
             ConcatenatedVectors,
-            music.read_wav_scale_for_video(
-                wav=audio_path,
+            music.read_wavs_scale_for_video(
+                wavs=audio_paths,
                 vector_length=multi_models.expected_vector_length,
-                frames_per_second=output_fps,
-            ).wav_data,
+                target_num_vectors=divisor.divide_no_remainder(
+                    numerator=output_fps, denominator=reader.projection_attributes.projection_fps
+                )
+                * reader.projection_attributes.projection_frame_count,
+            ),
         )
 
         synthesis_output = vector_synthesis(
@@ -677,7 +681,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
             source=finals,
             video_path=Path(output_path),
             video_fps=output_fps,
-            audio_path=audio_path,
+            audio_paths=audio_paths,
         )
 
         if create_debug_visualization:
@@ -740,7 +744,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
                 ),
                 video_path=Path(debug_path),
                 video_fps=output_fps,
-                audio_path=audio_path,
+                audio_paths=audio_paths,
             )
         else:
             more_itertools.consume(finals)

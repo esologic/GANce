@@ -299,9 +299,15 @@ def duplicate_to_vector_count(
     # Each sub array here is the point in the vector across the set of vectors.
     points_over_time = split.swapaxes(1, 0)
 
-    duplication_factor = divisor.divide_no_remainder(
-        numerator=target_vector_count, denominator=len(split)
-    )
+    try:
+        duplication_factor = divisor.divide_no_remainder(
+            numerator=target_vector_count, denominator=len(split)
+        )
+    except ValueError as e:
+        raise ValueError(
+            f"Cannot duplicate the input vectors (count {len(split)}) "
+            f"to the desired count {target_vector_count}."
+        ) from e
 
     scaled_points_over_time = np.array(
         [
