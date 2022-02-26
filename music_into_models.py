@@ -32,7 +32,7 @@ from gance.iterator_on_disk import HDF5_SERIALIZER, iterator_on_disk
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import MultiModel, sorted_models_in_directory
 from gance.projection import projection_file_reader
-from gance.vector_sources import music, vector_reduction
+from gance.vector_sources import music, vector_reduction, vector_sources_common
 from gance.vector_sources.vector_reduction import DataLabel, ResultLayers
 from gance.vector_sources.vector_types import ConcatenatedVectors
 
@@ -514,6 +514,8 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     and feed the result into a network for synthesis. Optionally overlay parts of the target
     video inside of the projection file onto the output video.
 
+    Note: Audio data will be scaled to the duration of the projection file.
+
     \f
     :param wav: See click help.
     :param output_path: See click help.
@@ -556,24 +558,30 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
         Path(projection_file_path)
     ) as reader:
 
+        final_latents = projection_file_reader.final_latents_matrices_label(reader)
+
         time_series_audio_vectors = cast(
             ConcatenatedVectors,
             music.read_wavs_scale_for_video(
                 wavs=audio_paths,
                 vector_length=multi_models.expected_vector_length,
-                target_num_vectors=divisor.divide_no_remainder(
-                    numerator=output_fps, denominator=reader.projection_attributes.projection_fps
-                )
-                * reader.projection_attributes.projection_frame_count,
+                target_num_vectors=int(
+                    divisor.divide_no_remainder(
+                        numerator=output_fps,
+                        denominator=reader.projection_attributes.projection_fps,
+                    )
+                    * (
+                        vector_sources_common.underlying_length(final_latents.data)
+                        / multi_models.expected_vector_length
+                    )
+                ),
             ),
         )
 
         synthesis_output = vector_synthesis(
             models=multi_models,
             data=alpha_blend_projection_file(
-                final_latents_matrices_label=projection_file_reader.final_latents_matrices_label(
-                    reader
-                ),
+                final_latents_matrices_label=final_latents,
                 alpha=alpha,
                 fft_roll_enabled=fft_roll_enabled,
                 fft_amplitude_range=fft_amplitude_range,

@@ -153,9 +153,10 @@ def read_wav_scale_for_video(
             / num_wav_samples
         )
     elif target_num_vectors is not None:
-        scaled_sample_rate = int(
-            input_wav.sample_rate * (target_num_vectors / num_wav_samples / vector_length)
-        )
+        original_num_vectors = num_wav_samples / vector_length
+        ratio = target_num_vectors / original_num_vectors
+        scaled_sample_rate = float(input_wav.sample_rate) * ratio
+
     else:
         raise ValueError("Need to use FPS mode or target vector count mode.")
 

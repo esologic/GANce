@@ -99,16 +99,28 @@ def sub_vectors(
 
 
 @overload
-def underlying_vector_length(data: SingleVector) -> int:
+def underlying_length(data: SingleVector) -> int:
     ...
 
 
 @overload
-def underlying_vector_length(data: SingleMatrix) -> int:
+def underlying_length(data: SingleMatrix) -> int:
     ...
 
 
-def underlying_vector_length(data: Union[SingleVector, SingleMatrix]) -> int:
+@overload
+def underlying_length(data: ConcatenatedVectors) -> int:
+    ...
+
+
+@overload
+def underlying_length(data: ConcatenatedMatrices) -> int:
+    ...
+
+
+def underlying_length(
+    data: Union[SingleVector, SingleMatrix, ConcatenatedVectors, ConcatenatedMatrices]
+) -> int:
     """
     Decides what type is on the input, then calculates the vector length accordingly.
     :param data: To evaluate.

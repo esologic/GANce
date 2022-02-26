@@ -123,7 +123,6 @@ def compute_eye_tracking_overlay(
             foreground_bounding_boxes=foreground_bounding_boxes if overlay_flag else None,
             context=OverlayContext(
                 bbox_perceptual_hash_distance=bbox_phash_dist,
-                image_perceptual_hash_distance=None,
                 bbox_distance=distance_boxes.distance if distance_boxes else None,
                 overlay_written=overlay_flag,
             ),

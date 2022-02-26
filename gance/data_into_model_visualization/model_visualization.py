@@ -41,7 +41,7 @@ from gance.vector_sources.vector_sources_common import (
     demote_to_vector_select,
     pad_array,
     sub_vectors,
-    underlying_vector_length,
+    underlying_length,
 )
 from gance.vector_sources.vector_types import (
     ConcatenatedVectors,
@@ -310,7 +310,7 @@ def _write_data_to_axes(
 
         return [
             ax.scatter(
-                np.arange(underlying_vector_length(data_label.data)),
+                np.arange(underlying_length(data_label.data)),
                 y_values,
                 color=color,
                 label=data_label.label,
@@ -605,7 +605,7 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
 
             LOGGER.info(f"Using model to synthesize frame #{frame_input.frame_index}")
 
-            if underlying_vector_length(frame_input.combined_sample.data) != vector_length:
+            if underlying_length(frame_input.combined_sample.data) != vector_length:
                 LOGGER.warning(
                     f"Bad Sample Shape, expected {vector_length}, "
                     f"got {frame_input.combined_sample.data.shape}"
