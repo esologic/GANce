@@ -6,7 +6,7 @@ from test.assets import WAV_CLAPS_PATH
 
 import numpy as np
 
-from gance.vector_sources.music import read_wav_scale_for_video
+from gance.vector_sources.music import read_wavs_scale_for_video
 from gance.vector_sources.vector_reduction import reduce_vector_rms_rolling_max
 from gance.vector_sources.vector_sources_common import sub_vectors
 from gance.vector_sources.vector_types import ConcatenatedVectors
@@ -22,8 +22,8 @@ def test_reduce_vector_rms_alignment() -> None:
     vector_length = 1000
 
     audio = ConcatenatedVectors(
-        read_wav_scale_for_video(
-            wav=WAV_CLAPS_PATH, vector_length=vector_length, frames_per_second=60.0
+        read_wavs_scale_for_video(
+            wavs=[WAV_CLAPS_PATH], vector_length=vector_length, frames_per_second=60.0
         ).wav_data
     )
 

@@ -32,7 +32,7 @@ from gance.iterator_on_disk import HDF5_SERIALIZER, iterator_on_disk
 from gance.logger_common import LOGGER
 from gance.model_interface.model_functions import MultiModel, sorted_models_in_directory
 from gance.projection import projection_file_reader
-from gance.vector_sources import music, vector_reduction, vector_sources_common
+from gance.vector_sources import music, vector_reduction
 from gance.vector_sources.vector_reduction import DataLabel, ResultLayers
 from gance.vector_sources.vector_types import ConcatenatedVectors
 
@@ -363,7 +363,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
                 wavs=audio_paths,
                 vector_length=multi_models.expected_vector_length,
                 frames_per_second=output_fps,
-            ),
+            ).wav_data,
         )
 
         synthesis_output = vector_synthesis(
@@ -560,22 +560,20 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
 
         final_latents = projection_file_reader.final_latents_matrices_label(reader)
 
+        frame_multiplier = divisor.divide_no_remainder(
+            numerator=output_fps,
+            denominator=reader.projection_attributes.projection_fps,
+        )
+
         time_series_audio_vectors = cast(
             ConcatenatedVectors,
             music.read_wavs_scale_for_video(
                 wavs=audio_paths,
                 vector_length=multi_models.expected_vector_length,
                 target_num_vectors=int(
-                    divisor.divide_no_remainder(
-                        numerator=output_fps,
-                        denominator=reader.projection_attributes.projection_fps,
-                    )
-                    * (
-                        vector_sources_common.underlying_length(final_latents.data)
-                        / multi_models.expected_vector_length
-                    )
+                    frame_multiplier * reader.projection_attributes.projection_frame_count
                 ),
-            ),
+            ).wav_data,
         )
 
         synthesis_output = vector_synthesis(
@@ -619,11 +617,6 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
         skip_mask: List[bool] = list(
             pd.Series(music_complexity_overlay_mask.result.data).fillna(np.inf)
             > complexity_change_threshold
-        )
-
-        frame_multiplier = divisor.divide_no_remainder(
-            numerator=output_fps,
-            denominator=reader.projection_attributes.projection_fps,
         )
 
         foreground_iterators = iter(

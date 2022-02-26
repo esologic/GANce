@@ -9,7 +9,7 @@ LOGGER_FORMAT = "[%(asctime)s - %(process)s - %(name)20s - %(levelname)s] %(mess
 LOGGER_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format=LOGGER_FORMAT,
     datefmt=LOGGER_DATE_FORMAT,
 )

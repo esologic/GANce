@@ -15,7 +15,7 @@ from gance.data_into_model_visualization.visualization_inputs import (
 from gance.gance_types import OptionalImageSourceType
 from gance.image_sources import image_sources_common
 from gance.model_interface.model_functions import MultiModel
-from gance.vector_sources.music import read_wav_scale_for_video
+from gance.vector_sources.music import read_wavs_scale_for_video
 from gance.vector_sources.vector_sources_common import sub_vectors
 
 
@@ -36,8 +36,8 @@ def get_model_output(
         model_paths=[SAMPLE_BATCH_1_MODEL_PATH, SAMPLE_BATCH_2_MODEL_PATH]
     ) as multi_models:
 
-        time_series_audio_vectors = read_wav_scale_for_video(
-            wav=WAV_CLAPS_PATH,
+        time_series_audio_vectors = read_wavs_scale_for_video(
+            wavs=[WAV_CLAPS_PATH],
             vector_length=multi_models.expected_vector_length,
             frames_per_second=video_fps,
         ).wav_data

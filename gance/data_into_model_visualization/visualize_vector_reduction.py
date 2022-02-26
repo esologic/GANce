@@ -19,7 +19,7 @@ from gance.data_into_model_visualization.visualization_common import (
 from gance.gance_types import ImageSourceType
 from gance.logger_common import LOGGER
 from gance.vector_sources import vector_reduction
-from gance.vector_sources.music import read_wav_scale_for_video
+from gance.vector_sources.music import read_wavs_scale_for_video
 from gance.vector_sources.vector_reduction import ResultLayers
 
 
@@ -31,8 +31,8 @@ def visualize_reducer_output(audio_path: Path, reducer: VectorsReducer) -> None:
 
     vector_length = 1000
 
-    audio = read_wav_scale_for_video(
-        wav=audio_path, vector_length=vector_length, frames_per_second=60.0
+    audio = read_wavs_scale_for_video(
+        wavs=[audio_path], vector_length=vector_length, frames_per_second=60.0
     ).wav_data
 
     reduced = vector_reduction.quantize_results_layers(

@@ -215,7 +215,7 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
         fft_roll_enabled=fft_roll_enabled,
     )
 
-    num_vectors = int(spectrogram.shape[0] / vector_length)
+    num_vectors = int(vector_sources_common.underlying_length(spectrogram) / vector_length)
 
     projected_vectors: ConcatenatedMatrices = vector_sources_common.promote_to_matrix_duplicate(
         data=vector_sources_common.duplicate_to_vector_count(
