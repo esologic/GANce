@@ -34,6 +34,7 @@ from gance.model_interface.model_functions import MultiModel, sorted_models_in_d
 from gance.projection import projection_file_reader
 from gance.vector_sources import music, vector_reduction
 from gance.vector_sources.vector_reduction import DataLabel, ResultLayers
+from gance.vector_sources.vector_sources_common import underlying_length
 from gance.vector_sources.vector_types import ConcatenatedVectors
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
@@ -560,6 +561,21 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
 
         final_latents = projection_file_reader.final_latents_matrices_label(reader)
 
+        final_latents_in_file = (
+            underlying_length(final_latents.data) / multi_models.expected_vector_length
+        )
+        processed_frames_in_file = reader.projection_attributes.projection_frame_count
+        projection_complete = reader.projection_attributes.complete
+
+        LOGGER.info(
+            f"Reading projection file. Complete: {projection_complete}, "
+            f"Final Latent Count: {final_latents_in_file}, "
+            f"Processed Frames: {processed_frames_in_file}"
+        )
+
+        if not projection_complete or abs(final_latents_in_file - processed_frames_in_file) > 2:
+            raise ValueError("Invalid Projection File, cannot continue.")
+
         frame_multiplier = divisor.divide_no_remainder(
             numerator=output_fps,
             denominator=reader.projection_attributes.projection_fps,
@@ -570,9 +586,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
             music.read_wavs_scale_for_video(
                 wavs=audio_paths,
                 vector_length=multi_models.expected_vector_length,
-                target_num_vectors=int(
-                    frame_multiplier * reader.projection_attributes.projection_frame_count
-                ),
+                target_num_vectors=int(frame_multiplier * final_latents_in_file),
             ).wav_data,
         )
 
