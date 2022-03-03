@@ -34,6 +34,7 @@ from gance.model_interface.model_functions import MultiModel, sorted_models_in_d
 from gance.projection import projection_file_reader
 from gance.vector_sources import music, vector_reduction
 from gance.vector_sources.vector_reduction import DataLabel, ResultLayers
+from gance.vector_sources.vector_sources_common import underlying_length
 from gance.vector_sources.vector_types import ConcatenatedVectors
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
@@ -122,6 +123,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                     exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True
                 ),
                 required=True,
+                multiple=True,
             ),
             click.option(
                 "-o",
@@ -306,7 +308,7 @@ def write_input_args(
 @cli.command()  # type: ignore
 @common_command_options
 def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
-    wav: str,
+    wav: List[str],
     output_path: str,
     models_directory: Optional[str],
     model_path: Optional[List[str]],
@@ -350,7 +352,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 
     write_input_args(output_path=run_config, input_locals=input_locals, model_paths=model_paths)
 
-    audio_path = Path(wav)
+    audio_paths = list(map(Path, wav))
 
     with MultiModel(model_paths=model_paths) as multi_models:
 
@@ -358,8 +360,8 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 
         time_series_audio_vectors = cast(
             ConcatenatedVectors,
-            music.read_wav_scale_for_video(
-                wav=audio_path,
+            music.read_wavs_scale_for_video(
+                wavs=audio_paths,
                 vector_length=multi_models.expected_vector_length,
                 frames_per_second=output_fps,
             ).wav_data,
@@ -387,7 +389,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
             source=synthesis_output.synthesized_images,
             video_path=Path(output_path),
             video_fps=output_fps,
-            audio_path=audio_path,
+            audio_paths=audio_paths,
         )
 
         if synthesis_output.visualization_images is not None and debug_path is not None:
@@ -400,7 +402,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
                 ),
                 video_path=Path(debug_path),
                 video_fps=output_fps,
-                audio_path=audio_path,
+                audio_paths=audio_paths,
             )
         else:
             # This causes the video to be written.
@@ -455,8 +457,8 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     "--phash_distance",
     type=click.IntRange(min=0),
     help=(
-        "Minimum distance between perceptual hashes of the synthesized image and it's "
-        "corresponding target frame to enable an overlay computation. "
+        "Minimum distance between perceptual hashes of the bounding box region of the synthesized "
+        "image and its corresponding target frame to enable an overlay computation. "
     ),
     default=30,
     show_default=True,
@@ -486,7 +488,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     show_default=True,
 )
 def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
-    wav: str,
+    wav: List[str],
     output_path: str,
     models_directory: Optional[str],
     model_path: Optional[List[str]],
@@ -512,6 +514,8 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     Transform audio data, combine it with final latents from a projection file,
     and feed the result into a network for synthesis. Optionally overlay parts of the target
     video inside of the projection file onto the output video.
+
+    Note: Audio data will be scaled to the duration of the projection file.
 
     \f
     :param wav: See click help.
@@ -547,7 +551,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
 
     create_debug_visualization = debug_path is not None
 
-    audio_path = Path(wav)
+    audio_paths = list(map(Path, wav))
 
     with MultiModel(
         model_paths=model_paths
@@ -555,21 +559,41 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
         Path(projection_file_path)
     ) as reader:
 
+        final_latents = projection_file_reader.final_latents_matrices_label(reader)
+
+        final_latents_in_file = (
+            underlying_length(final_latents.data) / multi_models.expected_vector_length
+        )
+        processed_frames_in_file = reader.projection_attributes.projection_frame_count
+        projection_complete = reader.projection_attributes.complete
+
+        LOGGER.info(
+            f"Reading projection file. Complete: {projection_complete}, "
+            f"Final Latent Count: {final_latents_in_file}, "
+            f"Processed Frames: {processed_frames_in_file}"
+        )
+
+        if not projection_complete or abs(final_latents_in_file - processed_frames_in_file) > 2:
+            raise ValueError("Invalid Projection File, cannot continue.")
+
+        frame_multiplier = divisor.divide_no_remainder(
+            numerator=output_fps,
+            denominator=reader.projection_attributes.projection_fps,
+        )
+
         time_series_audio_vectors = cast(
             ConcatenatedVectors,
-            music.read_wav_scale_for_video(
-                wav=audio_path,
+            music.read_wavs_scale_for_video(
+                wavs=audio_paths,
                 vector_length=multi_models.expected_vector_length,
-                frames_per_second=output_fps,
+                target_num_vectors=int(frame_multiplier * final_latents_in_file),
             ).wav_data,
         )
 
         synthesis_output = vector_synthesis(
             models=multi_models,
             data=alpha_blend_projection_file(
-                final_latents_matrices_label=projection_file_reader.final_latents_matrices_label(
-                    reader
-                ),
+                final_latents_matrices_label=final_latents,
                 alpha=alpha,
                 fft_roll_enabled=fft_roll_enabled,
                 fft_amplitude_range=fft_amplitude_range,
@@ -607,11 +631,6 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
         skip_mask: List[bool] = list(
             pd.Series(music_complexity_overlay_mask.result.data).fillna(np.inf)
             > complexity_change_threshold
-        )
-
-        frame_multiplier = divisor.divide_no_remainder(
-            numerator=output_fps,
-            denominator=reader.projection_attributes.projection_fps,
         )
 
         foreground_iterators = iter(
@@ -677,7 +696,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
             source=finals,
             video_path=Path(output_path),
             video_fps=output_fps,
-            audio_path=audio_path,
+            audio_paths=audio_paths,
         )
 
         if create_debug_visualization:
@@ -740,7 +759,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
                 ),
                 video_path=Path(debug_path),
                 video_fps=output_fps,
-                audio_path=audio_path,
+                audio_paths=audio_paths,
             )
         else:
             more_itertools.consume(finals)

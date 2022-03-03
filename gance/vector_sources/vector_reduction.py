@@ -39,7 +39,7 @@ def reduce_vector_rms_rolling_max(
     time_series_audio_vectors: ConcatenatedVectors, vector_length: int
 ) -> ResultLayers:
     """
-    Takes a single time series audio vector and reduces it to it's RMS value over that vector.
+    Takes a single time series audio vector and reduces it to its RMS value over that vector.
     :param time_series_audio_vectors: The vectors to reduce.
     :param vector_length: The number of points in `time_series_audio_vectors` that make up a frame
     in the output video.
@@ -107,7 +107,7 @@ def reduce_vector_rms_rolling_average(
     savgol_polyorder: int = 3,
 ) -> ResultLayers:
     """
-    Takes a single time series audio vector and reduces it to it's RMS value over that vector.
+    Takes a single time series audio vector and reduces it to its RMS value over that vector.
     :param time_series_audio_vectors: The vectors to reduce.
     :param vector_length: The number of points in `time_series_audio_vectors` that make up a frame
     in the output video.
@@ -139,7 +139,7 @@ def reduce_vector_gzip_compression_rolling_average(
     time_series_audio_vectors: ConcatenatedVectors, vector_length: int
 ) -> ResultLayers:
     """
-    Takes a single time series audio vector and reduces it to it's RMS value over that vector.
+    Takes a single time series audio vector and reduces it to its RMS value over that vector.
     :param time_series_audio_vectors: The vectors to reduce.
     :param vector_length: The number of points in `time_series_audio_vectors` that make up a frame
     in the output video.

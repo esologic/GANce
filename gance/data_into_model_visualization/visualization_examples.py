@@ -36,7 +36,7 @@ from gance.model_interface.model_functions import create_model_interface
 from gance.projection import projection_file_reader
 from gance.projection.projection_visualization import visualize_projection_history
 from gance.vector_sources import music, primatives, vector_sources_common
-from gance.vector_sources.music import read_wav_scale_for_video
+from gance.vector_sources.music import read_wavs_scale_for_video
 from gance.vector_sources.vector_reduction import reduce_vector_gzip_compression_rolling_average
 from gance.vector_sources.vector_sources_common import (
     rotate_vectors_over_time,
@@ -98,8 +98,8 @@ def data_visualizations_single_frame() -> None:
     fig = visualization_common.standard_matplotlib_figure()
 
     data = alpha_blend_vectors_max_rms_power_audio(
-        time_series_audio_vectors=read_wav_scale_for_video(
-            wav=WAV_CLAPS_PATH, vector_length=vector_length, frames_per_second=60.0
+        time_series_audio_vectors=read_wavs_scale_for_video(
+            wavs=[WAV_CLAPS_PATH], vector_length=vector_length, frames_per_second=60.0
         ).wav_data,
         vector_length=vector_length,
         model_indices=list(np.arange(20)),
@@ -138,8 +138,8 @@ def demo_rotation() -> None:
 
     vector_length = 512
 
-    time_series_audio_vectors = read_wav_scale_for_video(
-        wav=WAV_CLAPS_PATH, vector_length=vector_length, frames_per_second=60.0
+    time_series_audio_vectors = read_wavs_scale_for_video(
+        wavs=[WAV_CLAPS_PATH], vector_length=vector_length, frames_per_second=60.0
     ).wav_data
 
     spectrogram = compute_spectrogram_smooth_scale(
@@ -313,8 +313,8 @@ def blog_post_media() -> None:
 
         model_visualization.vectors_single_model_visualization(
             vectors_label=VectorsLabel(
-                data=music.read_wav_scale_for_video(
-                    wav=assets.NOVA_SNIPPET_PATH,
+                data=music.read_wavs_scale_for_video(
+                    wavs=[assets.NOVA_SNIPPET_PATH],
                     vector_length=model_interface.expected_vector_length,
                     frames_per_second=60.0,
                 ).wav_data,

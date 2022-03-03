@@ -1,6 +1,6 @@
 """
 Canonical function that needs to work the same across multiple use cases.
-Silly to have it's own file but here we are.
+Silly to have its own file but here we are.
 """
 
 import math

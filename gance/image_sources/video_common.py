@@ -224,14 +224,17 @@ def frames_in_video(
 
 
 def write_source_to_disk_forward(
-    source: ImageSourceType, video_path: Path, video_fps: float, audio_path: Optional[Path] = None
+    source: ImageSourceType,
+    video_path: Path,
+    video_fps: float,
+    audio_paths: Optional[List[Path]] = None,
 ) -> ImageSourceType:
     """
     Consume an image source, write it out to disk.
     :param source: To write to disk.
     :param video_path: Output video path.
     :param video_fps: Frames/Second of the output video.
-    :param audio_path: If given, the audio file at this path will be written to the output video.
+    :param audio_paths: If given, the audio files will be written to the output video.
     :return: None
     """
 
@@ -267,7 +270,7 @@ def write_source_to_disk_forward(
 
         writer.release()
 
-    if audio_path is None:
+    if audio_paths is None:
         yield from setup_iteration(video_path)
     else:
         # Don't write the video-only file to disk at the output path, instead
@@ -275,25 +278,28 @@ def write_source_to_disk_forward(
             temp_video_path = Path(file.name)
             yield from setup_iteration(temp_video_path)
             file.flush()
-            add_wav_to_video(
-                video_path=temp_video_path, audio_path=audio_path, output_path=video_path
+            add_wavs_to_video(
+                video_path=temp_video_path, audio_paths=audio_paths, output_path=video_path
             )
 
 
 def write_source_to_disk_consume(
-    source: ImageSourceType, video_path: Path, video_fps: float, audio_path: Optional[Path] = None
+    source: ImageSourceType,
+    video_path: Path,
+    video_fps: float,
+    audio_paths: Optional[List[Path]] = None,
 ) -> None:
     """
     Consume an image source, write it out to disk.
     :param source: To write to disk.
     :param video_path: Output video path.
     :param video_fps: FPS of the output video.
-    :param audio_path: If given, the audio file at this path will be written to the output video.
+    :param audio_paths: If given, the audio file at this path will be written to the output video.
     :return: None
     """
 
     more_itertools.consume(
         write_source_to_disk_forward(
-            source=source, video_path=video_path, video_fps=video_fps, audio_path=audio_path
+            source=source, video_path=video_path, video_fps=video_fps, audio_paths=audio_paths
         )
     )

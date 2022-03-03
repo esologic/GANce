@@ -168,7 +168,7 @@ def wrap_loaded_model(model: Network) -> ModelInterface:
 
     def create_image_generic(data: Union[SingleVector, SingleMatrix]) -> RGBInt8ImageType:
         """
-        Checks the data to determine it's type, then passes it to the corresponding function.
+        Checks the data to determine its type, then passes it to the corresponding function.
         Slightly less inefficient. Use only if you have to.
         :param data: Data to synthesize.
         :return: Raw image from model.

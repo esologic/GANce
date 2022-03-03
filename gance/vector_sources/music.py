@@ -5,7 +5,7 @@ vector to models.
 import pickle
 from functools import partial
 from pathlib import Path
-from typing import NamedTuple, Optional, Union, overload
+from typing import List, NamedTuple, Optional, Union, overload
 
 import numpy as np
 import resampy
@@ -13,6 +13,8 @@ from scipy.io import wavfile
 
 from gance.logger_common import LOGGER
 from gance.vector_sources.vector_sources_common import pad_array, remap_values_into_range
+
+WavDataType = Union["np.ndarray[np.int16]", "np.ndarray[np.float32]", "np.ndarray[np.int16]"]
 
 
 class WavFileProperties(NamedTuple):
@@ -25,50 +27,65 @@ class WavFileProperties(NamedTuple):
 
     # The actual amplitude data for the wav file
     # These are the data types I've seen in working pn this project, I'm sure there are more.
-    wav_data: Union["np.ndarray[np.int16]", "np.ndarray[np.float32]", "np.ndarray[np.int16]"]
+    wav_data: WavDataType
 
     # The name of the file, used for output/logging
     name: str
 
 
 @overload
-def read_wav_scale_for_video(
-    wav: WavFileProperties,
+def read_wavs_scale_for_video(
+    wavs: List[WavFileProperties],
     vector_length: int,
-    frames_per_second: float,
+    frames_per_second: Optional[float] = None,
+    target_num_vectors: Optional[int] = None,
     cache_path: Optional[Path] = None,
+    pad_to_length: bool = True,
 ) -> WavFileProperties:
     ...
 
 
 @overload
-def read_wav_scale_for_video(
-    wav: Path, vector_length: int, frames_per_second: float, cache_path: Optional[Path] = None
+def read_wavs_scale_for_video(
+    wavs: List[Path],
+    vector_length: int,
+    frames_per_second: Optional[float] = None,
+    target_num_vectors: Optional[int] = None,
+    cache_path: Optional[Path] = None,
+    pad_to_length: bool = True,
 ) -> WavFileProperties:
     ...
 
 
-def read_wav_scale_for_video(
-    wav: Union[Path, WavFileProperties],
+def read_wavs_scale_for_video(  # pylint: disable=too-many-locals
+    wavs: Union[List[Path], List[WavFileProperties]],
     vector_length: int,
-    frames_per_second: float,
+    frames_per_second: Optional[float] = None,
+    target_num_vectors: Optional[int] = None,
     cache_path: Optional[Path] = None,
+    pad_to_length: bool = True,
 ) -> WavFileProperties:
     """
-    Reads a `.wav` file into memory, converting it to mono, and then re-sampling the signal.
-    The output is stretched/shrank in the time domain such that enough data is available to create
-    one vector of `vector_length` samples for a video the length of the `.wav` file in time at the
-    input `frames_per_second`.
-    If the scaled wav file is not evenly divisible in length by `vector_length`, zeros are added
-    to the end.
-
-    :param wav: Path to the `.wav` file.
+    Reads multiple `.wav` files into memory, converts them to mono, and then re-samples the signals.
+    For each of the files, the output is stretched/shrank in the time domain such that enough data
+    is available to create one vector of `vector_length` samples for a video the length of the
+    `.wav` file in time at the input `frames_per_second`. Additionally, If the scaled wav file is
+    not evenly divisible in length by `vector_length`, zeros are added to the end.
+    :param wavs: A list of paths to wav files.
     :param vector_length: The side length of the network, ex: 1024.
     :param frames_per_second: The FPS of the resulting video.
     :param cache_path: This is an expensive operation, write the result to this path.
     If this path exists, return it rather than computing the file.
+    :param pad_to_length: If given, and If the scaled wav file is not evenly divisible in length
+    by `vector_length`, zeros are added to the end.
     :return: The data, the new sample rate, and a label as a NT.
     """
+
+    if frames_per_second is not None and target_num_vectors is not None:
+        raise ValueError("Can't use both FPS mode and target vector count mode.")
+
+    if frames_per_second is None and target_num_vectors is None:
+        raise ValueError("Need to use FPS mode or target vector count mode.")
 
     if cache_path is not None:
         LOGGER.debug("Looking for cached audio.")
@@ -81,30 +98,66 @@ def read_wav_scale_for_video(
         else:
             LOGGER.warning("No audio cache found, will be created.")
 
-    input_wav = read_wav_file(wav) if isinstance(wav, Path) else wav
+    input_wavs = [read_wav_file(wav) if isinstance(wav, Path) else wav for wav in wavs]
 
-    if len(input_wav.wav_data.shape) > 1:
-        input_wav = WavFileProperties(
-            wav_data=input_wav.wav_data.mean(axis=1),
-            sample_rate=input_wav.sample_rate,
-            name=f"{input_wav.name}_mono",
-        )
+    sample_rates = {input_wav.sample_rate for input_wav in input_wavs}
+
+    if len(sample_rates) != 1:
+        raise ValueError("Multiple sample rates for input audio files is unsupported.")
+
+    input_wav = WavFileProperties(
+        wav_data=np.concatenate(
+            [
+                input_wav.wav_data.mean(axis=1)
+                if len(input_wav.wav_data.shape) > 1
+                else input_wav.wav_data
+                for input_wav in input_wavs
+            ]
+        ),
+        sample_rate=next(iter(sample_rates)),
+        name="_".join([input_wav.name for input_wav in input_wavs]) + "_mono",
+    )
 
     num_wav_samples = input_wav.wav_data.shape[0]
 
-    scaled_sample_rate = int(
-        input_wav.sample_rate
-        * (vector_length * (frames_per_second * (num_wav_samples / input_wav.sample_rate)))
-        / num_wav_samples
+    LOGGER.debug(
+        "Resampling audio to fit number of vectors. " f"Original Num Samples={num_wav_samples}"
     )
+
+    if frames_per_second is not None:
+        scaled_sample_rate = int(
+            input_wav.sample_rate
+            * (vector_length * (frames_per_second * (num_wav_samples / input_wav.sample_rate)))
+            / num_wav_samples
+        )
+    elif target_num_vectors is not None:
+        original_num_vectors = num_wav_samples / vector_length
+        ratio = target_num_vectors / original_num_vectors
+        scaled_sample_rate = float(input_wav.sample_rate) * ratio
+        LOGGER.debug(
+            f"Original Num Vectors={original_num_vectors}, "
+            f"Ratio={ratio}, "
+            f"Original Sample Rate={input_wav.sample_rate}, "
+            f"New Sample Rate={scaled_sample_rate}, "
+        )
+    else:
+        raise ValueError("Need to use FPS mode or target vector count mode.")
 
     scaled_wav = _scale_wav_to_sample_rate(input_wav, scaled_sample_rate)
 
-    output = WavFileProperties(
-        wav_data=pad_array(
+    wav_data = (
+        pad_array(
             scaled_wav.wav_data,
             int(np.ceil(scaled_wav.wav_data.shape[0] / vector_length) * vector_length),
-        ),
+        )
+        if pad_to_length
+        else scaled_wav.wav_data
+    )
+
+    LOGGER.debug(f"New Num Samples={wav_data.shape[0]}")
+
+    output = WavFileProperties(
+        wav_data=wav_data,
         sample_rate=input_wav.sample_rate,
         name=f"{scaled_wav.name}_padded",
     )

@@ -7,6 +7,7 @@ but can produce deceptively different results. The resample function I think doe
 but linspace is more literal.
 """
 
+import logging
 import multiprocessing
 from typing import Callable, Iterable, Iterator, Tuple, Union, overload
 
@@ -25,6 +26,8 @@ from gance.vector_sources.vector_types import (
     SingleVector,
     is_vector,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 def pad_array(array: np.ndarray, size: int) -> np.ndarray:
@@ -99,16 +102,28 @@ def sub_vectors(
 
 
 @overload
-def underlying_vector_length(data: SingleVector) -> int:
+def underlying_length(data: SingleVector) -> int:
     ...
 
 
 @overload
-def underlying_vector_length(data: SingleMatrix) -> int:
+def underlying_length(data: SingleMatrix) -> int:
     ...
 
 
-def underlying_vector_length(data: Union[SingleVector, SingleMatrix]) -> int:
+@overload
+def underlying_length(data: ConcatenatedVectors) -> int:
+    ...
+
+
+@overload
+def underlying_length(data: ConcatenatedMatrices) -> int:
+    ...
+
+
+def underlying_length(
+    data: Union[SingleVector, SingleMatrix, ConcatenatedVectors, ConcatenatedMatrices]
+) -> int:
     """
     Decides what type is on the input, then calculates the vector length accordingly.
     :param data: To evaluate.
@@ -221,7 +236,7 @@ def scale_vectors_to_length_linspace(
     """
     Given an array of vectors, scale each of those vectors to a new length using a 1d linear space
     interpolation.
-    Note: I'm not sure if this works correctly, but it has served it's purpose here and there.
+    Note: I'm not sure if this works correctly, but it has served its purpose here and there.
     :param data: The data to scale.
     :param original_vector_length: The vectors in `data` are all this long.
     :param output_vector_length: The vectors in the output will be this long.
@@ -295,13 +310,25 @@ def duplicate_to_vector_count(
     """
 
     split = sub_vectors(data=data, vector_length=vector_length)
+    original_count = len(split)
 
     # Each sub array here is the point in the vector across the set of vectors.
     points_over_time = split.swapaxes(1, 0)
 
-    duplication_factor = divisor.divide_no_remainder(
-        numerator=target_vector_count, denominator=len(split)
-    )
+    try:
+        duplication_factor = divisor.divide_no_remainder(
+            numerator=target_vector_count, denominator=original_count
+        )
+        LOGGER.debug(
+            f"Duplicating vectors. "
+            f"Original count={original_count}, "
+            f"New count={target_vector_count}, duplication factor={duplication_factor}"
+        )
+    except ValueError as e:
+        raise ValueError(
+            f"Cannot duplicate the input vectors (count {len(split)}) "
+            f"to the desired count {target_vector_count}."
+        ) from e
 
     scaled_points_over_time = np.array(
         [
