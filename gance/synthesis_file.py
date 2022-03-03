@@ -103,13 +103,11 @@ def read_vector_in_file(path_to_json: Path) -> SingleVector:
         raw_dict = json.load(file)
 
         # No 'version' key means it's version 0.
-        if 'version' not in raw_dict or raw_dict['version'] < Version.version_2:
-            raw_dict['network_path'] = raw_dict.pop("model_path")
-            raw_dict['network_hash'] = raw_dict.pop("model_hash")
+        if "version" not in raw_dict or raw_dict["version"] < Version.version_2:
+            raw_dict["network_path"] = raw_dict.pop("model_path")
+            raw_dict["network_hash"] = raw_dict.pop("model_hash")
 
-        loaded = SynthesisFileDict.from_dict(  # type: ignore # pylint: disable=no-member
-            raw_dict
-        )
+        loaded = SynthesisFileDict.from_dict(raw_dict)  # type: ignore # pylint: disable=no-member
 
         version = loaded.version if loaded.version is not None else Version.version_0
 

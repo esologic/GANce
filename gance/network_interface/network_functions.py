@@ -33,7 +33,7 @@ sys.modules["dnnlib"] = dnnlib
 LENGTH_SENTINEL = -1
 STARTED_WITHOUT_ERROR_SENTINEL = "Started Without Error"
 
-network_SUFFIX = ".pkl"
+NETWORK_SUFFIX = ".pkl"
 
 
 def sorted_networks_in_directory(networks_directory: Path) -> List[Path]:
@@ -43,7 +43,7 @@ def sorted_networks_in_directory(networks_directory: Path) -> List[Path]:
     :param networks_directory: Path to the directory with networks in it.
     :return: List of Paths to networks.
     """
-    return list(sorted(networks_directory.glob(f"*{network_SUFFIX}")))
+    return list(sorted(networks_directory.glob(f"*{NETWORK_SUFFIX}")))
 
 
 class ImageFunction(Protocol):  # pylint: disable=too-few-public-methods
@@ -61,7 +61,7 @@ class ImageFunction(Protocol):  # pylint: disable=too-few-public-methods
         """
 
 
-class networkInterface(NamedTuple):
+class NetworkInterface(NamedTuple):
     """
     A common interface to only expose the necessary parts of a network to avoid confusion.
     """
@@ -109,7 +109,7 @@ def load_network_network(network_path: Path, call_init_function: bool) -> Networ
     return network
 
 
-def wrap_loaded_network(network: Network) -> networkInterface:
+def wrap_loaded_network(network: Network) -> NetworkInterface:
     """
     Given the network's network object produce a wrapper NT.
     :param network: The network to wrap.
@@ -180,15 +180,17 @@ def wrap_loaded_network(network: Network) -> networkInterface:
             LOGGER.info(f"Generic -> matrix, shape: {data.shape}")
             return create_image_matrix(data)
 
-    return networkInterface(
+    return NetworkInterface(
         create_image_vector=lambda data: convert_network_output_to_image(create_image_vector(data)),
         create_image_matrix=lambda data: convert_network_output_to_image(create_image_matrix(data)),
-        create_image_generic=lambda data: convert_network_output_to_image(create_image_generic(data)),
+        create_image_generic=lambda data: convert_network_output_to_image(
+            create_image_generic(data)
+        ),
         expected_vector_length=network.input_shape[1],
     )
 
 
-def create_network_interface(network_path: Path, call_init_function: bool) -> networkInterface:
+def create_network_interface(network_path: Path, call_init_function: bool) -> NetworkInterface:
     """
     Creates the interface to be able to send vectors to and get images out of the network.
     :param network_path: Path to the networks `.pkl` file on disk.
@@ -200,17 +202,17 @@ def create_network_interface(network_path: Path, call_init_function: bool) -> ne
     return wrap_loaded_network(load_network_network(network_path, call_init_function))
 
 
-class networkInterfaceInProcess(NamedTuple):
+class NetworkInterfaceInProcess(NamedTuple):
     """
     This exposes the networkInterface (for creating images etc) and a stop function, which when
     called unloads the network from memory.
     """
 
-    network_interface: networkInterface
+    network_interface: NetworkInterface
     stop_function: Callable[[], None]
 
 
-class _networkInput(NamedTuple):
+class _NetworkInput(NamedTuple):
     """
     Intermediate type.
     We don't want to have different queues for each possible type of vector, so we pass a flag
@@ -225,7 +227,7 @@ class _networkInput(NamedTuple):
     network_input: Union[SingleVector, SingleMatrix]
 
 
-def create_network_interface_process(network_path: Path) -> networkInterfaceInProcess:
+def create_network_interface_process(network_path: Path) -> NetworkInterfaceInProcess:
     """
     Wraps the loading of/ interfacing with a styleGAN2 network with in a subprocess, so the whole
     thing can be killed avoiding well known, and unsolved problems with memory leaks in tensorflow.
@@ -235,7 +237,7 @@ def create_network_interface_process(network_path: Path) -> networkInterfaceInPr
     """
 
     vector_length_value = multiprocessing.Value("i", LENGTH_SENTINEL)
-    input_queue: "Queue[Union[str, _networkInput]]" = multiprocessing.Queue()
+    input_queue: "Queue[Union[str, _NetworkInput]]" = multiprocessing.Queue()
     output_queue: "Queue[Union[str, RGBInt8ImageType]]" = multiprocessing.Queue()
     error_queue: "Queue[Union[str, Exception]]" = multiprocessing.Queue()
 
@@ -293,7 +295,7 @@ def create_network_interface_process(network_path: Path) -> networkInterfaceInPr
         full latents.
         :return: The resulting image.
         """
-        input_queue.put(_networkInput(is_a_vector, data))
+        input_queue.put(_NetworkInput(is_a_vector, data))
 
         while True:
             try:
@@ -330,8 +332,8 @@ def create_network_interface_process(network_path: Path) -> networkInterfaceInPr
         """
         return image_from_vector(is_vector(data), data)
 
-    return networkInterfaceInProcess(
-        network_interface=networkInterface(
+    return NetworkInterfaceInProcess(
+        network_interface=NetworkInterface(
             create_image_vector=partial(image_from_vector, True),
             create_image_matrix=partial(image_from_vector, False),
             create_image_generic=handle_generic,
@@ -344,15 +346,15 @@ def create_network_interface_process(network_path: Path) -> networkInterfaceInPr
 def _network_worker(
     network_path: Path,
     vector_length_value: Any,
-    input_queue: "Queue[Union[str, _networkInput]]",
+    input_queue: "Queue[Union[str, _NetworkInput]]",
     output_queue: "Queue[Union[str, RGBInt8ImageType]]",
     error_queue: "Queue[Union[str, Exception]]",
     started_event: Any,
     stop_event: Any,
 ) -> None:
     """
-    Used to create images from a network inside of a child process, (an `multiprocessing.Process`) so
-    the entire tensorflow/keras/cuda session can be destroyed and cleaned up by the host's OS
+    Used to create images from a network inside of a child process, (an `multiprocessing.Process`)
+    so the entire tensorflow/keras/cuda session can be destroyed and cleaned up by the host's OS
     rather than python. This is because the teardown process is messy in tensorflow and can often
     lead to memory leaks. The input args are all thread safe, and are used for IPC.
 
@@ -380,7 +382,9 @@ def _network_worker(
         # Need to do the init function every time, because this will be called inside of a child
         # process only. Once these child processes are killed the tensorflow session goes away as
         # well.
-        network_interface = create_network_interface(network_path=network_path, call_init_function=True)
+        network_interface = create_network_interface(
+            network_path=network_path, call_init_function=True
+        )
         logging.debug("network successfully loaded in worker process.")
     except Exception as e:  # pylint: disable=broad-except
         # Catch everything, this error will be consumed in the parent.
@@ -408,11 +412,13 @@ def _network_worker(
 
     while not stop_event.is_set():
         try:
-            network_input_or_sentinel: Union[_networkInput, str] = input_queue.get_nowait()
-            if isinstance(network_input_or_sentinel, _networkInput):
+            network_input_or_sentinel: Union[_NetworkInput, str] = input_queue.get_nowait()
+            if isinstance(network_input_or_sentinel, _NetworkInput):
                 try:
                     image = (
-                        network_interface.create_image_vector(network_input_or_sentinel.network_input)
+                        network_interface.create_image_vector(
+                            network_input_or_sentinel.network_input
+                        )
                         if network_input_or_sentinel.is_vector
                         else network_interface.create_image_matrix(
                             network_input_or_sentinel.network_input
@@ -472,13 +478,13 @@ def _raise_exception_if_unloaded(function):
     return wrapper
 
 
-class Multinetwork:
+class MultiNetwork:
     """
     Allows user to switch between networks during a run.
     networks are loaded/unloaded into memory/GPU on demand.
     """
 
-    def __init__(self: "Multinetwork", network_paths: List[Path]) -> None:
+    def __init__(self: "MultiNetwork", network_paths: List[Path]) -> None:
         """
         :param network_paths: The list of candidate networks.
         """
@@ -488,19 +494,19 @@ class Multinetwork:
 
         # These will get set when the context manager is used or the `self.load()` function is
         # called.
-        self._currently_loaded_network: Optional[networkInterfaceInProcess] = None
+        self._currently_loaded_network: Optional[NetworkInterfaceInProcess] = None
         self._expected_vector_length: Optional[int] = None
 
     @property  # type: ignore
     @_raise_exception_if_unloaded
-    def expected_vector_length(self: "Multinetwork") -> int:
+    def expected_vector_length(self: "MultiNetwork") -> int:
         """
         The length of expected input vectors, as reported by the network.
         :return: value as an int.
         """
         return self._expected_vector_length
 
-    def __enter__(self: "Multinetwork") -> Optional["Multinetwork"]:
+    def __enter__(self: "MultiNetwork") -> Optional["MultiNetwork"]:
         """
         For using this object as a context manager. Calls the load method and returns self.
         If the network cannot be loaded into the GPU, the resulting object will be `None`.
@@ -527,7 +533,7 @@ class Multinetwork:
         if self._currently_loaded_network is not None:
             self.unload()
 
-    def _load_network_at_index(self: "Multinetwork", index: int) -> None:
+    def _load_network_at_index(self: "MultiNetwork", index: int) -> None:
         """
         Load the network at the given index. If the network is already loaded, do nothing.
         :param index: network index to load.
@@ -538,7 +544,8 @@ class Multinetwork:
         # The same path can get passed in via the network list more than once.
         if (
             index != self._currently_loaded_network_index
-            and self._network_paths[self._currently_loaded_network_index] != self._network_paths[index]
+            and self._network_paths[self._currently_loaded_network_index]
+            != self._network_paths[index]
         ):
             logging.info(
                 f"Unloading {self._network_paths[self._currently_loaded_network_index].name}, "
@@ -550,7 +557,7 @@ class Multinetwork:
 
     @_raise_exception_if_unloaded
     def indexed_create_image_vector(
-        self: "Multinetwork", index: int, data: SingleVector
+        self: "MultiNetwork", index: int, data: SingleVector
     ) -> RGBInt8ImageType:
         """
         Returns a frame for the network at the given index given the input vector.
@@ -563,7 +570,7 @@ class Multinetwork:
 
     @_raise_exception_if_unloaded
     def indexed_create_image_matrix(
-        self: "Multinetwork", index: int, data: SingleMatrix
+        self: "MultiNetwork", index: int, data: SingleMatrix
     ) -> RGBInt8ImageType:
         """
         Returns a frame for the network at the given index given the input matrix.
@@ -576,7 +583,7 @@ class Multinetwork:
 
     @_raise_exception_if_unloaded
     def indexed_create_image_generic(
-        self: "Multinetwork", index: int, data: Union[SingleVector, SingleMatrix]
+        self: "MultiNetwork", index: int, data: Union[SingleVector, SingleMatrix]
     ) -> RGBInt8ImageType:
         """
         Returns a frame for the network at the given index given the input matrix.
@@ -587,7 +594,7 @@ class Multinetwork:
         self._load_network_at_index(index)
         return self._currently_loaded_network.network_interface.create_image_generic(data)
 
-    def load(self: "Multinetwork") -> None:
+    def load(self: "MultiNetwork") -> None:
         """
         Loads the network at the set index into memory for use.
         :return: None
@@ -600,7 +607,7 @@ class Multinetwork:
         )
 
     @_raise_exception_if_unloaded
-    def unload(self: "Multinetwork") -> None:
+    def unload(self: "MultiNetwork") -> None:
         """
         Kills the child process, and frees the corresponding resources associated with the
         currently loaded network.
@@ -609,7 +616,7 @@ class Multinetwork:
         self._currently_loaded_network.stop_function()
 
     @property
-    def network_indices(self: "Multinetwork") -> List[int]:
+    def network_indices(self: "MultiNetwork") -> List[int]:
         """
         The number of different networks this object can switch between, candidates
         for the `index` parameter of `create_image`.

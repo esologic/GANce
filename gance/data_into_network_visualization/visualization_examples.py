@@ -30,7 +30,9 @@ from gance.data_into_network_visualization.vectors_to_image import (
 from gance.data_into_network_visualization.visualization_inputs import (
     alpha_blend_vectors_max_rms_power_audio,
 )
-from gance.data_into_network_visualization.visualize_vector_reduction import visualize_reducer_output
+from gance.data_into_network_visualization.visualize_vector_reduction import (
+    visualize_reducer_output,
+)
 from gance.image_sources.video_common import add_wav_to_video
 from gance.network_interface.network_functions import create_network_interface
 from gance.projection import projection_file_reader

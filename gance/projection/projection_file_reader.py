@@ -14,7 +14,7 @@ from h5py._hl.group import Group  # pylint: disable=protected-access
 
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.logger_common import LOGGER
-from gance.network_interface.network_functions import networkInterface
+from gance.network_interface.network_functions import NetworkInterface
 from gance.projection.projection_types import (
     CompleteLatentsType,
     FlattenedNoisesType,
@@ -338,7 +338,7 @@ def projection_history_step_matrices_label(
 
 def network_outputs_at_projection_step(
     projection_file_path: Path,
-    network_interface: networkInterface,
+    network_interface: NetworkInterface,
     projection_step_to_take: int,
 ) -> Iterator[RGBInt8ImageType]:
     """
@@ -348,7 +348,8 @@ def network_outputs_at_projection_step(
     it's faster to use the `ProjectionFileReader` interface.
     :param projection_file_path: Path to file to read.
     :param network_interface: Latents from the projection history will be fed into this network.
-    :param projection_step_to_take: This step of projection will be retrieved and fed to the network.
+    :param projection_step_to_take: This step of projection will be retrieved and fed to the
+    network.
     :return: Resulting images for each frame in the file.
     """
 
@@ -389,7 +390,7 @@ def final_latents_at_frame(projection_file_path: Path, frame_number: int) -> Sin
 
 
 def network_outputs_at_final_latents(
-    projection_file_path: Path, network_interface: networkInterface
+    projection_file_path: Path, network_interface: NetworkInterface
 ) -> Iterator[RGBInt8ImageType]:
     """
     For the final latents for each frame in the projection file,

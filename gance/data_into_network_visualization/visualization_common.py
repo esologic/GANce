@@ -78,7 +78,8 @@ class VisualizationInput(NamedTuple):
     # to create images.
     combined: Union[VectorsLabel, MatricesLabel]
 
-    # Results should be one integer per vector, this contains which network should be used per frame.
+    # Results should be one integer per vector, this contains which network should be used per
+    # frame.
     # Layers are only consumed by data visualization, not actually fed into the synthesis.
     # A list of `DataLabel` NTs that represent the different transformations on the input
     # vectors that led to the output values stored in `network_index`.

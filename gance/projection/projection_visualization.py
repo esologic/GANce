@@ -14,12 +14,15 @@ from matplotlib import pyplot as plt
 from scipy.interpolate import UnivariateSpline
 
 from gance.data_into_network_visualization import visualization_common
-from gance.data_into_network_visualization.vectors_to_image import SingleVectorViz, vector_visualizer
+from gance.data_into_network_visualization.vectors_to_image import (
+    SingleVectorViz,
+    vector_visualizer,
+)
 from gance.hash_file import hash_file
 from gance.image_sources.video_common import create_video_writer
 from gance.logger_common import LOGGER
 from gance.network_interface.network_functions import (
-    networkInterfaceInProcess,
+    NetworkInterfaceInProcess,
     create_network_interface_process,
 )
 from gance.projection.projection_file_reader import (
@@ -269,7 +272,7 @@ def _setup_visualization(
     projection_network_path: Path,
     projection_file_reader: ProjectionFileReader,
     video_height: int,
-) -> Tuple[networkInterfaceInProcess, SingleVectorViz, MatricesLabel]:
+) -> Tuple[NetworkInterfaceInProcess, SingleVectorViz, MatricesLabel]:
     """
     Boilerplate setup function to get a few common things in place for visualization.
     :param network_not_matching_ok: Process this arg.
@@ -400,7 +403,8 @@ def visualize_partial_projection_history(  # pylint: disable=too-many-locals
     :param projection_network_path: Path to the network to re-create the projection.
     :param network_not_matching_ok: If the input network given by `projection_network_path` doesn't
     match the network that was used in the projection file, raise a ValueError if given.
-    :param projection_step_to_take: This step of projection will be retrieved and fed to the network.
+    :param projection_step_to_take: This step of projection will be retrieved and fed to the
+    network.
     :param video_height: The height of the output video in pixels, the width will be 3x the height.
     :return: None
     """

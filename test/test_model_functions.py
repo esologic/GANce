@@ -1,8 +1,8 @@
 """
-Unit tests around working with models.
+Unit tests around working with networks.
 """
 
-from test.assets import SAMPLE_BATCH_1_MODEL_PATH
+from test.assets import SAMPLE_BATCH_1_NETWORK_PATH
 from typing import Union
 
 import numpy as np
@@ -10,10 +10,10 @@ import pytest
 from pytest_mock import MockFixture
 
 from gance.gance_types import RGBInt8ImageType
-from gance.model_interface.model_functions import (
-    ModelInterface,
-    ModelInterfaceInProcess,
-    MultiModel,
+from gance.network_interface.network_functions import (
+    MultiNetwork,
+    NetworkInterface,
+    NetworkInterfaceInProcess,
 )
 from gance.vector_sources.vector_types import SingleMatrix, SingleVector
 
@@ -26,12 +26,12 @@ def fake_stop_function() -> None:
 
 
 @pytest.mark.parametrize("load", [True, False])
-def test_multi_model_unloaded_leads_to_errors(load: bool, mocker: MockFixture) -> None:
+def test_multi_network_unloaded_leads_to_errors(load: bool, mocker: MockFixture) -> None:
     """
-    Test to make sure that `MultiModel` will raise ValueErrors if you try to access the model
+    Test to make sure that `Multinetwork` will raise ValueErrors if you try to access the network
     without first calling the `load()` method directly or with the context manager.
-    Also makes sure that the context manager correctly loads and unloads the underlying model.
-    :param load: if the model should actually be loaded or not.
+    Also makes sure that the context manager correctly loads and unloads the underlying network.
+    :param load: if the network should actually be loaded or not.
     :param mocker: mocking fixture.
     :return: None
     """
@@ -49,12 +49,12 @@ def test_multi_model_unloaded_leads_to_errors(load: bool, mocker: MockFixture) -
         """
         return expected_image
 
-    patched_stop = mocker.patch("test.test_model_functions.fake_stop_function")
+    patched_stop = mocker.patch("test.test_network_functions.fake_stop_function")
 
     patched_load = mocker.patch(
-        "gance.model_interface.model_functions.create_model_interface_process",
-        return_value=ModelInterfaceInProcess(
-            ModelInterface(
+        "gance.network_interface.network_functions.create_network_interface_process",
+        return_value=NetworkInterfaceInProcess(
+            NetworkInterface(
                 create_image_vector=fake_vector_function,
                 create_image_matrix=fake_vector_function,
                 create_image_generic=fake_vector_function,
@@ -64,31 +64,33 @@ def test_multi_model_unloaded_leads_to_errors(load: bool, mocker: MockFixture) -
         ),
     )
 
-    def make_model() -> MultiModel:
+    def make_network() -> MultiNetwork:
         """
-        Helper function to create the model for the test.
-        :return: The multi model for testing.
+        Helper function to create the network for the test.
+        :return: The multi network for testing.
         """
-        return MultiModel(model_paths=[SAMPLE_BATCH_1_MODEL_PATH])
+        return MultiNetwork(network_paths=[SAMPLE_BATCH_1_NETWORK_PATH])
 
     assert not patched_stop.called
 
     if load:
-        with make_model() as multi_model:
-            assert multi_model.expected_vector_length == expected_vector_length
+        with make_network() as multi_network:
+            assert multi_network.expected_vector_length == expected_vector_length
             assert (
-                multi_model.indexed_create_image_vector(index=0, data=SingleVector(np.zeros((10,))))
+                multi_network.indexed_create_image_vector(
+                    index=0, data=SingleVector(np.zeros((10,)))
+                )
                 == expected_image
             ).all()
         # Verifies that the context manager is calling the load/stop functions.
         assert patched_load.called
         assert patched_stop.called
     else:
-        multi_model = make_model()
+        multi_network = make_network()
         with pytest.raises(ValueError):
             # This won't execute, just need something here that accesses the value.
-            print(multi_model.expected_vector_length)
+            print(multi_network.expected_vector_length)
         with pytest.raises(ValueError):
-            multi_model.indexed_create_image_vector(index=0, data=SingleVector(np.zeros((10,))))
+            multi_network.indexed_create_image_vector(index=0, data=SingleVector(np.zeros((10,))))
         assert not patched_load.called
         assert not patched_stop.called

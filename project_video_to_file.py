@@ -87,7 +87,7 @@ def _directory_of_io(
 def _process_io(  # pylint: disable=too-many-arguments,too-many-locals
     io_pairs: List[_VideoPathOutputPath],
     video_fps: Optional[float],
-    path_to_model: str,
+    path_to_network: str,
     projection_width_height: Optional[Tuple[int, int]],
     projection_fps: Optional[float],
     steps_per_projection: Optional[int],
@@ -101,7 +101,7 @@ def _process_io(  # pylint: disable=too-many-arguments,too-many-locals
     Project the videos in `io_pairs`.
     :param io_pairs: Tuples of the input videos, and the path to their projection files.
     :param video_fps: Can be used to override the actual FPS of the input video.
-    :param path_to_model: Path to the model to do the projection with.
+    :param path_to_network: Path to the network to do the projection with.
     :param projection_width_height: Scale each frame of the video to this size before feeding it
     into projection.
     :param projection_fps: Down sample the video to be at this FPS. Note, can only be lower than the
@@ -121,7 +121,7 @@ def _process_io(  # pylint: disable=too-many-arguments,too-many-locals
     :return: None
     """
 
-    model_path = Path(path_to_model)
+    network_path = Path(path_to_network)
 
     if log is not None:
         file_handler = logging.FileHandler(log)
@@ -140,7 +140,7 @@ def _process_io(  # pylint: disable=too-many-arguments,too-many-locals
     for index, io_pair in enumerate(io_pairs):
         gance.projection.projector_file_writer.project_video_to_file(
             path_to_video=io_pair.video_path,
-            path_to_model=model_path,
+            path_to_network=network_path,
             projection_file_path=io_pair.output_path,
             video_fps=video_fps,
             # Click needs the tuple of `None`'s we don't want that though.
@@ -174,11 +174,11 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 show_default=True,
             ),
             click.option(
-                "--path_to_model",
+                "--path_to_network",
                 type=click.Path(
                     exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True
                 ),
-                help="Path to the model to do the projection with.",
+                help="Path to the network to do the projection with.",
             ),
             click.option(
                 "--projection_width_height",
@@ -295,7 +295,7 @@ def cli() -> None:
 def videos(  # pylint: disable=too-many-arguments,too-many-locals
     video_output: Optional[List[Tuple[str, str]]],
     video_fps: Optional[float],
-    path_to_model: str,
+    path_to_network: str,
     projection_width_height: Optional[Tuple[int, int]],
     projection_fps: Optional[float],
     steps_per_projection: Optional[int],
@@ -312,7 +312,7 @@ def videos(  # pylint: disable=too-many-arguments,too-many-locals
 
     :param video_output: Tuples of (video, resulting projection file path).
     :param video_fps: Can be used to override the actual FPS of the input video.
-    :param path_to_model: Path to the model to do the projection with.
+    :param path_to_network: Path to the network to do the projection with.
     :param output_path: Path to output file.
     :param projection_width_height: Scale each frame of the video to this size before feeding it
     into projection.
@@ -336,7 +336,7 @@ def videos(  # pylint: disable=too-many-arguments,too-many-locals
     _process_io(
         io_pairs=_passed_directly(video_output),
         video_fps=video_fps,
-        path_to_model=path_to_model,
+        path_to_network=path_to_network,
         projection_width_height=projection_width_height,
         projection_fps=projection_fps,
         steps_per_projection=steps_per_projection,
@@ -383,7 +383,7 @@ def directory(  # pylint: disable=too-many-arguments,too-many-locals
     output_file_directory: str,
     output_file_prefix: str,
     video_fps: Optional[float],
-    path_to_model: str,
+    path_to_network: str,
     projection_width_height: Optional[Tuple[int, int]],
     projection_fps: Optional[float],
     steps_per_projection: Optional[int],
@@ -403,7 +403,7 @@ def directory(  # pylint: disable=too-many-arguments,too-many-locals
     :param output_file_directory: Resulting projection files will be written to this directory.
     :param output_file_prefix: Will be prepended to the output projection file names.
     :param video_fps: Can be used to override the actual FPS of the input video.
-    :param path_to_model: Path to the model to do the projection with.
+    :param path_to_network: Path to the network to do the projection with.
     :param output_path: Path to output file.
     :param projection_width_height: Scale each frame of the video to this size before feeding it
     into projection.
@@ -432,7 +432,7 @@ def directory(  # pylint: disable=too-many-arguments,too-many-locals
             output_file_prefix=output_file_prefix,
         ),
         video_fps=video_fps,
-        path_to_model=path_to_model,
+        path_to_network=path_to_network,
         projection_width_height=projection_width_height,
         projection_fps=projection_fps,
         steps_per_projection=steps_per_projection,

@@ -36,7 +36,7 @@ from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.image_sources.video_common import create_video_writer
 from gance.iterator_on_disk import deserialize_hdf5, serialize_hdf5
 from gance.logger_common import LOGGER
-from gance.network_interface.network_functions import networkInterface, Multinetwork
+from gance.network_interface.network_functions import MultiNetwork, NetworkInterface
 from gance.vector_sources.vector_sources_common import (
     demote_to_vector_select,
     pad_array,
@@ -461,7 +461,7 @@ def load_network_image_and_delete(frame_input_path: _FrameInputPath) -> RGBInt8I
 
 def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
     data: VisualizationInput,
-    networks: Optional[Multinetwork],
+    networks: Optional[MultiNetwork],
     default_vector_length: Optional[int] = 1024,
     video_height: Optional[int] = 1024,
     enable_3d: bool = False,
@@ -478,11 +478,11 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
 
     If no network is given, creates a video out of only the matplotlib components.
 
-    Since network switching is a costly operation, frames are first written to disk as pickled objects
-    sorted by their network index, so network switching only needs to happen once per the number of
-    input networks. The images are then loaded back into memory and written to the output video file
-    in the order they should be displayed. The intermediate pickled objects are all created in
-    a `TemporaryDirectory` and are destroyed after they fall out of scope.
+    Since network switching is a costly operation, frames are first written to disk as pickled
+    objects sorted by their network index, so network switching only needs to happen once per the
+    number of input networks. The images are then loaded back into memory and written to the output
+    video file in the order they should be displayed. The intermediate pickled objects are all
+    created in a `TemporaryDirectory` and are destroyed after they fall out of scope.
 
     Note: This is the most complicated function in the whole project.
 
@@ -499,8 +499,8 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
     will be created alongside the output of the network.
     :param frames_to_visualize: The number of frames in the input to visualize. Starts from the
     first index, goes to this value. Ex. 10 is given, the first 10 frames will be visualized.
-    :param network_index_window_width: For the time-series visualization of the network index, this is
-    how many indices should be displayed at once.
+    :param network_index_window_width: For the time-series visualization of the network index, this
+    is how many indices should be displayed at once.
     :param force_optimize_synthesis_order: If the snythesis order optimization should
     be done or not.
     :return: `output_video_path`, but now the video will actually be there.
@@ -614,7 +614,8 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
             return cast(
                 RGBInt8ImageType,
                 cv2.resize(
-                    networks.indexed_create_image_generic(  # This is the call that uses the network.
+                    # This is the call that uses the network.
+                    networks.indexed_create_image_generic(
                         index=frame_input.network_index,
                         data=frame_input.combined_sample.data,
                     ),
@@ -671,7 +672,9 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
             return map(render_network_frame_in_memory, frame_inputs)
 
     return SynthesisOutput(
-        synthesized_images=create_network_frames(next(input_sources)) if networks is not None else None,
+        synthesized_images=create_network_frames(next(input_sources))
+        if networks is not None
+        else None,
         visualization_images=create_visualization_frames(next(input_sources))
         if (enable_2d or enable_3d)
         else None,
@@ -692,7 +695,7 @@ def _y_bounds(data: np.ndarray, y_range: Optional[Tuple[int, int]] = None) -> Tu
 def vectors_single_network_visualization(  # pylint: disable=too-many-locals
     vectors_label: VectorsLabel,
     output_video_path: Path,
-    network: networkInterface,
+    network: NetworkInterface,
     video_height: Optional[int] = 1024,
     y_range: Optional[Tuple[int, int]] = None,
     video_fps: float = 60.0,
@@ -750,7 +753,7 @@ def single_vector_single_network_visualization(
     vector: SingleVector,
     title: str,
     output_image_path: Path,
-    network: networkInterface,
+    network: NetworkInterface,
     image_height: Optional[int] = 1024,
     y_range: Optional[Tuple[int, int]] = None,
 ) -> None:

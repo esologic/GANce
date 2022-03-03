@@ -11,7 +11,7 @@ import pytest
 
 import gance.vector_sources.music
 import gance.vector_sources.primatives
-from gance.data_into_model_visualization.vectors_3d import _reshape_vectors_for_3d_plotting
+from gance.data_into_network_visualization.vectors_3d import _reshape_vectors_for_3d_plotting
 
 
 def reshape_using_chunks(data: np.ndarray, chunk_width: int) -> np.ndarray:
@@ -32,7 +32,7 @@ def reshape_using_chunks(data: np.ndarray, chunk_width: int) -> np.ndarray:
         Create the iterator for the data.
         :param data:  The wav data to turn into chunks.
         :param samples_per_chunk: Data points per sub list (chunk).
-        :param reshape: Should be True when feeding into model.
+        :param reshape: Should be True when feeding into network.
         :return: Yield `data` in chunks.
         """
         for c in more_itertools.chunked(data, n=samples_per_chunk):

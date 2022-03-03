@@ -179,8 +179,8 @@ class TotalProjectionResult(NamedTuple):
     # The final output image from the projection.
     projected_image: RGBInt8ImageType
 
-    # Exposed for convenience, the final latent vectors of the projection. Was input into the network
-    # to produce `projected_image`.
+    # Exposed for convenience, the final latent vectors of the projection. Was input into the
+    # network to produce `projected_image`.
     final_latents: CompleteLatentsType
 
     # Noises are a complicated data structure and may need to be flattened before saving etc.

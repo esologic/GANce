@@ -10,8 +10,8 @@ ASSETS_DIRECTORY_PATH = str(_ASSETS_DIRECTORY)
 FACE_IMAGE_PATH = _ASSETS_DIRECTORY.joinpath("face_image.jpeg")
 NO_FACE_IMAGE_PATH = _ASSETS_DIRECTORY.joinpath("no_face_image.jpeg")
 
-SAMPLE_BATCH_1_MODEL_PATH = _ASSETS_DIRECTORY.joinpath("sample_batch_1_model.pkl")
-SAMPLE_BATCH_2_MODEL_PATH = _ASSETS_DIRECTORY.joinpath("sample_batch_2_model.pkl")
+SAMPLE_BATCH_1_NETWORK_PATH = _ASSETS_DIRECTORY.joinpath("sample_batch_1_network.pkl")
+SAMPLE_BATCH_2_NETWORK_PATH = _ASSETS_DIRECTORY.joinpath("sample_batch_2_network.pkl")
 
 BATCH_2_IMAGE_1_PATH = _ASSETS_DIRECTORY.joinpath("batch_2_sample_1_image.jpeg")
 BATCH_2_IMAGE_2_PATH = _ASSETS_DIRECTORY.joinpath("batch_2_sample_2_image.jpeg")
