@@ -74,15 +74,15 @@ class VisualizationInput(NamedTuple):
     # The right side of the combination, not actually fed into the rendering.
     b_vectors: Union[VectorsLabel, MatricesLabel]
 
-    # The result of the combination, vectors from this array are picked off and fed into the model
+    # The result of the combination, vectors from this array are picked off and fed into the network
     # to create images.
     combined: Union[VectorsLabel, MatricesLabel]
 
-    # Results should be one integer per vector, this contains which model should be used per frame.
+    # Results should be one integer per vector, this contains which network should be used per frame.
     # Layers are only consumed by data visualization, not actually fed into the synthesis.
     # A list of `DataLabel` NTs that represent the different transformations on the input
-    # vectors that led to the output values stored in `model_index`.
-    model_indices: ResultLayers
+    # vectors that led to the output values stored in `network_index`.
+    network_indices: ResultLayers
 
 
 class FrameInput(NamedTuple):
@@ -103,16 +103,16 @@ class FrameInput(NamedTuple):
     # The piece of `combined` that will be used in this frame.
     combined_sample: DataLabel
 
-    # Which model should be used to synthesize the resulting image.
-    model_index: int
+    # Which network should be used to synthesize the resulting image.
+    network_index: int
 
-    # Holds a number of `model_index` values before and after `frame_index`.
-    # Consumed by data visualization to show the history of the model index for any given frame.
-    surrounding_model_indices: np.ndarray
+    # Holds a number of `network_index` values before and after `frame_index`.
+    # Consumed by data visualization to show the history of the network index for any given frame.
+    surrounding_network_indices: np.ndarray
 
     # Exactly like in `VisualizationInput`, but in the same range of indices as
-    # `surrounding_model_indices`, so you can see the same context.
-    model_index_layers: List[DataLabel]
+    # `surrounding_network_indices`, so you can see the same context.
+    network_index_layers: List[DataLabel]
 
 
 class ConfiguredAxes(NamedTuple):
@@ -124,9 +124,9 @@ class ConfiguredAxes(NamedTuple):
     a_2d_axis: Optional[Axes] = None
     b_2d_axis: Optional[Axes] = None
     combined_2d_axis: Optional[Axes] = None
-    model_index_plot_axis: Optional[Axes] = None
-    current_model_index_plot_axis: Optional[Axes] = None
-    model_selection_context: Optional[Axes] = None
+    network_index_plot_axis: Optional[Axes] = None
+    current_network_index_plot_axis: Optional[Axes] = None
+    network_selection_context: Optional[Axes] = None
 
 
 def render_current_matplotlib_frame(fig: Figure, resolution: Tuple[int, int]) -> RGBInt8ImageType:

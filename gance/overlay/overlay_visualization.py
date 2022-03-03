@@ -11,7 +11,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 
-from gance.data_into_model_visualization import visualization_common
+from gance.data_into_network_visualization import visualization_common
 from gance.gance_types import ImageSourceType
 from gance.logger_common import LOGGER
 

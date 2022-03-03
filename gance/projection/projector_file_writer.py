@@ -45,7 +45,7 @@ from gance.gance_types import RGBInt8ImageType
 from gance.hash_file import hash_file
 from gance.image_sources.video_common import frames_in_video
 from gance.logger_common import LOGGER
-from gance.model_interface.model_functions import load_model_network, wrap_loaded_model
+from gance.network_interface.network_functions import load_network_network, wrap_loaded_network
 from gance.process_common import COMPLETE_SENTINEL, cleanup_worker, empty_queue_sentinel
 from gance.projection.projection_types import (
     CompleteLatentsType,
@@ -120,15 +120,15 @@ class ProjectionAttributes:  # pylint: disable=too-many-instance-attributes
     # Hex digest of the target. This can be used to figure out exactly which input was projected.
     target_md5_hash: str
 
-    # The following fields are related to the model used in projection.
+    # The following fields are related to the network used in projection.
 
     # This is going to change! It is maintained to give a future viewer of this projection some
     # context as to how it was created.
-    original_model_path: str
+    original_network_path: str
 
-    # Hex digest of the pickled model. This can be used to figure out exactly which model was
+    # Hex digest of the pickled network. This can be used to figure out exactly which network was
     # used for projection.
-    model_md5_hash: str
+    network_md5_hash: str
 
     # The following fields are related to the projection itself
 
@@ -179,7 +179,7 @@ class TotalProjectionResult(NamedTuple):
     # The final output image from the projection.
     projected_image: RGBInt8ImageType
 
-    # Exposed for convenience, the final latent vectors of the projection. Was input into the model
+    # Exposed for convenience, the final latent vectors of the projection. Was input into the network
     # to produce `projected_image`.
     final_latents: CompleteLatentsType
 
@@ -204,7 +204,7 @@ class IntermediateProcessorFunction(Protocol):
         """
         :param step_number: The current projection step.
         :param latents: Output from `projector.get_dlatents()`. These are the latent codes that are
-        fed into the model to produce images that are then evaluated and iterated on.
+        fed into the network to produce images that are then evaluated and iterated on.
         :param noises: Output from `projector.get_noises()`, the noise that is used with
         input to shape vectors over time.
         :param images: Output from `projector.get_images()`, the images that are evaluated
@@ -214,22 +214,22 @@ class IntermediateProcessorFunction(Protocol):
 
 
 def _total_projection(
-    model_path: Path,
+    network_path: Path,
     target_image: RGBInt8ImageType,
     intermediate_processor: IntermediateProcessorFunction,
     start_event: Any,
     num_projection_steps: Optional[int],
 ) -> TotalProjectionResult:
     """
-    Project an image using a given model.
-    :param model_path: Path to the model used in projection.
+    Project an image using a given network.
+    :param network_path: Path to the network used in projection.
     :param target_image: Image to project.
     :param intermediate_processor: See protocol docs.
     :param num_projection_steps: The desired number of steps in the projection.
     :return: The component parts of the projection.
     """
     try:
-        network = load_model_network(model_path, True)
+        network = load_network_network(network_path, True)
         projector = Projector(num_steps=num_projection_steps)
         projector.set_network(network)  # type: ignore
 
@@ -248,7 +248,7 @@ def _total_projection(
 
         LOGGER.info("Projection complete, synthesizing final image.")
 
-        projected_image = wrap_loaded_model(model=network).create_image_matrix(
+        projected_image = wrap_loaded_network(network=network).create_image_matrix(
             complete_latents_to_matrix(results.final_latents)
         )
 
@@ -266,7 +266,7 @@ def _total_projection(
 
 
 def _projector_worker(
-    model_path: Path,
+    network_path: Path,
     image: RGBInt8ImageType,
     output_queue: "Queue[Union[TotalProjectionResult, Exception, str]]",
     intermediate_processor: IntermediateProcessorFunction,
@@ -277,7 +277,7 @@ def _projector_worker(
     """
     Meant to be called as a child process so when the underlying works is completed all resources
     are correctly freed.
-    :param model_path: The path to the model to complete the projection with.
+    :param network_path: The path to the network to complete the projection with.
     :param image: The image to project.
     :param output_queue: Results, exceptions and sentinels are put in this queue to communicate
     with the caller.
@@ -286,7 +286,7 @@ def _projector_worker(
 
     try:
         projection = _total_projection(
-            model_path=model_path,
+            network_path=network_path,
             target_image=image,
             intermediate_processor=intermediate_processor,
             num_projection_steps=num_projection_steps,
@@ -329,14 +329,14 @@ def _pull_from_queue(
 
 
 def project_image_in_process(  # pylint: disable=too-many-locals
-    model_path: Path,
+    network_path: Path,
     image: RGBInt8ImageType,
     intermediate_processor: IntermediateProcessorFunction,
     steps_per_projection: int,
     expected_time_per_step: float = DEFAULT_EXPECTED_TIME_PER_STEP,
 ) -> TotalProjectionResult:
     """
-    Use a model to get a latent projection of a given image. Does all computation in a child
+    Use a network to get a latent projection of a given image. Does all computation in a child
     process to get around memory leak problems.
 
     I incorrectly assumed that hdf5 files could be written from multiple processes. Originally,
@@ -348,7 +348,7 @@ def project_image_in_process(  # pylint: disable=too-many-locals
 
     This is kind of deceptive and given more time I'd come up with a more elegant solution.
 
-    :param model_path: Path to the model to do the projection.
+    :param network_path: Path to the network to do the projection.
     :param image: The image to project.
     :param intermediate_processor: Defines functions that process the intermediate parts of a
     projection. Implementors could write this data to a file, visualize it, compute stats etc.
@@ -394,7 +394,7 @@ def project_image_in_process(  # pylint: disable=too-many-locals
     worker = multiprocessing.Process(
         target=_projector_worker,
         kwargs={
-            "model_path": model_path,
+            "network_path": network_path,
             "image": image,
             "output_queue": output_queue,
             "intermediate_processor": queue_putter,
@@ -564,7 +564,7 @@ def project_process_intermediate(
     Word of warning. Trying to maintain a whole set of latents, noises, and images in memory
     at once is very difficult, which is why this processor function was implemented.
     :param target_tfrecords: Contains the image we're trying to project.
-    :param projector: Contains the model we're going to be projecting with, and monitors how the
+    :param projector: Contains the network we're going to be projecting with, and monitors how the
     process is going.
     :param intermediate_processor: Provides a way for user to process the projection steps along
     the way, see protocol for more docs.
@@ -615,7 +615,7 @@ def project_process_intermediate(
 
 def project_video_to_file(  # pylint: disable=too-many-locals,too-many-arguments
     path_to_video: Path,
-    path_to_model: Path,
+    path_to_network: Path,
     projection_file_path: Path,
     video_fps: Optional[float] = None,
     projection_width_height: Optional[Tuple[int, int]] = None,
@@ -630,7 +630,7 @@ def project_video_to_file(  # pylint: disable=too-many-locals,too-many-arguments
     """
     Project a video to a projection file on disk.
     :param path_to_video: Path to the video to project.
-    :param path_to_model: Path to the model to do the projection with.
+    :param path_to_network: Path to the network to do the projection with.
     :param projection_file_path: Path to output file.
     :param video_fps: Can override the actual FPS of the input video.
     :param projection_width_height: Scale each frame of the video to this size before feeding it
@@ -670,7 +670,7 @@ def project_video_to_file(  # pylint: disable=too-many-locals,too-many-arguments
         if projection_width_height is not None
         else video.original_resolution
     )
-    model_hash: str = hash_file(path_to_model)
+    network_hash: str = hash_file(path_to_network)
     target_hash: str = hash_file(path_to_video)
 
     # TODO - find a better home for this `1000` magic number.
@@ -704,8 +704,8 @@ def project_video_to_file(  # pylint: disable=too-many-locals,too-many-arguments
             original_width_height=video.original_resolution,
             projection_width_height=projection_width_height,
             target_md5_hash=target_hash,
-            original_model_path=str(path_to_model),
-            model_md5_hash=model_hash,
+            original_network_path=str(path_to_network),
+            network_md5_hash=network_hash,
             steps_in_projection=steps_per_projection,
             # Can't use a `None` here, not compatible with hdf5
             noises_shapes=shapes if shapes else np.nan,
@@ -752,7 +752,7 @@ def project_video_to_file(  # pylint: disable=too-many-locals,too-many-arguments
             ]
 
             result: TotalProjectionResult = project_image_in_process(
-                model_path=path_to_model,
+                network_path=path_to_network,
                 image=frame,
                 intermediate_processor=partial(
                     _write_intermediate,

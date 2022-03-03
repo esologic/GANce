@@ -16,23 +16,23 @@ from gance.apply_spectrogram import (
     reshape_spectrogram_to_vectors,
 )
 from gance.assets import WAV_CLAPS_PATH
-from gance.data_into_model_visualization import model_visualization, visualization_common
-from gance.data_into_model_visualization.model_visualization import (
+from gance.data_into_network_visualization import network_visualization, visualization_common
+from gance.data_into_network_visualization.network_visualization import (
     _configure_axes,
     _frame_inputs,
     _write_data_to_axes,
 )
-from gance.data_into_model_visualization.vectors_to_image import (
+from gance.data_into_network_visualization.vectors_to_image import (
     multi_plot_vectors,
     vectors_to_video,
     visualize_data_with_spectrogram_and_3d_vectors,
 )
-from gance.data_into_model_visualization.visualization_inputs import (
+from gance.data_into_network_visualization.visualization_inputs import (
     alpha_blend_vectors_max_rms_power_audio,
 )
-from gance.data_into_model_visualization.visualize_vector_reduction import visualize_reducer_output
+from gance.data_into_network_visualization.visualize_vector_reduction import visualize_reducer_output
 from gance.image_sources.video_common import add_wav_to_video
-from gance.model_interface.model_functions import create_model_interface
+from gance.network_interface.network_functions import create_network_interface
 from gance.projection import projection_file_reader
 from gance.projection.projection_visualization import visualize_projection_history
 from gance.vector_sources import music, primatives, vector_sources_common
@@ -102,7 +102,7 @@ def data_visualizations_single_frame() -> None:
             wavs=[WAV_CLAPS_PATH], vector_length=vector_length, frames_per_second=60.0
         ).wav_data,
         vector_length=vector_length,
-        model_indices=list(np.arange(20)),
+        network_indices=list(np.arange(20)),
         alpha=0.5,
         fft_roll_enabled=False,
         fft_amplitude_range=(-4, 4),
@@ -181,8 +181,8 @@ def blog_post_media() -> None:
 
     y_range = (-20, 20)
 
-    model_interface = create_model_interface(
-        model_path=assets.PRODUCTION_MODEL_PATH, call_init_function=True
+    network_interface = create_network_interface(
+        network_path=assets.PRODUCTION_network_PATH, call_init_function=True
     )
 
     projection_file_latents = projection_file_reader.final_latents_at_frame(
@@ -190,71 +190,71 @@ def blog_post_media() -> None:
         frame_number=561,
     )
 
-    model_visualization.single_vector_single_model_visualization(
+    network_visualization.single_vector_single_network_visualization(
         vector=SingleVector(projection_file_latents),
         title="Projection File Original Final Latents",
         output_image_path=output_dir.joinpath("projection_final_original.png"),
-        model=model_interface,
+        network=network_interface,
         y_range=(-20, 20),
     )
 
-    model_visualization.single_vector_single_model_visualization(
+    network_visualization.single_vector_single_network_visualization(
         vector=SingleVector(projection_file_latents * 0.9),
         title="Projection File Original Final Latents",
         output_image_path=output_dir.joinpath("projection_final_small.png"),
-        model=model_interface,
+        network=network_interface,
         y_range=(-20, 20),
     )
 
-    model_visualization.single_vector_single_model_visualization(
+    network_visualization.single_vector_single_network_visualization(
         vector=SingleVector(projection_file_latents * 1.1),
         title="Projection File Original Final Latents",
         output_image_path=output_dir.joinpath("projection_final_large.png"),
-        model=model_interface,
+        network=network_interface,
         y_range=(-20, 20),
     )
 
-    model_visualization.single_vector_single_model_visualization(
+    network_visualization.single_vector_single_network_visualization(
         vector=SingleVector(
-            np.full(shape=(model_interface.expected_vector_length,), fill_value=10)
+            np.full(shape=(network_interface.expected_vector_length,), fill_value=10)
         ),
         title="Line",
         output_image_path=output_dir.joinpath("line_to_image.png"),
-        model=model_interface,
+        network=network_interface,
         y_range=y_range,
     )
 
-    sin_vector = np.sin(np.arange(0, model_interface.expected_vector_length / 10, 0.1)) * 10
+    sin_vector = np.sin(np.arange(0, network_interface.expected_vector_length / 10, 0.1)) * 10
 
-    model_visualization.single_vector_single_model_visualization(
+    network_visualization.single_vector_single_network_visualization(
         vector=sin_vector,
         title="Sine Wave",
         output_image_path=output_dir.joinpath("sine_wav_to_image.png"),
-        model=model_interface,
+        network=network_interface,
         y_range=y_range,
     )
 
-    random_noise = np.random.rand(model_interface.expected_vector_length) * 10
+    random_noise = np.random.rand(network_interface.expected_vector_length) * 10
 
-    model_visualization.single_vector_single_model_visualization(
+    network_visualization.single_vector_single_network_visualization(
         vector=random_noise,
         title="Noise",
         output_image_path=output_dir.joinpath("noise_image.png"),
-        model=model_interface,
+        network=network_interface,
         y_range=y_range,
     )
 
-    model_visualization.single_vector_single_model_visualization(
+    network_visualization.single_vector_single_network_visualization(
         vector=primatives.single_square_wave_vector(
             rising_edge_x=150,
             falling_edge_x=500,
             y_offset=0,
             y_amplitude=10,
-            vector_length=model_interface.expected_vector_length,
+            vector_length=network_interface.expected_vector_length,
         ),
         title="Square Wave",
         output_image_path=output_dir.joinpath("original_step.png"),
-        model=model_interface,
+        network=network_interface,
         y_range=y_range,
     )
 
@@ -263,47 +263,47 @@ def blog_post_media() -> None:
         falling_edge_x=500,
         y_offset=0,
         y_amplitude=10,
-        vector_length=model_interface.expected_vector_length,
+        vector_length=network_interface.expected_vector_length,
     )
 
-    model_visualization.single_vector_single_model_visualization(
+    network_visualization.single_vector_single_network_visualization(
         vector=square_vector,
         title="Tweaked Square",
         output_image_path=output_dir.joinpath("modified_step.png"),
-        model=model_interface,
+        network=network_interface,
         y_range=(-20, 20),
     )
 
-    model_visualization.single_vector_single_model_visualization(
+    network_visualization.single_vector_single_network_visualization(
         vector=random_noise,
         title="Early training network",
         output_image_path=output_dir.joinpath("early_network_noise_image.png"),
-        model=create_model_interface(
-            model_path=assets.EARLY_TRAINING_MODEL_PATH, call_init_function=True
+        network=create_network_interface(
+            network_path=assets.EARLY_TRAINING_NETWORK_PATH, call_init_function=True
         ),
         y_range=y_range,
     )
 
-    model_visualization.single_vector_single_model_visualization(
+    network_visualization.single_vector_single_network_visualization(
         vector=random_noise,
         title="Middle training network",
         output_image_path=output_dir.joinpath("middle_network_noise_image.png"),
-        model=create_model_interface(
-            model_path=assets.MID_TRAINING_MODEL_PATH, call_init_function=True
+        network=create_network_interface(
+            network_path=assets.MID_TRAINING_NETWORK_PATH, call_init_function=True
         ),
         y_range=y_range,
     )
 
-    model_visualization.vectors_single_model_visualization(
+    network_visualization.vectors_single_network_visualization(
         vectors_label=VectorsLabel(
             data=vector_sources_common.interpolate_between_vectors(
                 start=sin_vector, end=square_vector, count=1000
             ),
-            vector_length=model_interface.expected_vector_length,
+            vector_length=network_interface.expected_vector_length,
             label="Interpolation between Sine vector and Square Wave",
         ),
         output_video_path=output_dir.joinpath("sin_square_interp.mp4"),
-        model=model_interface,
+        network=network_interface,
         y_range=(-20, 20),
     )
 
@@ -311,18 +311,18 @@ def blog_post_media() -> None:
 
         tmp_video_path = Path(f.name)
 
-        model_visualization.vectors_single_model_visualization(
+        network_visualization.vectors_single_network_visualization(
             vectors_label=VectorsLabel(
                 data=music.read_wavs_scale_for_video(
                     wavs=[assets.NOVA_SNIPPET_PATH],
-                    vector_length=model_interface.expected_vector_length,
+                    vector_length=network_interface.expected_vector_length,
                     frames_per_second=60.0,
                 ).wav_data,
-                vector_length=model_interface.expected_vector_length,
+                vector_length=network_interface.expected_vector_length,
                 label="Audio Directly Into Network",
             ),
             output_video_path=tmp_video_path,
-            model=model_interface,
+            network=network_interface,
         )
 
         while not tmp_video_path.exists():
@@ -337,8 +337,8 @@ def blog_post_media() -> None:
     visualize_projection_history(
         projection_file_path=assets.PROJECTION_FILE_PATH,
         output_video_path=output_dir.joinpath("projection_history.mp4"),
-        projection_model_path=assets.PRODUCTION_MODEL_PATH,
-        model_not_matching_ok=False,
+        projection_network_path=assets.PRODUCTION_network_PATH,
+        network_not_matching_ok=False,
         start_frame_index=561,
         end_frame_index=562,
     )

@@ -1,6 +1,6 @@
 """
 Functions/types to be able to read in music via wav files and then present that data as an input
-vector to models.
+vector to networks.
 """
 import pickle
 from functools import partial

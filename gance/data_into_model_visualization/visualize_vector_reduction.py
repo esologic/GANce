@@ -10,8 +10,8 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from gance.data_into_model_visualization import visualization_common
-from gance.data_into_model_visualization.visualization_common import (
+from gance.data_into_network_visualization import visualization_common
+from gance.data_into_network_visualization.visualization_common import (
     VectorsReducer,
     infinite_colors,
     standard_matplotlib_figure,
@@ -37,7 +37,7 @@ def visualize_reducer_output(audio_path: Path, reducer: VectorsReducer) -> None:
 
     reduced = vector_reduction.quantize_results_layers(
         results_layers=reducer(time_series_audio_vectors=audio, vector_length=vector_length),
-        model_indices=list(range(30)),
+        network_indices=list(range(30)),
     )
 
     # Needs to be this aspect ratio
@@ -73,10 +73,10 @@ def visualize_reducer_output(audio_path: Path, reducer: VectorsReducer) -> None:
     # Plot the result
     result_axis.plot(x_values, reduced.result.data)
     result_axis.set_title("Quantized Result")
-    result_axis.set_ylabel("Model Index")
+    result_axis.set_ylabel("network Index")
     result_axis.set_xlabel("Frame #")
 
-    fig.suptitle(f"Model Selection for {audio_path.name}", fontsize=16)
+    fig.suptitle(f"network Selection for {audio_path.name}", fontsize=16)
 
     plt.tight_layout()
     plt.show()

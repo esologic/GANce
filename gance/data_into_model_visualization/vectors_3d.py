@@ -17,7 +17,7 @@ def _reshape_vectors_for_3d_plotting(data: ConcatenatedVectors, vector_length: i
     index 1, the y point, the position of the vector within the group of vectors.
     index 2, the z point, the data we're looking at, from `data`.
     :param data: The array to reshape.
-    :param vector_length: The x length, the length of the input vector of the model.
+    :param vector_length: The x length, the length of the input vector of the network.
     :return: The reshaped array.
     """
 
@@ -41,7 +41,7 @@ def plot_vectors_3d(
     The X coordinate will be the position in the chunk.
     The Y coordinate will be the chunk index.
     The z coordinate will be the value of that position in the chunk.
-    This way it's easy to visualize how the input vectors to the model are changing over time.
+    This way it's easy to visualize how the input vectors to the network are changing over time.
     :param ax_3d: The axis to plot the data on.
     :param vectors_label: Holds and describes the vectors to plot.
     :param x_label: The label on the x axis of the graph.

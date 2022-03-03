@@ -11,7 +11,7 @@ from sklearn.preprocessing import minmax_scale
 from typing_extensions import Protocol
 
 from gance.apply_spectrogram import compute_spectrogram_smooth_scale
-from gance.data_into_model_visualization.visualization_common import (
+from gance.data_into_network_visualization.visualization_common import (
     ResultLayers,
     VisualizationInput,
 )
@@ -38,13 +38,13 @@ class CreateVisualizationInput(Protocol):  # pylint: disable=too-few-public-meth
         self: "CreateVisualizationInput",
         time_series_audio_vectors: np.ndarray,
         vector_length: int,
-        model_indices: List[int],
+        network_indices: List[int],
     ) -> VisualizationInput:
         """
         :param time_series_audio_vectors: The input audio file in time series form. Shouldn't
         be a spectrogram etc.
-        :param vector_length: The length of the input vector to the model.
-        :param model_indices: The indices of the candidate models to be chosen from to render
+        :param vector_length: The length of the input vector to the network.
+        :param network_indices: The indices of the candidate networks to be chosen from to render
         an image.
         :return: A NamedTuple for holding the result, each part is consumed in a different way.
         """
@@ -76,7 +76,7 @@ def _create_spectrogram(
             results_layers=reduce_vector_rms_rolling_average(
                 time_series_audio_vectors=time_series_audio_vectors, vector_length=vector_length
             ),
-            model_indices=list(np.arange(0, 3)),
+            network_indices=list(np.arange(0, 3)),
         )
 
         spectrogram = vector_sources_common.smooth_each_vector(
@@ -97,7 +97,7 @@ def alpha_blend_vectors_max_rms_power_audio(
     fft_amplitude_range: Tuple[int, int],
     time_series_audio_vectors: np.ndarray,
     vector_length: int,
-    model_indices: List[int],
+    network_indices: List[int],
 ) -> VisualizationInput:
     """
     For vectors:
@@ -108,8 +108,8 @@ def alpha_blend_vectors_max_rms_power_audio(
 
     For index:
         * A rolling max rms power is computed on audio
-        * This value is scaled to the range of model indices and quantized to actually select
-        the models.
+        * This value is scaled to the range of network indices and quantized to actually select
+        the networks.
 
     :param alpha: 0 means no music will be visible in combined signal, 1 means combined signal
     will be entirely music.
@@ -119,7 +119,7 @@ def alpha_blend_vectors_max_rms_power_audio(
     FFT during alpha blending.
     :param time_series_audio_vectors: See docs in the protocol.
     :param vector_length: See docs in the protocol.
-    :param model_indices: See docs in the protocol.
+    :param network_indices: See docs in the protocol.
     :return: The vector sources to be passed to the visualization functions.
     """
 
@@ -147,7 +147,7 @@ def alpha_blend_vectors_max_rms_power_audio(
         results_layers=reduce_vector_rms_rolling_average(
             time_series_audio_vectors=time_series_audio_vectors, vector_length=vector_length
         ),
-        model_indices=model_indices,
+        network_indices=network_indices,
     )
 
     return VisualizationInput(
@@ -162,7 +162,7 @@ def alpha_blend_vectors_max_rms_power_audio(
             vector_length=vector_length,
             label=f"Combined w/ Alpha Blending, a={alpha}",
         ),
-        model_indices=indices_layers,
+        network_indices=indices_layers,
     )
 
 
@@ -174,7 +174,7 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
     blend_depth: int,
     time_series_audio_vectors: ConcatenatedVectors,  # required by protocol
     vector_length: int,  # required by protocol
-    model_indices: List[int],  # required by protocol
+    network_indices: List[int],  # required by protocol
 ) -> VisualizationInput:
     """
     For vectors:
@@ -192,8 +192,8 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
 
     For index:
         * A rolling max rms power is computed on audio
-        * This value is scaled to the range of model indices and quantized to actually select
-        the models.
+        * This value is scaled to the range of network indices and quantized to actually select
+        the networks.
 
     :param final_latents_matrices_label: Concatenated final latents from a projection file.
     :param alpha: 0 means no music will be visible in combined signal, 1 means combined signal
@@ -204,7 +204,7 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
     FFT during alpha blending.
     :param time_series_audio_vectors: See docs in the protocol.
     :param vector_length: See docs in the protocol.
-    :param model_indices: See docs in the protocol.
+    :param network_indices: See docs in the protocol.
     :return: The vector sources to be passed to the visualization functions.
     """
 
@@ -249,7 +249,7 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
             savgol_window_length=3,
             savgol_polyorder=2,
         ),
-        model_indices=model_indices,
+        network_indices=network_indices,
     )
 
     return VisualizationInput(
@@ -266,5 +266,5 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
             vector_length=vector_length,
             label=f"Combined w/ Alpha Blending, a={alpha}",
         ),
-        model_indices=indices_layers,
+        network_indices=indices_layers,
     )

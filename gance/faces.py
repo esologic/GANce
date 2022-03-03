@@ -12,7 +12,7 @@ from gance.gance_types import LabeledCoordinates
 class FaceFinderProxy:
     """
     Under the hood, `face_recognition` uses dnnlib, which stylegan also uses.
-    An init function is called upon import, which makes the loading of models within the
+    An init function is called upon import, which makes the loading of networks within the
     subprocesses impossible. There's probably a better way around this but this was expedient.
     """
 
