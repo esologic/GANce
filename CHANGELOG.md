@@ -12,7 +12,8 @@ This results to tighter looking overlays.
 * Can use `--wav` argument multiple times now, good for working through projection files with
 multiple tracks.
 * Audio files are now scaled in duration to the length of the video contained in the projection file.
-This way, the number of FFTs, and the number of final latents to blend are always the same.
+This way, the number of FFTs, and the number of final latents to blend are always the same. There's
+a check to make sure the projected frame count and the # of vectors are not too far off. 
 
 
 0.18.0 - (2022-02-08)
