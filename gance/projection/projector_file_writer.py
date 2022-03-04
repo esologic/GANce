@@ -67,7 +67,7 @@ DEFAULT_EXPECTED_TIME_PER_STEP = 60.0
 # that can be stored in that queue. If you start running out of memory decrease this number.
 FORWARDING_QUEUE_MAX_SIZE = 75
 
-FORMAT_VERSION = 1
+LATEST_VERSION = 2
 TARGET_IMAGES_GROUP_NAME = "target_images"
 FINAL_LATENTS_GROUP_NAME = "final_latents"
 FINAL_IMAGE_GROUP_NAME = "final_images"
@@ -698,7 +698,7 @@ def project_video_to_file(  # pylint: disable=too-many-locals,too-many-arguments
         :return: The attributes ready to be written to the file.
         """
         output = ProjectionAttributes(
-            version_number=FORMAT_VERSION,
+            version_number=LATEST_VERSION,
             complete=complete,
             original_target_path=str(path_to_video),
             original_width_height=video.original_resolution,

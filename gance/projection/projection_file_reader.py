@@ -25,6 +25,7 @@ from gance.projection.projector_file_writer import (
     FINAL_LATENTS_GROUP_NAME,
     IMAGES_HISTORIES_GROUP_NAME,
     LATENTS_HISTORIES_GROUP_NAME,
+    LATEST_VERSION,
     NOISES_HISTORIES_GROUP_NAME,
     TARGET_IMAGES_GROUP_NAME,
     ProjectionAttributes,
@@ -110,7 +111,14 @@ class ProjectionFileReader:  # pylint: disable=too-many-instance-attributes
 
         self._file = h5py.File(name=str(projection_file_path), mode="r")
 
-        a = ProjectionAttributes.from_dict(self._file.attrs)  # type: ignore # pylint: disable=no-member
+        attributes = dict(self._file.attrs)
+
+        if attributes["version_number"] == 1:
+            attributes["original_network_path"] = attributes.pop("original_model_path")
+            attributes["network_md5_hash"] = attributes.pop("model_md5_hash")
+            attributes["version_number"] = LATEST_VERSION
+
+        a = ProjectionAttributes.from_dict(attributes)  # type: ignore # pylint: disable=no-member
         self._projection_attributes: ProjectionAttributes = a
 
         self._target_images: ImageSourceType = cast(
