@@ -127,7 +127,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
             ),
             click.option(
                 "-o",
-                "--output_path",
+                "--output-path",
                 help="Output video will be written to this path",
                 type=click.Path(
                     exists=False,
@@ -149,7 +149,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
             ),
             optgroup.option(
                 "-d",
-                "--networks_directory",
+                "--networks-directory",
                 help=(
                     "network `.pkl` files will be read from this directory. "
                     "These will be alphanumerically sorted."
@@ -161,7 +161,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
             ),
             optgroup.option(
                 "-m",
-                "--network_path",
+                "--network-path",
                 help=(
                     "Paths to particular network files. "
                     "These will be used for synthesis in the order they're given."
@@ -173,7 +173,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 default=None,
             ),
             optgroup.option(
-                "--networks_json",
+                "--networks-json",
                 help=(
                     'Path to a JSON file with a single key: "networks" '
                     "that maps to a list of paths "
@@ -187,7 +187,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
             ),
             click.option(
                 "-n",
-                "--frames_to_visualize",
+                "--frames-to-visualize",
                 help=(
                     "The number of frames in the input to visualize. "
                     "Starts from the first index, goes to this value. "
@@ -200,7 +200,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
             ),
             click.option(
                 "-f",
-                "--output_fps",
+                "--output-fps",
                 help=(
                     "Frames per second of output video. Input sources will be upscaled to "
                     "satisfy this requirement."
@@ -212,7 +212,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
             ),
             click.option(
                 "-s",
-                "--output_side_length",
+                "--output-side-length",
                 help=(
                     "Both the synthesized output from the network, and the individual elements of "
                     "the debug visualizations are squares. This sets their side lengths in pixels."
@@ -228,7 +228,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 help="Control the visualization produced alongside the output video.",
             ),
             optgroup.option(
-                "--debug_path",
+                "--debug-path",
                 help=(
                     "If provided, a video containing debug visualizations of the "
                     "synthesis steps will be written to this path."
@@ -238,7 +238,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 ),
             ),
             optgroup.option(
-                "--debug_window",
+                "--debug-window",
                 help=(
                     "For visualizations that represent trends in data that span multiple "
                     "frames of video, this param controls the number of frames to represent "
@@ -255,14 +255,14 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 show_default=True,
             ),
             click.option(
-                "--fft_roll_enabled",
+                "--fft-roll-enabled",
                 help="If true, the FFT vectors move over time.",
                 is_flag=True,
                 required=False,
                 show_default=True,
             ),
             click.option(
-                "--fft_amplitude_range",
+                "--fft-amplitude-range",
                 help="Values in FFT are scaled to this range.",
                 type=click.Tuple(types=(float, float)),
                 required=False,
@@ -270,7 +270,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 show_default=True,
             ),
             click.option(
-                "--run_config",
+                "--run-config",
                 help="If given, a JSON file containing input parameters, and metadata about the "
                 "output videos is written to this path after the run has finished.",
                 type=click.Path(
@@ -414,13 +414,13 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 @cli.command()  # pylint: disable=too-many-arguments
 @common_command_options
 @click.option(
-    "--projection_file_path",
+    "--projection-file-path",
     help="Path to the projection file.",
     type=click.Path(exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True),
     required=True,
 )
 @click.option(
-    "--blend_depth",
+    "--blend-depth",
     help=(
         "Number of vectors within the final latents matrices that receive the FFT during "
         "alpha blending."
@@ -440,7 +440,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 )
 @optgroup.option(
     "-w",
-    "--complexity_change_rolling_sum_window",
+    "--complexity-change-rolling-sum-window",
     type=click.IntRange(min=0),
     help="The number of frames to window the music complexity computation to.",
     default=30,
@@ -448,7 +448,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 )
 @optgroup.option(
     "-t",
-    "--complexity_change_threshold",
+    "--complexity-change-threshold",
     type=click.IntRange(min=0),
     help="If complexity is under this value, an overlay computation is enabled.",
     default=100,
@@ -456,7 +456,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 )
 @optgroup.option(
     "-p",
-    "--phash_distance",
+    "--phash-distance",
     type=click.IntRange(min=0),
     help=(
         "Minimum distance between perceptual hashes of the bounding box region of the synthesized "
@@ -467,7 +467,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 )
 @optgroup.option(
     "-b",
-    "--bbox_distance",
+    "--bbox-distance",
     type=click.FloatRange(min=0),
     help=(
         "For pairs of synthesized images and their corresponding targets that both contain eye "
@@ -479,7 +479,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 )
 @optgroup.option(
     "-t",
-    "--track_length",
+    "--track-length",
     type=click.IntRange(min=0),
     help=(
         "For sequences of adjacent frames that could contain an overlay, "
