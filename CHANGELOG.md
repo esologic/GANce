@@ -3,6 +3,8 @@
 0.19.0 - (2022-02-XX)
 ------------------
 
+* Refactored codebase to make sure 'network' was used over 'model' in all cases. They're networks
+not models.
 A few more changes to projection file blending:
 * Added a few more arguments to `music_into_models.py` to be able to make selecting the production
 list of models easier. Now input args can be saved to file, and lists of models can be passed in

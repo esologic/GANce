@@ -14,7 +14,7 @@ from h5py._hl.group import Group  # pylint: disable=protected-access
 
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.logger_common import LOGGER
-from gance.model_interface.model_functions import ModelInterface
+from gance.network_interface.network_functions import NetworkInterface
 from gance.projection.projection_types import (
     CompleteLatentsType,
     FlattenedNoisesType,
@@ -25,6 +25,7 @@ from gance.projection.projector_file_writer import (
     FINAL_LATENTS_GROUP_NAME,
     IMAGES_HISTORIES_GROUP_NAME,
     LATENTS_HISTORIES_GROUP_NAME,
+    LATEST_VERSION,
     NOISES_HISTORIES_GROUP_NAME,
     TARGET_IMAGES_GROUP_NAME,
     ProjectionAttributes,
@@ -110,7 +111,14 @@ class ProjectionFileReader:  # pylint: disable=too-many-instance-attributes
 
         self._file = h5py.File(name=str(projection_file_path), mode="r")
 
-        a = ProjectionAttributes.from_dict(self._file.attrs)  # type: ignore # pylint: disable=no-member
+        attributes = dict(self._file.attrs)
+
+        if attributes["version_number"] == 1:
+            attributes["original_network_path"] = attributes.pop("original_model_path")
+            attributes["network_md5_hash"] = attributes.pop("model_md5_hash")
+            attributes["version_number"] = LATEST_VERSION
+
+        a = ProjectionAttributes.from_dict(attributes)  # type: ignore # pylint: disable=no-member
         self._projection_attributes: ProjectionAttributes = a
 
         self._target_images: ImageSourceType = cast(
@@ -287,7 +295,7 @@ def final_latents_matrices_label(reader: ProjectionFileReader) -> MatricesLabel:
         reader.final_latents,
         label=(
             f"{Path(reader.projection_attributes.original_target_path).name} "
-            f"proj by {Path(reader.projection_attributes.original_model_path).name}"
+            f"proj by {Path(reader.projection_attributes.original_network_path).name}"
         ),
     )
 
@@ -330,32 +338,33 @@ def projection_history_step_matrices_label(
         iterator=complete_latents_at_position,
         label=(
             f"{Path(reader.projection_attributes.original_target_path).name} "
-            f"proj by {Path(reader.projection_attributes.original_model_path).name} "
+            f"proj by {Path(reader.projection_attributes.original_network_path).name} "
             f"step {projection_step}"
         ),
     )
 
 
-def model_outputs_at_projection_step(
+def network_outputs_at_projection_step(
     projection_file_path: Path,
-    model_interface: ModelInterface,
+    network_interface: NetworkInterface,
     projection_step_to_take: int,
 ) -> Iterator[RGBInt8ImageType]:
     """
     At the given step in the projection history for each frame in the projection file,
-    feed the matrices into the model and return the image.
+    feed the matrices into the network and return the image.
     Note: This is a one-shot helper function. If you need to do more operations on the file,
     it's faster to use the `ProjectionFileReader` interface.
     :param projection_file_path: Path to file to read.
-    :param model_interface: Latents from the projection history will be fed into this model.
-    :param projection_step_to_take: This step of projection will be retrieved and fed to the model.
+    :param network_interface: Latents from the projection history will be fed into this network.
+    :param projection_step_to_take: This step of projection will be retrieved and fed to the
+    network.
     :return: Resulting images for each frame in the file.
     """
 
     with load_projection_file(projection_file_path) as reader:
 
         yield from [
-            model_interface.create_image_matrix(latents)
+            network_interface.create_image_matrix(latents)
             for latents in _yield_position_from_sub_iterables(
                 iterator_of_iterators=reader.latents_histories, position=projection_step_to_take
             )
@@ -388,22 +397,22 @@ def final_latents_at_frame(projection_file_path: Path, frame_number: int) -> Sin
         return next(itertools.islice(reader.final_latents, frame_number, frame_number + 1))
 
 
-def model_outputs_at_final_latents(
-    projection_file_path: Path, model_interface: ModelInterface
+def network_outputs_at_final_latents(
+    projection_file_path: Path, network_interface: NetworkInterface
 ) -> Iterator[RGBInt8ImageType]:
     """
     For the final latents for each frame in the projection file,
-    feed the matrices into the model and return the image.
+    feed the matrices into the network and return the image.
     Note: This is a one-shot helper function. If you need to do more operations on the file,
     it's faster to use the `ProjectionFileReader` interface.
     :param projection_file_path: Path to file to read.
-    :param model_interface: Latents from the projection history will be fed into this model.
-    :return: The results from the model.
+    :param network_interface: Latents from the projection history will be fed into this network.
+    :return: The results from the network.
     """
 
     with load_projection_file(projection_file_path) as reader:
         yield from [
-            model_interface.create_image_matrix(final_latents)
+            network_interface.create_image_matrix(final_latents)
             for final_latents in reader.final_latents
         ]
 

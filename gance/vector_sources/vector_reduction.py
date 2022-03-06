@@ -1,5 +1,5 @@
 """
-Functions to aide in selecting the model for a given frame in a visualization based on the audio
+Functions to aide in selecting the network for a given frame in a visualization based on the audio
 associated with that frame.
 """
 
@@ -14,7 +14,7 @@ from scipy.interpolate import UnivariateSpline
 from scipy.ndimage import maximum_filter1d
 from scipy.signal import savgol_filter
 
-from gance.data_into_model_visualization.visualization_common import DataLabel, ResultLayers
+from gance.data_into_network_visualization.visualization_common import DataLabel, ResultLayers
 from gance.vector_sources.vector_sources_common import remap_values_into_range, sub_vectors
 from gance.vector_sources.vector_types import ConcatenatedVectors, SingleVector
 
@@ -160,7 +160,7 @@ def reduce_vector_gzip_compression_rolling_average(
 
 def quantize_results_layers(
     results_layers: ResultLayers,
-    model_indices: List[int],
+    network_indices: List[int],
 ) -> ResultLayers:
     """
     Takes the output of `reducer(
@@ -168,14 +168,14 @@ def quantize_results_layers(
         * Scales the values into the range of the possible indices.
         * Quantizes the floats from the scaling operation into indexes to be consumed.
 
-    The resulting indexes are used to select which model gets used to create a given frame.
+    The resulting indexes are used to select which network gets used to create a given frame.
     It's the responsibility of the function given as `reducer` to go from audio -> index.
 
     :param time_series_audio_vectors: The audio to get reduced into indexes.
     :param vector_length: Each frame in the resulting video will be displayed for this many
     points of audio.
     :param reducer: See docs in the Protocol.
-    :param model_indices: The candidate indices to choose from.
+    :param network_indices: The candidate indices to choose from.
     :return: An iterator of the indices. First frame of the generated video (based on the audio)
     should map to first item out of the iterator etc.
     """
@@ -183,7 +183,7 @@ def quantize_results_layers(
     scaled_into_index_range = remap_values_into_range(
         data=results_layers.result.data,
         input_range=(min(results_layers.result.data), max(results_layers.result.data)),
-        output_range=(0, len(model_indices) - 1),
+        output_range=(0, len(network_indices) - 1),
     )
 
     quantized = np.rint(scaled_into_index_range).astype(int)

@@ -4,8 +4,8 @@ Tests write/read/module functions in projection file.
 
 from pathlib import Path
 from test.assets import (
-    SAMPLE_BATCH_1_MODEL_PATH,
-    SAMPLE_BATCH_2_MODEL_PATH,
+    SAMPLE_BATCH_1_NETWORK_PATH,
+    SAMPLE_BATCH_2_NETWORK_PATH,
     SAMPLE_FACE_VIDEO_SHORT_PATH,
 )
 from test.test_common import wait_get_size
@@ -17,7 +17,7 @@ from py._path.local import LocalPath  # pylint: disable=protected-access
 
 from gance.image_sources import video_common
 from gance.image_sources.still_image_common import write_image
-from gance.model_interface.model_functions import create_model_interface_process
+from gance.network_interface.network_functions import create_network_interface_process
 from gance.projection import projection_file_reader, projection_visualization, projector_file_writer
 from gance.vector_sources.vector_types import SingleMatrix
 
@@ -35,10 +35,10 @@ def distance(final_latent: SingleMatrix, latent_history: List[SingleMatrix], ind
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("model_path", [SAMPLE_BATCH_2_MODEL_PATH, SAMPLE_BATCH_1_MODEL_PATH])
+@pytest.mark.parametrize("network_path", [SAMPLE_BATCH_2_NETWORK_PATH, SAMPLE_BATCH_1_NETWORK_PATH])
 @pytest.mark.parametrize("steps_per_projection", [10, 15, 30])
 def test_project_video_to_file(  # pylint: disable=too-many-locals
-    tmpdir: LocalPath, model_path: Path, steps_per_projection: int
+    tmpdir: LocalPath, network_path: Path, steps_per_projection: int
 ) -> None:
     """
     Tests to make sure that the method of writing a projection file still works.
@@ -53,7 +53,7 @@ def test_project_video_to_file(  # pylint: disable=too-many-locals
 
     # Tests to make sure that this process can complete without an error.
     projector_file_writer.project_video_to_file(
-        path_to_model=model_path,
+        path_to_network=network_path,
         path_to_video=SAMPLE_FACE_VIDEO_SHORT_PATH,
         projection_file_path=projection_file_path,
         steps_per_projection=steps_per_projection,  # timebounds this to about a minute per frame
@@ -82,7 +82,7 @@ def test_project_video_to_file(  # pylint: disable=too-many-locals
             assert np.array_equal(target_image, expected_image)
 
         for matrix in final_latents:
-            # Known property of this model
+            # Known property of this network
             assert matrix.shape == (18, 512)
             assert matrix.sum() > 0
 
@@ -108,16 +108,16 @@ def test_project_video_to_file(  # pylint: disable=too-many-locals
         projection_file_path=projection_file_path
     )
 
-    # Check that the final vectors in the file produce the same image when fed to the model they
+    # Check that the final vectors in the file produce the same image when fed to the network they
     # did during their first run.
-    model_interface = create_model_interface_process(model_path=model_path)
+    network_interface = create_network_interface_process(network_path=network_path)
 
     try:
 
-        for model_output, model_output_in_file in zip(
-            projection_file_reader.model_outputs_at_final_latents(
+        for network_output, network_output_in_file in zip(
+            projection_file_reader.network_outputs_at_final_latents(
                 projection_file_path=projection_file_path,
-                model_interface=model_interface.model_interface,
+                network_interface=network_interface.network_interface,
             ),
             projection_file_reader.final_images(projection_file_path=projection_file_path),
         ):
@@ -126,14 +126,14 @@ def test_project_video_to_file(  # pylint: disable=too-many-locals
             # comparing sizes is roughly analogous to checking the visual contents which is the
             # idea of this test.
 
-            model_image_path = Path(str(tmpdir)).joinpath("model_image.png")
+            network_image_path = Path(str(tmpdir)).joinpath("network_image.png")
             file_image_path = Path(str(tmpdir)).joinpath("file_image.png")
 
-            write_image(image=model_output, path=model_image_path)
-            write_image(image=model_output_in_file, path=file_image_path)
+            write_image(image=network_output, path=network_image_path)
+            write_image(image=network_output_in_file, path=file_image_path)
 
             # Check if they're within 5000 bytes of eachother.
-            assert abs(wait_get_size(model_image_path) - wait_get_size(file_image_path)) < 5000
+            assert abs(wait_get_size(network_image_path) - wait_get_size(file_image_path)) < 5000
 
         # Using the resulting projection file, create several of the common visualizations. These
         # should be able to compute without error.
@@ -153,22 +153,22 @@ def test_project_video_to_file(  # pylint: disable=too-many-locals
         projection_visualization.visualize_projection_history(
             projection_file_path=projection_file_path,
             output_video_path=projection_history_path,
-            projection_model_path=model_path,
-            model_not_matching_ok=False,
+            projection_network_path=network_path,
+            network_not_matching_ok=False,
         )
         projection_step_path = Path(str(tmpdir)).joinpath("projection_step.mp4")
         projection_visualization.visualize_partial_projection_history(
             projection_file_path=projection_file_path,
             output_video_path=projection_step_path,
-            projection_model_path=model_path,
-            model_not_matching_ok=False,
+            projection_network_path=network_path,
+            network_not_matching_ok=False,
             projection_step_to_take=0,
         )
     except AssertionError as e:
         # Needs to be called or you'll run out of vram across subsequent runs
-        model_interface.stop_function()
+        network_interface.stop_function()
         raise e
 
-    model_interface.stop_function()
+    network_interface.stop_function()
 
-    print(f"Tests passed! for {steps_per_projection} steps, model: {str(model_path)}")
+    print(f"Tests passed! for {steps_per_projection} steps, network: {str(network_path)}")

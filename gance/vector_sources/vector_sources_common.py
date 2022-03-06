@@ -350,7 +350,7 @@ def promote_to_matrix_duplicate(
 ) -> ConcatenatedMatrices:
     """
     Will be used to take a 1 dimensional vector and promote it to a shape that it can be
-    input into full depth model.
+    input into full depth network.
     :param data: data to duplicate.
     :param target_depth: The number of times to duplicate `data`. New shape will be
     (`target_depth`, len(data)).
@@ -382,7 +382,7 @@ def demote_to_vector_select(
 ) -> Union[SingleMatrix, ConcatenatedMatrices]:
     """
     Will be used to take a 1 dimensional vector and promote it to a shape that it can be
-    input into full depth model.
+    input into full depth network.
     :param data: data to duplicate.
     :param target_depth: The number of times to duplicate `data`. New shape will be
     (`target_depth`, len(data)).

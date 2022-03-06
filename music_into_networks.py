@@ -1,6 +1,6 @@
 """
 Feed inputs (music, videos) into a network and record the output.
-Also tools to visualize these vectors against the model outputs.
+Also tools to visualize these vectors against the network outputs.
 """
 
 import json
@@ -20,9 +20,9 @@ from pydantic import BaseModel, FilePath
 
 from gance import divisor, overlay
 from gance.assets import OUTPUT_DIRECTORY
-from gance.data_into_model_visualization import visualize_vector_reduction
-from gance.data_into_model_visualization.model_visualization import vector_synthesis
-from gance.data_into_model_visualization.visualization_inputs import (
+from gance.data_into_network_visualization import visualize_vector_reduction
+from gance.data_into_network_visualization.network_visualization import vector_synthesis
+from gance.data_into_network_visualization.visualization_inputs import (
     alpha_blend_projection_file,
     alpha_blend_vectors_max_rms_power_audio,
 )
@@ -30,7 +30,7 @@ from gance.gance_types import RGBInt8ImageType
 from gance.image_sources import video_common
 from gance.iterator_on_disk import HDF5_SERIALIZER, iterator_on_disk
 from gance.logger_common import LOGGER
-from gance.model_interface.model_functions import MultiModel, sorted_models_in_directory
+from gance.network_interface.network_functions import MultiNetwork, sorted_networks_in_directory
 from gance.projection import projection_file_reader
 from gance.vector_sources import music, vector_reduction
 from gance.vector_sources.vector_reduction import DataLabel, ResultLayers
@@ -43,10 +43,10 @@ logging.getLogger("numba").setLevel(logging.WARNING)
 
 class NetworksFile(BaseModel):
     """
-    Describes a `NetworksFile`, a .json file full paths to pickled StyleGAN models.
+    Describes a `NetworksFile`, a .json file full paths to pickled StyleGAN networks.
     """
 
-    models: List[FilePath]
+    networks: List[FilePath]
 
 
 @click.group()
@@ -64,46 +64,46 @@ def cli() -> None:
     """
 
 
-def _parse_model_paths(
-    models_directory: Optional[str], models: Optional[List[str]], models_json: Optional[str]
+def _parse_network_paths(
+    networks_directory: Optional[str], networks: Optional[List[str]], networks_json: Optional[str]
 ) -> List[Path]:
     """
-    Given the user's input from the CLI, get a list of the models to be used in the run.
-    :param models_directory: A string representing a path to a directory that contains model
+    Given the user's input from the CLI, get a list of the networks to be used in the run.
+    :param networks_directory: A string representing a path to a directory that contains network
     files. Optionally given.
-    :param models: Paths (as strings) leading directly to models. Optionally given.
-    :param models_json: Path to a json file with a list of model paths.
-    :return: Path objects leading to the models. Sorted by filename.
+    :param networks: Paths (as strings) leading directly to networks. Optionally given.
+    :param networks_json: Path to a json file with a list of network paths.
+    :return: Path objects leading to the networks. Sorted by filename.
     :raises ValueError: If something goes wrong with a parse.
     """
 
-    all_models = []
+    all_networks = []
 
-    if models_directory is not None:
-        models_directory_path = Path(models_directory)
-        all_models += sorted_models_in_directory(models_directory=models_directory_path)
+    if networks_directory is not None:
+        networks_directory_path = Path(networks_directory)
+        all_networks += sorted_networks_in_directory(networks_directory=networks_directory_path)
 
-    if models is not None:
-        all_models += list(map(Path, models))
+    if networks is not None:
+        all_networks += list(map(Path, networks))
 
-    if models_json is not None:
-        LOGGER.info(f"Loading model JSON: {models_json}")
+    if networks_json is not None:
+        LOGGER.info(f"Loading network JSON: {networks_json}")
         try:
-            with open(models_json) as f:
-                all_models += list(map(Path, NetworksFile(**json.load(f)).models))
+            with open(networks_json) as f:
+                all_networks += list(map(Path, NetworksFile(**json.load(f)).networks))
         except pydantic.error_wrappers.ValidationError as e:
-            raise ValueError("Ran into formatting problem with models JSON.") from e
+            raise ValueError("Ran into formatting problem with networks JSON.") from e
         except Exception as e:
-            raise ValueError("Couldn't open models JSON.") from e
+            raise ValueError("Couldn't open networks JSON.") from e
 
-    if not all_models:
-        raise ValueError("No models given, cannot continue.")
+    if not all_networks:
+        raise ValueError("No networks given, cannot continue.")
 
-    LOGGER.info("Discovered Models: ")
-    for path in all_models:
+    LOGGER.info("Discovered networks: ")
+    for path in all_networks:
         LOGGER.info(f"\t{path}")
 
-    return all_models
+    return all_networks
 
 
 def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -118,7 +118,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
             click.option(
                 "-a",
                 "--wav",
-                help="Path to the wav file to input to the model(s).",
+                help="Path to the wav file to input to the network(s).",
                 type=click.Path(
                     exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True
                 ),
@@ -140,17 +140,18 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 show_default=True,
             ),
             optgroup.group(
-                "Model sources",
+                "network sources",
                 cls=RequiredAnyOptionGroup,
                 help=(
-                    "Must provide a directory that contains models, or paths to " "specific models."
+                    "Must provide a directory that contains networks, or paths to "
+                    "specific networks."
                 ),
             ),
             optgroup.option(
                 "-d",
-                "--models_directory",
+                "--networks_directory",
                 help=(
-                    "Model `.pkl` files will be read from this directory. "
+                    "network `.pkl` files will be read from this directory. "
                     "These will be alphanumerically sorted."
                 ),
                 type=click.Path(
@@ -160,9 +161,9 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
             ),
             optgroup.option(
                 "-m",
-                "--model_path",
+                "--network_path",
                 help=(
-                    "Paths to particular model files. "
+                    "Paths to particular network files. "
                     "These will be used for synthesis in the order they're given."
                 ),
                 type=click.Path(
@@ -172,10 +173,11 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 default=None,
             ),
             optgroup.option(
-                "--models_json",
+                "--networks_json",
                 help=(
-                    'Path to a JSON file with a single key: "models" that maps to a list of paths '
-                    "to model pickle files. These will be used for synthesis in the order they "
+                    'Path to a JSON file with a single key: "networks" '
+                    "that maps to a list of paths "
+                    "to network pickle files. These will be used for synthesis in the order they "
                     "appear in the file."
                 ),
                 type=click.Path(
@@ -286,20 +288,20 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
 
 
 def write_input_args(
-    output_path: Optional[str], input_locals: Dict[str, Any], model_paths: List[Path]
+    output_path: Optional[str], input_locals: Dict[str, Any], network_paths: List[Path]
 ) -> None:
     """
     Function to dump input args to CLI function to a file.
     :param output_path: Path to the file to write, don't do anything if this value is None.
     :param input_locals: The `locals()` call right after the CLI is invoked.
-    :param model_paths: Paths to the models that will be used in the run.
+    :param network_paths: Paths to the networks that will be used in the run.
     :return: None
     """
 
     if output_path is not None:
         with open(output_path, "w") as f:
             json.dump(
-                {"current_locals": input_locals, "models_paths": [str(p) for p in model_paths]},
+                {"current_locals": input_locals, "networks_paths": [str(p) for p in network_paths]},
                 f,
                 indent=4,
             )
@@ -310,9 +312,9 @@ def write_input_args(
 def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     wav: List[str],
     output_path: str,
-    models_directory: Optional[str],
-    model_path: Optional[List[str]],
-    models_json: Optional[str],
+    networks_directory: Optional[str],
+    network_path: Optional[List[str]],
+    networks_json: Optional[str],
     frames_to_visualize: Optional[int],
     output_fps: float,
     output_side_length: int,
@@ -330,9 +332,9 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     \f
     :param wav: See click help.
     :param output_path: See click help.
-    :param models_directory: See click help.
-    :param model_path: See click help.
-    :param models_json: See click help.
+    :param networks_directory: See click help.
+    :param network_path: See click help.
+    :param networks_json: See click help.
     :param frames_to_visualize: See click help.
     :param output_fps: See click help.
     :param output_side_length: See click help.
@@ -346,15 +348,15 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     """
 
     input_locals = locals()
-    model_paths = _parse_model_paths(
-        models_directory=models_directory, models=model_path, models_json=models_json
+    network_paths = _parse_network_paths(
+        networks_directory=networks_directory, networks=network_path, networks_json=networks_json
     )
 
-    write_input_args(output_path=run_config, input_locals=input_locals, model_paths=model_paths)
+    write_input_args(output_path=run_config, input_locals=input_locals, network_paths=network_paths)
 
     audio_paths = list(map(Path, wav))
 
-    with MultiModel(model_paths=model_paths) as multi_models:
+    with MultiNetwork(network_paths=network_paths) as multi_networks:
 
         LOGGER.info(f"Writing video: {output_path}")
 
@@ -362,26 +364,26 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
             ConcatenatedVectors,
             music.read_wavs_scale_for_video(
                 wavs=audio_paths,
-                vector_length=multi_models.expected_vector_length,
+                vector_length=multi_networks.expected_vector_length,
                 frames_per_second=output_fps,
             ).wav_data,
         )
 
         synthesis_output = vector_synthesis(
-            models=multi_models,
+            networks=multi_networks,
             data=alpha_blend_vectors_max_rms_power_audio(
                 alpha=alpha,
                 fft_roll_enabled=fft_roll_enabled,
                 fft_amplitude_range=fft_amplitude_range,
                 time_series_audio_vectors=time_series_audio_vectors,
-                vector_length=multi_models.expected_vector_length,
-                model_indices=multi_models.model_indices,
+                vector_length=multi_networks.expected_vector_length,
+                network_indices=multi_networks.network_indices,
             ),
-            default_vector_length=multi_models.expected_vector_length,
+            default_vector_length=multi_networks.expected_vector_length,
             enable_3d=False,
             enable_2d=debug_path is not None,
             frames_to_visualize=frames_to_visualize,
-            model_index_window_width=debug_window,
+            network_index_window_width=debug_window,
             video_height=output_side_length,
         )
 
@@ -490,9 +492,9 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     wav: List[str],
     output_path: str,
-    models_directory: Optional[str],
-    model_path: Optional[List[str]],
-    models_json: Optional[str],
+    networks_directory: Optional[str],
+    network_path: Optional[List[str]],
+    networks_json: Optional[str],
     frames_to_visualize: Optional[int],
     output_fps: float,
     output_side_length: int,
@@ -520,9 +522,9 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     \f
     :param wav: See click help.
     :param output_path: See click help.
-    :param models_directory: See click help.
-    :param model_path: See click help.
-    :param models_json: See click help.
+    :param networks_directory: See click help.
+    :param network_path: See click help.
+    :param networks_json: See click help.
     :param frames_to_visualize: See click help.
     :param output_fps: See click help.
     :param output_side_length: See click help.
@@ -543,26 +545,26 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     """
 
     input_locals = locals()
-    model_paths = _parse_model_paths(
-        models_directory=models_directory, models=model_path, models_json=models_json
+    network_paths = _parse_network_paths(
+        networks_directory=networks_directory, networks=network_path, networks_json=networks_json
     )
 
-    write_input_args(output_path=run_config, input_locals=input_locals, model_paths=model_paths)
+    write_input_args(output_path=run_config, input_locals=input_locals, network_paths=network_paths)
 
     create_debug_visualization = debug_path is not None
 
     audio_paths = list(map(Path, wav))
 
-    with MultiModel(
-        model_paths=model_paths
-    ) as multi_models, projection_file_reader.load_projection_file(
+    with MultiNetwork(
+        network_paths=network_paths
+    ) as multi_networks, projection_file_reader.load_projection_file(
         Path(projection_file_path)
     ) as reader:
 
         final_latents = projection_file_reader.final_latents_matrices_label(reader)
 
         final_latents_in_file = (
-            underlying_length(final_latents.data) / multi_models.expected_vector_length
+            underlying_length(final_latents.data) / multi_networks.expected_vector_length
         )
         processed_frames_in_file = reader.projection_attributes.projection_frame_count
         projection_complete = reader.projection_attributes.complete
@@ -585,13 +587,13 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
             ConcatenatedVectors,
             music.read_wavs_scale_for_video(
                 wavs=audio_paths,
-                vector_length=multi_models.expected_vector_length,
+                vector_length=multi_networks.expected_vector_length,
                 target_num_vectors=int(frame_multiplier * final_latents_in_file),
             ).wav_data,
         )
 
         synthesis_output = vector_synthesis(
-            models=multi_models,
+            networks=multi_networks,
             data=alpha_blend_projection_file(
                 final_latents_matrices_label=final_latents,
                 alpha=alpha,
@@ -599,14 +601,14 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
                 fft_amplitude_range=fft_amplitude_range,
                 blend_depth=blend_depth,
                 time_series_audio_vectors=time_series_audio_vectors,
-                vector_length=multi_models.expected_vector_length,
-                model_indices=multi_models.model_indices,
+                vector_length=multi_networks.expected_vector_length,
+                network_indices=multi_networks.network_indices,
             ),
-            default_vector_length=multi_models.expected_vector_length,
+            default_vector_length=multi_networks.expected_vector_length,
             enable_3d=False,
             enable_2d=create_debug_visualization,
             frames_to_visualize=frames_to_visualize,
-            model_index_window_width=debug_window,
+            network_index_window_width=debug_window,
             video_height=output_side_length,
         )
 
@@ -617,7 +619,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
                         data=vector_reduction.derive_results_layers(
                             vector_reduction.reduce_vector_gzip_compression_rolling_average(
                                 time_series_audio_vectors=time_series_audio_vectors,
-                                vector_length=multi_models.expected_vector_length,
+                                vector_length=multi_networks.expected_vector_length,
                             ),
                             order=1,
                         ).result.data,

@@ -14,8 +14,8 @@ from matplotlib.axes import Axes
 from typing_extensions import Protocol
 
 from gance.apply_spectrogram import compute_spectrogram, reshape_spectrogram_to_vectors
-from gance.data_into_model_visualization.vectors_3d import plot_vectors_3d
-from gance.data_into_model_visualization.visualization_common import (
+from gance.data_into_network_visualization.vectors_3d import plot_vectors_3d
+from gance.data_into_network_visualization.visualization_common import (
     infinite_colors,
     render_current_matplotlib_frame,
     standard_matplotlib_figure,

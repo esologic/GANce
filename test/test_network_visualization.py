@@ -2,43 +2,47 @@
 Test functions for some of the more complicated image pipelines.
 """
 
-from test.assets import SAMPLE_BATCH_1_MODEL_PATH, SAMPLE_BATCH_2_MODEL_PATH, WAV_CLAPS_PATH
+from test.assets import SAMPLE_BATCH_1_NETWORK_PATH, SAMPLE_BATCH_2_NETWORK_PATH, WAV_CLAPS_PATH
 from typing import Tuple
 
 import pytest
 
-from gance.data_into_model_visualization import model_visualization
-from gance.data_into_model_visualization.model_visualization import SynthesisOutput
-from gance.data_into_model_visualization.visualization_inputs import (
+from gance.data_into_network_visualization import network_visualization
+from gance.data_into_network_visualization.network_visualization import SynthesisOutput
+from gance.data_into_network_visualization.visualization_inputs import (
     alpha_blend_vectors_max_rms_power_audio,
 )
 from gance.gance_types import OptionalImageSourceType
 from gance.image_sources import image_sources_common
-from gance.model_interface.model_functions import MultiModel
+from gance.network_interface.network_functions import MultiNetwork
 from gance.vector_sources.music import read_wavs_scale_for_video
 from gance.vector_sources.vector_sources_common import sub_vectors
 
 
-def get_model_output(
-    enable_3d: bool, enable_2d: bool, video_fps: float, model_enabled: bool, video_side_length: int
+def get_network_output(
+    enable_3d: bool,
+    enable_2d: bool,
+    video_fps: float,
+    network_enabled: bool,
+    video_side_length: int,
 ) -> Tuple[int, SynthesisOutput]:
     """
     Modify only the test-relevant components of the visualization run.
-    :param enable_3d: 3D model panel will be added.
-    :param enable_2d: 2D model panel will be added.
+    :param enable_3d: 3D network panel will be added.
+    :param enable_2d: 2D network panel will be added.
     :param video_fps: FPS of resulting video stream.
-    :param model_enabled: If model images will be added.
+    :param network_enabled: If network images will be added.
     :param video_side_length: Controls resolution of output video.
     :return: Tuple, (number of expected output frames, streams of frames)
     """
 
-    with MultiModel(
-        model_paths=[SAMPLE_BATCH_1_MODEL_PATH, SAMPLE_BATCH_2_MODEL_PATH]
-    ) as multi_models:
+    with MultiNetwork(
+        network_paths=[SAMPLE_BATCH_1_NETWORK_PATH, SAMPLE_BATCH_2_NETWORK_PATH]
+    ) as multi_networks:
 
         time_series_audio_vectors = read_wavs_scale_for_video(
             wavs=[WAV_CLAPS_PATH],
-            vector_length=multi_models.expected_vector_length,
+            vector_length=multi_networks.expected_vector_length,
             frames_per_second=video_fps,
         ).wav_data
 
@@ -47,16 +51,16 @@ def get_model_output(
             fft_roll_enabled=True,  # Param doesn't matter for test.
             fft_amplitude_range=(-10, 10),  # Param doesn't matter for test.
             time_series_audio_vectors=time_series_audio_vectors,
-            vector_length=multi_models.expected_vector_length,
-            model_indices=multi_models.model_indices,
+            vector_length=multi_networks.expected_vector_length,
+            network_indices=multi_networks.network_indices,
         )
 
         return len(
-            sub_vectors(data.combined.data, vector_length=multi_models.expected_vector_length)
-        ), model_visualization.vector_synthesis(
+            sub_vectors(data.combined.data, vector_length=multi_networks.expected_vector_length)
+        ), network_visualization.vector_synthesis(
             data=data,
-            models=multi_models if model_enabled else None,
-            default_vector_length=multi_models.expected_vector_length,
+            networks=multi_networks if network_enabled else None,
+            default_vector_length=multi_networks.expected_vector_length,
             video_height=video_side_length,  # Param doesn't matter for test.
             enable_3d=enable_3d,
             enable_2d=enable_2d,
@@ -76,7 +80,7 @@ def assert_all_none(frames: OptionalImageSourceType) -> int:
 
 @pytest.mark.gpu
 @pytest.mark.parametrize(
-    "model_enabled",
+    "network_enabled",
     [True, False],
 )
 @pytest.mark.parametrize(
@@ -96,7 +100,11 @@ def assert_all_none(frames: OptionalImageSourceType) -> int:
     [100, 300, 512, 1024],
 )
 def test_vector_synthesis_integration(
-    enable_3d: bool, enable_2d: bool, video_fps: float, model_enabled: bool, video_side_length: int
+    enable_3d: bool,
+    enable_2d: bool,
+    video_fps: float,
+    network_enabled: bool,
+    video_side_length: int,
 ) -> None:
     """
     Integration style test, to verify that this function works as expected by examining
@@ -104,44 +112,44 @@ def test_vector_synthesis_integration(
     :param enable_3d: Passed to function under test.
     :param enable_2d: Passed to function under test.
     :param video_fps: Passed to function under test.
-    :param model_enabled: Passed to function under test.
+    :param network_enabled: Passed to function under test.
     :return: None
     """
 
-    if not (enable_3d or enable_2d or model_enabled):
+    if not (enable_3d or enable_2d or network_enabled):
         with pytest.raises(ValueError):
-            get_model_output(
+            get_network_output(
                 enable_3d=enable_3d,
                 enable_2d=enable_2d,
                 video_fps=video_fps,
-                model_enabled=model_enabled,
+                network_enabled=network_enabled,
                 video_side_length=video_side_length,
             )
     else:
-        expected_num_frames, model_output = get_model_output(
+        expected_num_frames, network_output = get_network_output(
             enable_3d=enable_3d,
             enable_2d=enable_2d,
             video_fps=video_fps,
-            model_enabled=model_enabled,
+            network_enabled=network_enabled,
             video_side_length=video_side_length,
         )
 
         if enable_3d or enable_2d:
-            visualization_frames = list(model_output.visualization_images)
+            visualization_frames = list(network_output.visualization_images)
             for frame in visualization_frames:
                 resolution = image_sources_common.image_resolution(frame)
                 assert resolution.height == video_side_length
                 assert resolution.width == video_side_length * (enable_2d + enable_3d)
             assert expected_num_frames == len(visualization_frames)
         else:
-            assert model_output.visualization_images is None
+            assert network_output.visualization_images is None
 
-        if model_enabled:
-            model_frames = list(model_output.synthesized_images)
-            for frame in model_frames:
+        if network_enabled:
+            network_frames = list(network_output.synthesized_images)
+            for frame in network_frames:
                 resolution = image_sources_common.image_resolution(frame)
                 assert resolution.height == video_side_length
                 assert resolution.width == video_side_length
-            assert expected_num_frames == len(model_frames)
+            assert expected_num_frames == len(network_frames)
         else:
-            assert model_output.synthesized_images is None
+            assert network_output.synthesized_images is None

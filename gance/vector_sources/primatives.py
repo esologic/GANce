@@ -7,7 +7,7 @@ from typing import NamedTuple, Optional
 import numpy as np
 import scipy
 
-from gance.data_into_model_visualization.vectors_to_image import (
+from gance.data_into_network_visualization.vectors_to_image import (
     multi_plot_vectors,
     visualize_data_with_spectrogram_and_3d_vectors,
 )

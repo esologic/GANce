@@ -13,14 +13,17 @@ from matplotlib import colors as mcolors
 from matplotlib import pyplot as plt
 from scipy.interpolate import UnivariateSpline
 
-from gance.data_into_model_visualization import visualization_common
-from gance.data_into_model_visualization.vectors_to_image import SingleVectorViz, vector_visualizer
+from gance.data_into_network_visualization import visualization_common
+from gance.data_into_network_visualization.vectors_to_image import (
+    SingleVectorViz,
+    vector_visualizer,
+)
 from gance.hash_file import hash_file
 from gance.image_sources.video_common import create_video_writer
 from gance.logger_common import LOGGER
-from gance.model_interface.model_functions import (
-    ModelInterfaceInProcess,
-    create_model_interface_process,
+from gance.network_interface.network_functions import (
+    NetworkInterfaceInProcess,
+    create_network_interface_process,
 )
 from gance.projection.projection_file_reader import (
     ProjectionFileReader,
@@ -265,27 +268,27 @@ def visualize_final_latents(
 
 
 def _setup_visualization(
-    model_not_matching_ok: bool,
-    projection_model_path: Path,
+    network_not_matching_ok: bool,
+    projection_network_path: Path,
     projection_file_reader: ProjectionFileReader,
     video_height: int,
-) -> Tuple[ModelInterfaceInProcess, SingleVectorViz, MatricesLabel]:
+) -> Tuple[NetworkInterfaceInProcess, SingleVectorViz, MatricesLabel]:
     """
     Boilerplate setup function to get a few common things in place for visualization.
-    :param model_not_matching_ok: Process this arg.
-    :param projection_model_path: Path to the model to use in subsequent projections.
+    :param network_not_matching_ok: Process this arg.
+    :param projection_network_path: Path to the network to use in subsequent projections.
     :param projection_file_reader: File being read in visualization.
     :param video_height: Visualization will be a square.
     :return: Configured elements to be consumed by visualizations.
     """
 
-    if not model_not_matching_ok:
-        input_model_hash = hash_file(projection_model_path)
+    if not network_not_matching_ok:
+        input_network_hash = hash_file(projection_network_path)
 
-        if input_model_hash != projection_file_reader.projection_attributes.model_md5_hash:
-            raise ValueError("Input model was not the one used in projection.")
+        if input_network_hash != projection_file_reader.projection_attributes.network_md5_hash:
+            raise ValueError("Input network was not the one used in projection.")
 
-    model = create_model_interface_process(model_path=projection_model_path)
+    network = create_network_interface_process(network_path=projection_network_path)
 
     # This isn't consumed for visualization, but is used to understand properties of the
     # latent histories.
@@ -299,14 +302,14 @@ def _setup_visualization(
         output_height=video_height,
     )
 
-    return model, make_visualization, matrices_label
+    return network, make_visualization, matrices_label
 
 
 def visualize_projection_history(  # pylint: disable=too-many-locals
     projection_file_path: Path,
     output_video_path: Path,
-    projection_model_path: Path,
-    model_not_matching_ok: bool,
+    projection_network_path: Path,
+    network_not_matching_ok: bool,
     video_height: Optional[int] = 1024,
     start_frame_index: Optional[int] = None,
     end_frame_index: Optional[int] = None,
@@ -314,14 +317,14 @@ def visualize_projection_history(  # pylint: disable=too-many-locals
     """
     Shows each projection history latent over time as it approaches the target.
 
-    This function uses the input model to visualize each projection set. However if the projection
+    This function uses the input network to visualize each projection set. However if the projection
     file was created with these `image_histories` recorded, you wouldn't need to re-synthesize.
     TODO: detect if synthesis step is needed.
     :param projection_file_path: Path to file to read.
     :param output_video_path: The path to write the resulting video to.
-    :param projection_model_path: Path to the model to re-create the projection.
-    :param model_not_matching_ok: If the input model given by `projection_model_path` doesn't
-    match the model that was used in the projection file, raise a ValueError if given.
+    :param projection_network_path: Path to the network to re-create the projection.
+    :param network_not_matching_ok: If the input network given by `projection_network_path` doesn't
+    match the network that was used in the projection file, raise a ValueError if given.
     :param video_height: The height of the output video in pixels, the width will be 3x the height.
     :param end_frame_index: Only get the history of the given index if desired.
     :return: None
@@ -329,9 +332,9 @@ def visualize_projection_history(  # pylint: disable=too-many-locals
 
     with load_projection_file(projection_file_path) as reader:
 
-        model, make_visualization, matrices_label = _setup_visualization(
-            model_not_matching_ok=model_not_matching_ok,
-            projection_model_path=projection_model_path,
+        network, make_visualization, matrices_label = _setup_visualization(
+            network_not_matching_ok=network_not_matching_ok,
+            projection_network_path=projection_network_path,
             projection_file_reader=reader,
             video_height=video_height,
         )
@@ -353,7 +356,7 @@ def visualize_projection_history(  # pylint: disable=too-many-locals
 
             for latent_index, latents in enumerate(latent_history):
 
-                projection_image = model.model_interface.create_image_matrix(latents)
+                projection_image = network.network_interface.create_image_matrix(latents)
 
                 with make_visualization(
                     x_values=x_values,
@@ -374,15 +377,15 @@ def visualize_projection_history(  # pylint: disable=too-many-locals
                     f"latent step: {latent_index}"
                 )
 
-        model.stop_function()
+        network.stop_function()
         video.release()
 
 
 def visualize_partial_projection_history(  # pylint: disable=too-many-locals
     projection_file_path: Path,
     output_video_path: Path,
-    projection_model_path: Path,
-    model_not_matching_ok: bool,
+    projection_network_path: Path,
+    network_not_matching_ok: bool,
     projection_step_to_take: int,
     video_height: Optional[int] = 1024,
 ) -> None:
@@ -392,24 +395,25 @@ def visualize_partial_projection_history(  # pylint: disable=too-many-locals
     synthesized final latents, next to the synthesis output from the latent plucked from the
     projection history.
 
-    This function uses the input model to visualize each projection set. However if the projection
+    This function uses the input network to visualize each projection set. However if the projection
     file was created with these `image_histories` recorded, you wouldn't need to re-synthesize.
     TODO: detect if synthesis step is needed.
     :param projection_file_path: Path to file to read.
     :param output_video_path: The path to write the resulting video to.
-    :param projection_model_path: Path to the model to re-create the projection.
-    :param model_not_matching_ok: If the input model given by `projection_model_path` doesn't
-    match the model that was used in the projection file, raise a ValueError if given.
-    :param projection_step_to_take: This step of projection will be retrieved and fed to the model.
+    :param projection_network_path: Path to the network to re-create the projection.
+    :param network_not_matching_ok: If the input network given by `projection_network_path` doesn't
+    match the network that was used in the projection file, raise a ValueError if given.
+    :param projection_step_to_take: This step of projection will be retrieved and fed to the
+    network.
     :param video_height: The height of the output video in pixels, the width will be 3x the height.
     :return: None
     """
 
     with load_projection_file(projection_file_path) as reader:
 
-        model, make_visualization, matrices_label = _setup_visualization(
-            model_not_matching_ok=model_not_matching_ok,
-            projection_model_path=projection_model_path,
+        network, make_visualization, matrices_label = _setup_visualization(
+            network_not_matching_ok=network_not_matching_ok,
+            projection_network_path=projection_network_path,
             projection_file_reader=reader,
             video_height=video_height,
         )
@@ -429,7 +433,7 @@ def visualize_partial_projection_history(  # pylint: disable=too-many-locals
 
             latents = next(itertools.islice(latent_history, projection_step_to_take, None))
 
-            projection_image = model.model_interface.create_image_matrix(latents)
+            projection_image = network.network_interface.create_image_matrix(latents)
 
             with make_visualization(x_values=x_values, y_values=latents) as visualization:
                 # Puts the data visualization to the left of the synthesis.
@@ -443,5 +447,5 @@ def visualize_partial_projection_history(  # pylint: disable=too-many-locals
                 f"latent step: {projection_step_to_take}"
             )
 
-        model.stop_function()
+        network.stop_function()
         video.release()
