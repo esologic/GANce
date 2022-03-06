@@ -17,22 +17,22 @@ from gance.vector_sources.primatives import gaussian_data
 
 @click.command()
 @click.option(
-    "--network_directory",
+    "--network-directory",
     type=click.Path(exists=True, file_okay=False, readable=True, dir_okay=True, resolve_path=True),
     help="Directory of networks. Will be passed in order.",
     multiple=True,
     required=True,
 )
 @click.option(
-    "--output_directory",
+    "--output-directory",
     type=click.Path(file_okay=False, readable=True, dir_okay=True, resolve_path=True),
     help="Destination directory for validated networks.",
     required=True,
 )
 def check_move_networks(network_directory: List[str], output_directory: str) -> None:
     """
-    Scan directories of networks for network files, for each of these networks, load them, and
-    feed in a vector to make sure they are valid and work for our purposes.
+    Scan directories of networks for pickled networks, for each of these networks, load them, and
+    feed in a vector to make sure they are still functional (no bit rot).
     Valid networks are copied to the output directory and renamed with the
     pattern: `{count}_{parent_dir_name}_{network_name}`.
 

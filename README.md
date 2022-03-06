@@ -12,9 +12,13 @@ The functionality available in the libraries are exposed through a series of com
 interfaces. The following is a listing of the commands that are stable and mostly usable at this
 point.
 
-| **Script**             | **Description**                                                                                                                    |
-|------------------------|------------------------------------------------------------------------------------------------------------------------------------|
-| `music_into_models.py` | Feed inputs (music, videos) into a network and record the output. Also tools to visualize these vectors against the model outputs. |
+| **Script**                 | **Description**                                                                                                                                                                                                                                          |
+|----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `check_move_networks.py`   | Scan directories of networks for pickled networks, for each of these networks, load them, and feed in a vector to make sure they are still functional (no bit rot).                                                                                      |
+| `music_into_networks.py`   | Feed inputs (music, videos) into a network and record the output. Also tools to visualize these vectors against the network outputs.                                                                                                                     |
+| `process_images.py`        | Tools to prepare images for styleGAN training.                                                                                                                                                                                                           |
+| `project_video_to_file.py` | Tools to [project](https://github.com/NVlabs/stylegan2#projecting-images-to-latent-space) video into the latent space of a given network, and also visualize the results. Resulting projection files are consumed primarily in `music_into_networks.py`. |
+| `snythesize_images.py`     | Given some styleGAN networks, load each network and synthesize a number of images with them. Interesting vectors can be reused with other networks.                                                                                                      |
 
 ## Getting Started
 

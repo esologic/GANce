@@ -3,6 +3,7 @@
 0.19.0 - (2022-03-06)
 ------------------
 
+* Removed underscores from all CLI arguments.
 * Refactored codebase to make sure 'network' was used over 'model' in all cases. They're networks
 not models.
 A few more changes to projection file blending:

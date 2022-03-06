@@ -5,14 +5,19 @@ CLI to project videos to a file.
 """
 
 import logging
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any, Callable, List, NamedTuple, Optional, Tuple
 
 import click
 
 import gance.projection.projector_file_writer
+from gance import cli_common
 from gance.cli_common import DEFAULT_TWO_TUPLE, EXTENSION_HDF5, EXTENSION_MP4
+from gance.image_sources.video_common import add_wavs_to_video
 from gance.logger_common import LOGGER, LOGGER_DATE_FORMAT, LOGGER_FORMAT
+from gance.projection import projection_visualization
 
 
 class _VideoPathOutputPath(NamedTuple):
@@ -167,21 +172,21 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
     for option in reversed(
         [
             click.option(
-                "--video_fps",
+                "--video-fps",
                 type=click.FloatRange(min=1),
                 help="Used to override the FPS of the input video file.",
                 default=None,
                 show_default=True,
             ),
             click.option(
-                "--path_to_network",
+                "--path-to-network",
                 type=click.Path(
                     exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True
                 ),
                 help="Path to the network to do the projection with.",
             ),
             click.option(
-                "--projection_width_height",
+                "--projection-width-height",
                 type=click.Tuple([click.IntRange(min=0), click.IntRange(min=0)]),
                 help=(
                     "If given each frame of the input video will be scaled "
@@ -191,7 +196,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 show_default=True,
             ),
             click.option(
-                "--projection_fps",
+                "--projection-fps",
                 type=click.FloatRange(min=0),
                 help=(
                     "Down sample the video to be at this FPS. Note, can only be lower than the "
@@ -202,7 +207,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 show_default=True,
             ),
             click.option(
-                "--steps_per_projection",
+                "--steps-per-projection",
                 type=click.IntRange(min=0),
                 help=(
                     "The number of times the `.step()` function will be called for the "
@@ -213,7 +218,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 show_default=True,
             ),
             click.option(
-                "--num_frames_to_project",
+                "--num-frames-to-project",
                 type=click.IntRange(min=0),
                 help=(
                     "The number of frames to project. After the video has been down sampled to the "
@@ -225,14 +230,14 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 show_default=True,
             ),
             click.option(
-                "--latents_histories_enabled",
+                "--latents-histories-enabled",
                 type=click.BOOL,
                 help="Records the intermediate latents seen during projection.",
                 default=True,
                 show_default=True,
             ),
             click.option(
-                "--noises_histories_enabled",
+                "--noises-histories-enabled",
                 type=click.BOOL,
                 help=(
                     "If the noises used in each projection should be recorded. "
@@ -242,7 +247,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 show_default=True,
             ),
             click.option(
-                "--images_histories_enabled",
+                "--images-histories-enabled",
                 type=click.BOOL,
                 help=(
                     "If the images over time throughout the projection should be recorded. "
@@ -254,7 +259,7 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
             click.option(
                 "--log",
                 type=click.Path(file_okay=True, writable=True, dir_okay=False, resolve_path=True),
-                help=("If given, logs generated during this run will be written to this path."),
+                help="If given, logs generated during this run will be written to this path.",
                 default=None,
                 show_default=True,
             ),
@@ -279,7 +284,7 @@ def cli() -> None:
 
 @cli.command()  # type: ignore
 @click.option(
-    "--video_output",
+    "--video-output",
     type=click.Tuple(
         types=[
             click.Path(
@@ -350,24 +355,24 @@ def videos(  # pylint: disable=too-many-arguments,too-many-locals
 
 @cli.command()  # type: ignore
 @click.option(
-    "--directory_of_videos",
+    "--directory-of-videos",
     type=click.Path(exists=True, file_okay=False, readable=True, dir_okay=True, resolve_path=True),
     help="Directory that contains videos to project.",
 )
 @click.option(
-    "--video_extension",
+    "--video-extension",
     type=str,
     help="The extension of the videos in the given directory.",
     default=EXTENSION_MP4,
     show_default=True,
 )
 @click.option(
-    "--output_file_directory",
+    "--output-file-directory",
     type=click.Path(file_okay=False, writable=True, resolve_path=True),
     help="Resulting projection files will be written to this directory.",
 )
 @click.option(
-    "--output_file_prefix",
+    "--output-file-prefix",
     type=str,
     help=(
         "Resulting projection files will be named: "
@@ -442,6 +447,58 @@ def directory(  # pylint: disable=too-many-arguments,too-many-locals
         images_histories_enabled=images_histories_enabled,
         log=log,
     )
+
+
+@cli.command()
+@cli_common.single_projection_file_path
+@cli_common.video_path
+@cli_common.audio_paths
+@cli_common.video_height
+def visualize_final_latents(  # pylint: disable=too-many-arguments,too-many-locals
+    projection_file: str,
+    video_path: str,
+    audio_path: Optional[List[str]],
+    video_height: Optional[int],
+) -> None:
+    """
+    Create a video that, side by side, displays:
+
+    * Final Latents as a graph.
+    * Target image.
+    * Final latents image.
+
+    \f
+
+    :param projection_file: See click help or called function docs.
+    :param video_path: See click help or called function docs.
+    :param audio_path: Optional path to audio file.
+    :param video_height: See click help or called function docs.
+    :return: None
+    """
+
+    output_video_path = Path(video_path)
+
+    with tempfile.NamedTemporaryFile(suffix=output_video_path.suffix) as f:
+
+        tmp_video_path = Path(f.name)
+
+        projection_visualization.visualize_final_latents(
+            projection_file_path=Path(projection_file),
+            output_video_path=tmp_video_path,
+            video_height=video_height,
+        )
+
+        if audio_path:
+            while not tmp_video_path.exists():
+                pass
+
+            add_wavs_to_video(
+                video_path=tmp_video_path,
+                audio_paths=[Path(path) for path in audio_path],
+                output_path=output_video_path,
+            )
+        else:
+            shutil.move(src=str(tmp_video_path), dst=str(output_video_path))
 
 
 if __name__ == "__main__":

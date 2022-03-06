@@ -19,13 +19,13 @@ single_projection_file_path = click.option(
 )
 
 video_path = click.option(
-    "--video_path",
+    "--video-path",
     type=CLICK_INPUT_PATH,
     help="Destination path for the resulting visualization",
 )
 
 audio_paths = click.option(
-    "--audio_path",
+    "--audio-path",
     type=click.Path(file_okay=True, writable=True, dir_okay=False, resolve_path=True),
     default=None,
     help="If given, this audio file will be added to the resulting video. "
@@ -35,7 +35,7 @@ audio_paths = click.option(
 )
 
 video_height = click.option(
-    "--video_height",
+    "--video-height",
     type=click.IntRange(min=1),
     help="A Tuple (Path to the video to project, Path to destination of projection file)",
     default=1024,
