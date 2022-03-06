@@ -1,6 +1,6 @@
 # Changelog
 
-0.19.0 - (2022-02-XX)
+0.19.0 - (2022-03-06)
 ------------------
 
 * Refactored codebase to make sure 'network' was used over 'model' in all cases. They're networks
