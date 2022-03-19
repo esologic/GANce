@@ -12,11 +12,9 @@ import click
 import more_itertools
 import numpy as np
 import pandas as pd
-import pydantic
 from click_option_group import AllOptionGroup, RequiredAnyOptionGroup, optgroup
 from cv2 import cv2
 from lz.transposition import transpose
-from pydantic import BaseModel, FilePath
 
 from gance import divisor, overlay
 from gance.assets import OUTPUT_DIRECTORY
@@ -30,7 +28,7 @@ from gance.gance_types import RGBInt8ImageType
 from gance.image_sources import video_common
 from gance.iterator_on_disk import HDF5_SERIALIZER, iterator_on_disk
 from gance.logger_common import LOGGER
-from gance.network_interface.network_functions import MultiNetwork, sorted_networks_in_directory
+from gance.network_interface.network_functions import MultiNetwork, parse_network_paths
 from gance.projection import projection_file_reader
 from gance.vector_sources import music, vector_reduction
 from gance.vector_sources.vector_reduction import DataLabel, ResultLayers
@@ -39,14 +37,6 @@ from gance.vector_sources.vector_types import ConcatenatedVectors
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("numba").setLevel(logging.WARNING)
-
-
-class NetworksFile(BaseModel):
-    """
-    Describes a `NetworksFile`, a .json file full paths to pickled StyleGAN networks.
-    """
-
-    networks: List[FilePath]
 
 
 @click.group()
@@ -62,48 +52,6 @@ def cli() -> None:
 
     :return: None
     """
-
-
-def _parse_network_paths(
-    networks_directory: Optional[str], networks: Optional[List[str]], networks_json: Optional[str]
-) -> List[Path]:
-    """
-    Given the user's input from the CLI, get a list of the networks to be used in the run.
-    :param networks_directory: A string representing a path to a directory that contains network
-    files. Optionally given.
-    :param networks: Paths (as strings) leading directly to networks. Optionally given.
-    :param networks_json: Path to a json file with a list of network paths.
-    :return: Path objects leading to the networks. Sorted by filename.
-    :raises ValueError: If something goes wrong with a parse.
-    """
-
-    all_networks = []
-
-    if networks_directory is not None:
-        networks_directory_path = Path(networks_directory)
-        all_networks += sorted_networks_in_directory(networks_directory=networks_directory_path)
-
-    if networks is not None:
-        all_networks += list(map(Path, networks))
-
-    if networks_json is not None:
-        LOGGER.info(f"Loading network JSON: {networks_json}")
-        try:
-            with open(networks_json) as f:
-                all_networks += list(map(Path, NetworksFile(**json.load(f)).networks))
-        except pydantic.error_wrappers.ValidationError as e:
-            raise ValueError("Ran into formatting problem with networks JSON.") from e
-        except Exception as e:
-            raise ValueError("Couldn't open networks JSON.") from e
-
-    if not all_networks:
-        raise ValueError("No networks given, cannot continue.")
-
-    LOGGER.info("Discovered networks: ")
-    for path in all_networks:
-        LOGGER.info(f"\t{path}")
-
-    return all_networks
 
 
 def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -288,17 +236,23 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
 
 
 def write_input_args(
-    output_path: Optional[str], input_locals: Dict[str, Any], network_paths: List[Path]
+    output_path: Optional[str],
+    input_locals: Dict[str, Any],
+    network_paths: Optional[List[Path]] = None,
 ) -> None:
     """
     Function to dump input args to CLI function to a file.
     :param output_path: Path to the file to write, don't do anything if this value is None.
     :param input_locals: The `locals()` call right after the CLI is invoked.
-    :param network_paths: Paths to the networks that will be used in the run.
     :return: None
     """
 
     if output_path is not None:
+
+        if network_paths is None:
+            multi_networks: Optional[MultiNetwork] = input_locals.pop("multi_networks", None)
+            network_paths = multi_networks.network_paths if multi_networks else None
+
         with open(output_path, "w") as f:
             json.dump(
                 {"current_locals": input_locals, "networks_paths": [str(p) for p in network_paths]},
@@ -348,7 +302,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     """
 
     input_locals = locals()
-    network_paths = _parse_network_paths(
+    network_paths = parse_network_paths(
         networks_directory=networks_directory, networks=network_path, networks_json=networks_json
     )
 
@@ -411,90 +365,10 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
             more_itertools.consume(forwarded_hero_frames)
 
 
-@cli.command()  # pylint: disable=too-many-arguments
-@common_command_options
-@click.option(
-    "--projection-file-path",
-    help="Path to the projection file.",
-    type=click.Path(exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True),
-    required=True,
-)
-@click.option(
-    "--blend-depth",
-    help=(
-        "Number of vectors within the final latents matrices that receive the FFT during "
-        "alpha blending."
-    ),
-    type=click.IntRange(min=0, max=18),
-    required=False,
-    default=10,
-    show_default=True,
-)
-@optgroup.group(
-    "Eye-Tracking Overlay Parameters",
-    cls=AllOptionGroup,
-    help=(
-        "Controls how eye-containing sections of the target images get overlaid on "
-        "top of the output images. "
-    ),
-)
-@optgroup.option(
-    "-w",
-    "--complexity-change-rolling-sum-window",
-    type=click.IntRange(min=0),
-    help="The number of frames to window the music complexity computation to.",
-    default=30,
-    show_default=True,
-)
-@optgroup.option(
-    "-t",
-    "--complexity-change-threshold",
-    type=click.IntRange(min=0),
-    help="If complexity is under this value, an overlay computation is enabled.",
-    default=100,
-    show_default=True,
-)
-@optgroup.option(
-    "-p",
-    "--phash-distance",
-    type=click.IntRange(min=0),
-    help=(
-        "Minimum distance between perceptual hashes of the bounding box region of the synthesized "
-        "image and its corresponding target frame to enable an overlay computation. "
-    ),
-    default=30,
-    show_default=True,
-)
-@optgroup.option(
-    "-b",
-    "--bbox-distance",
-    type=click.FloatRange(min=0),
-    help=(
-        "For pairs of synthesized images and their corresponding targets that both contain eye "
-        "bounding boxes, this value is the minimum distance in pixels between "
-        "the origins of those bounding boxes to enable an overlay computation."
-    ),
-    default=100,
-    show_default=True,
-)
-@optgroup.option(
-    "-t",
-    "--track-length",
-    type=click.IntRange(min=0),
-    help=(
-        "For sequences of adjacent frames that could contain an overlay, "
-        "this parameter is the minimum number of overlay frames in a row to be included in the "
-        "output video."
-    ),
-    default=10,
-    show_default=True,
-)
-def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
+def _projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-locals
     wav: List[str],
     output_path: str,
-    networks_directory: Optional[str],
-    network_path: Optional[List[str]],
-    networks_json: Optional[str],
+    multi_networks: MultiNetwork,
     frames_to_visualize: Optional[int],
     output_fps: float,
     output_side_length: int,
@@ -513,53 +387,18 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     track_length: int,
 ) -> None:
     """
-    Transform audio data, combine it with final latents from a projection file,
-    and feed the result into a network for synthesis. Optionally overlay parts of the target
-    video inside of the projection file onto the output video.
-
-    Note: Audio data will be scaled to the duration of the projection file.
-
-    \f
-    :param wav: See click help.
-    :param output_path: See click help.
-    :param networks_directory: See click help.
-    :param network_path: See click help.
-    :param networks_json: See click help.
-    :param frames_to_visualize: See click help.
-    :param output_fps: See click help.
-    :param output_side_length: See click help.
-    :param debug_path: See click help.
-    :param debug_window: See click help.
-    :param alpha: See click help.
-    :param fft_roll_enabled: See click help.
-    :param fft_amplitude_range: See click help.
-    :param run_config: See click help.
-    :param projection_file_path: See click help.
-    :param blend_depth: See click help.
-    :param complexity_change_rolling_sum_window: See click help.
-    :param complexity_change_threshold: See click help.
-    :param phash_distance: See click help.
-    :param bbox_distance: See click help.
-    :param track_length: See click help.
-    :return: None
+    See docs in CLI function.
     """
 
     input_locals = locals()
-    network_paths = _parse_network_paths(
-        networks_directory=networks_directory, networks=network_path, networks_json=networks_json
-    )
 
-    write_input_args(output_path=run_config, input_locals=input_locals, network_paths=network_paths)
+    write_input_args(output_path=run_config, input_locals=input_locals)
 
     create_debug_visualization = debug_path is not None
 
     audio_paths = list(map(Path, wav))
 
-    with MultiNetwork(
-        network_paths=network_paths
-    ) as multi_networks, projection_file_reader.load_projection_file(
-        Path(projection_file_path)
-    ) as reader:
+    with projection_file_reader.load_projection_file(Path(projection_file_path)) as reader:
 
         final_latents = projection_file_reader.final_latents_matrices_label(reader)
 
@@ -765,6 +604,167 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
             )
         else:
             more_itertools.consume(finals)
+
+
+@cli.command()  # pylint: disable=too-many-arguments
+@common_command_options
+@click.option(
+    "--projection-file-path",
+    help="Path to the projection file.",
+    type=click.Path(exists=True, file_okay=True, readable=True, dir_okay=False, resolve_path=True),
+    required=True,
+)
+@click.option(
+    "--blend-depth",
+    help=(
+        "Number of vectors within the final latents matrices that receive the FFT during "
+        "alpha blending."
+    ),
+    type=click.IntRange(min=0, max=18),
+    required=False,
+    default=10,
+    show_default=True,
+)
+@optgroup.group(
+    "Eye-Tracking Overlay Parameters",
+    cls=AllOptionGroup,
+    help=(
+        "Controls how eye-containing sections of the target images get overlaid on "
+        "top of the output images. "
+    ),
+)
+@optgroup.option(
+    "-w",
+    "--complexity-change-rolling-sum-window",
+    type=click.IntRange(min=0),
+    help="The number of frames to window the music complexity computation to.",
+    default=30,
+    show_default=True,
+)
+@optgroup.option(
+    "-t",
+    "--complexity-change-threshold",
+    type=click.IntRange(min=0),
+    help="If complexity is under this value, an overlay computation is enabled.",
+    default=100,
+    show_default=True,
+)
+@optgroup.option(
+    "-p",
+    "--phash-distance",
+    type=click.IntRange(min=0),
+    help=(
+        "Minimum distance between perceptual hashes of the bounding box region of the synthesized "
+        "image and its corresponding target frame to enable an overlay computation. "
+    ),
+    default=30,
+    show_default=True,
+)
+@optgroup.option(
+    "-b",
+    "--bbox-distance",
+    type=click.FloatRange(min=0),
+    help=(
+        "For pairs of synthesized images and their corresponding targets that both contain eye "
+        "bounding boxes, this value is the minimum distance in pixels between "
+        "the origins of those bounding boxes to enable an overlay computation."
+    ),
+    default=100,
+    show_default=True,
+)
+@optgroup.option(
+    "-t",
+    "--track-length",
+    type=click.IntRange(min=0),
+    help=(
+        "For sequences of adjacent frames that could contain an overlay, "
+        "this parameter is the minimum number of overlay frames in a row to be included in the "
+        "output video."
+    ),
+    default=10,
+    show_default=True,
+)
+def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
+    wav: List[str],
+    output_path: str,
+    networks_directory: Optional[str],
+    network_path: Optional[List[str]],
+    networks_json: Optional[str],
+    frames_to_visualize: Optional[int],
+    output_fps: float,
+    output_side_length: int,
+    debug_path: Optional[str],
+    debug_window: Optional[int],
+    alpha: float,
+    fft_roll_enabled: bool,
+    fft_amplitude_range: Tuple[int, int],
+    run_config: Optional[str],
+    projection_file_path: str,
+    blend_depth: int,
+    complexity_change_rolling_sum_window: int,
+    complexity_change_threshold: int,
+    phash_distance: int,
+    bbox_distance: float,
+    track_length: int,
+) -> None:
+    """
+    Transform audio data, combine it with final latents from a projection file,
+    and feed the result into a network for synthesis. Optionally overlay parts of the target
+    video inside of the projection file onto the output video.
+
+    Note: Audio data will be scaled to the duration of the projection file.
+
+    \f
+    :param wav: See click help.
+    :param output_path: See click help.
+    :param networks_directory: See click help.
+    :param network_path: See click help.
+    :param networks_json: See click help.
+    :param frames_to_visualize: See click help.
+    :param output_fps: See click help.
+    :param output_side_length: See click help.
+    :param debug_path: See click help.
+    :param debug_window: See click help.
+    :param alpha: See click help.
+    :param fft_roll_enabled: See click help.
+    :param fft_amplitude_range: See click help.
+    :param run_config: See click help.
+    :param projection_file_path: See click help.
+    :param blend_depth: See click help.
+    :param complexity_change_rolling_sum_window: See click help.
+    :param complexity_change_threshold: See click help.
+    :param phash_distance: See click help.
+    :param bbox_distance: See click help.
+    :param track_length: See click help.
+    :return: None
+    """
+
+    network_paths = parse_network_paths(
+        networks_directory=networks_directory, networks=network_path, networks_json=networks_json
+    )
+
+    with MultiNetwork(network_paths=network_paths) as multi_networks:
+        _projection_file_blend_api(
+            wav=wav,
+            output_path=output_path,
+            multi_networks=multi_networks,
+            frames_to_visualize=frames_to_visualize,
+            output_fps=output_fps,
+            output_side_length=output_side_length,
+            debug_path=debug_path,
+            debug_window=debug_window,
+            alpha=alpha,
+            fft_roll_enabled=fft_roll_enabled,
+            fft_amplitude_range=fft_amplitude_range,
+            run_config=run_config,
+            projection_file_path=projection_file_path,
+            blend_depth=blend_depth,
+            complexity_change_rolling_sum_window=complexity_change_rolling_sum_window,
+            complexity_change_threshold=complexity_change_threshold,
+            phash_distance=phash_distance,
+            bbox_distance=bbox_distance,
+            track_length=track_length,
+        )
 
 
 if __name__ == "__main__":
