@@ -12,11 +12,9 @@ import click
 import more_itertools
 import numpy as np
 import pandas as pd
-import pydantic
 from click_option_group import AllOptionGroup, RequiredAnyOptionGroup, optgroup
 from cv2 import cv2
 from lz.transposition import transpose
-from pydantic import BaseModel, FilePath
 
 from gance import divisor, overlay
 from gance.assets import OUTPUT_DIRECTORY
@@ -30,7 +28,7 @@ from gance.gance_types import RGBInt8ImageType
 from gance.image_sources import video_common
 from gance.iterator_on_disk import HDF5_SERIALIZER, iterator_on_disk
 from gance.logger_common import LOGGER
-from gance.network_interface.network_functions import MultiNetwork, sorted_networks_in_directory
+from gance.network_interface.network_functions import MultiNetwork, parse_network_paths
 from gance.projection import projection_file_reader
 from gance.vector_sources import music, vector_reduction
 from gance.vector_sources.vector_reduction import DataLabel, ResultLayers
@@ -39,14 +37,6 @@ from gance.vector_sources.vector_types import ConcatenatedVectors
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("numba").setLevel(logging.WARNING)
-
-
-class NetworksFile(BaseModel):
-    """
-    Describes a `NetworksFile`, a .json file full paths to pickled StyleGAN networks.
-    """
-
-    networks: List[FilePath]
 
 
 @click.group()
@@ -62,48 +52,6 @@ def cli() -> None:
 
     :return: None
     """
-
-
-def _parse_network_paths(
-    networks_directory: Optional[str], networks: Optional[List[str]], networks_json: Optional[str]
-) -> List[Path]:
-    """
-    Given the user's input from the CLI, get a list of the networks to be used in the run.
-    :param networks_directory: A string representing a path to a directory that contains network
-    files. Optionally given.
-    :param networks: Paths (as strings) leading directly to networks. Optionally given.
-    :param networks_json: Path to a json file with a list of network paths.
-    :return: Path objects leading to the networks. Sorted by filename.
-    :raises ValueError: If something goes wrong with a parse.
-    """
-
-    all_networks = []
-
-    if networks_directory is not None:
-        networks_directory_path = Path(networks_directory)
-        all_networks += sorted_networks_in_directory(networks_directory=networks_directory_path)
-
-    if networks is not None:
-        all_networks += list(map(Path, networks))
-
-    if networks_json is not None:
-        LOGGER.info(f"Loading network JSON: {networks_json}")
-        try:
-            with open(networks_json) as f:
-                all_networks += list(map(Path, NetworksFile(**json.load(f)).networks))
-        except pydantic.error_wrappers.ValidationError as e:
-            raise ValueError("Ran into formatting problem with networks JSON.") from e
-        except Exception as e:
-            raise ValueError("Couldn't open networks JSON.") from e
-
-    if not all_networks:
-        raise ValueError("No networks given, cannot continue.")
-
-    LOGGER.info("Discovered networks: ")
-    for path in all_networks:
-        LOGGER.info(f"\t{path}")
-
-    return all_networks
 
 
 def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -348,7 +296,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     """
 
     input_locals = locals()
-    network_paths = _parse_network_paths(
+    network_paths = parse_network_paths(
         networks_directory=networks_directory, networks=network_path, networks_json=networks_json
     )
 
@@ -545,7 +493,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     """
 
     input_locals = locals()
-    network_paths = _parse_network_paths(
+    network_paths = parse_network_paths(
         networks_directory=networks_directory, networks=network_path, networks_json=networks_json
     )
 
