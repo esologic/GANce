@@ -1,0 +1,17 @@
+{
+  "networks": [
+    "/home/gpu/gance/gance/assets/networks/training_complete/110_00012-stylegan2-luke-1gpu-config-e_network-snapshot-000860.pkl",
+    "/home/gpu/gance/gance/assets/networks/training_complete/110_00012-stylegan2-luke-1gpu-config-e_network-snapshot-000860.pkl",
+    "/home/gpu/gance/gance/assets/networks/training_complete/110_00012-stylegan2-luke-1gpu-config-e_network-snapshot-000860.pkl",
+    "/home/gpu/gance/gance/assets/networks/training_complete/110_00012-stylegan2-luke-1gpu-config-e_network-snapshot-000860.pkl",
+    "/home/gpu/gance/gance/assets/networks/training_complete/110_00012-stylegan2-luke-1gpu-config-e_network-snapshot-000860.pkl",
+    "/home/gpu/gance/gance/assets/networks/training_complete/110_00012-stylegan2-luke-1gpu-config-e_network-snapshot-000860.pkl",
+    "/home/gpu/gance/gance/assets/networks/training_complete/110_00012-stylegan2-luke-1gpu-config-e_network-snapshot-000860.pkl",
+    "/home/gpu/gance/gance/assets/networks/training_complete/110_00012-stylegan2-luke-1gpu-config-e_network-snapshot-000860.pkl",
+    "/home/gpu/gance/gance/assets/networks/training_complete/10_00006-stylegan2-luke-1gpu-config-e_network-snapshot-000409.pkl",
+    "/home/gpu/gance/gance/assets/networks/training_complete/6_00006-stylegan2-luke-1gpu-config-e_network-snapshot-000245.pkl",
+    "/home/gpu/gance/gance/assets/networks/training_complete/5_00006-stylegan2-luke-1gpu-config-e_network-snapshot-000204.pkl",
+    "/home/gpu/gance/gance/assets/networks/training_complete/4_00006-stylegan2-luke-1gpu-config-e_network-snapshot-000163.pkl",
+    "/home/gpu/gance/gance/assets/networks/training_complete/3_00006-stylegan2-luke-1gpu-config-e_network-snapshot-000123.pkl"
+  ]
+}
