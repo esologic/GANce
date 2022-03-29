@@ -117,8 +117,6 @@ if __name__ == "__main__":
                 f"--run-config {str(output_dir.joinpath(f'{command_parameters.name}.json'))}",
                 f"--projection-file-path {command_parameters.projection_file_path}",
                 f"--blend-depth 10",
-                f"--complexity-change-rolling-sum-window 30",
-                f"--complexity-change-threshold 5000",
                 f"--phash-distance 25",
                 f"--bbox-distance 50",
                 f"--track-length 5",
