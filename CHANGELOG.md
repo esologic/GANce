@@ -1,5 +1,17 @@
 # Changelog
 
+0.20.0 - (2022-03-29)
+------------------
+
+* In `music_into_models.py projection-file-blend`, the notion of connecting overlay appearances
+with audio activity has been removed, meaning `--complexity-change-rolling-sum-window` and 
+`--complexity-change-threshold` are disabled. This functionality was underdeveloped, and didn't 
+really work in a predictable way. The functionality will still be there in 
+`projection_file_blend_api`, just not accessible via the CLI.
+* In the same script, if `--phash-distance`, `--bbox-distance` and `--track-length` aren't provided, 
+overlays won't be computed in the resulting videos.
+
+
 0.19.0 - (2022-03-06)
 ------------------
 

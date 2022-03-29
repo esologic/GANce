@@ -6,47 +6,27 @@ Also tools to visualize these vectors against the network outputs.
 import json
 import logging
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import click
 import more_itertools
-import numpy as np
-import pandas as pd
-import pydantic
 from click_option_group import AllOptionGroup, RequiredAnyOptionGroup, optgroup
 from cv2 import cv2
-from lz.transposition import transpose
-from pydantic import BaseModel, FilePath
 
-from gance import divisor, overlay
 from gance.assets import OUTPUT_DIRECTORY
-from gance.data_into_network_visualization import visualize_vector_reduction
 from gance.data_into_network_visualization.network_visualization import vector_synthesis
 from gance.data_into_network_visualization.visualization_inputs import (
-    alpha_blend_projection_file,
     alpha_blend_vectors_max_rms_power_audio,
 )
-from gance.gance_types import RGBInt8ImageType
 from gance.image_sources import video_common
-from gance.iterator_on_disk import HDF5_SERIALIZER, iterator_on_disk
 from gance.logger_common import LOGGER
-from gance.network_interface.network_functions import MultiNetwork, sorted_networks_in_directory
-from gance.projection import projection_file_reader
-from gance.vector_sources import music, vector_reduction
-from gance.vector_sources.vector_reduction import DataLabel, ResultLayers
-from gance.vector_sources.vector_sources_common import underlying_length
+from gance.network_interface.network_functions import MultiNetwork, parse_network_paths
+from gance.projection_file_blend import projection_file_blend_api
+from gance.vector_sources import music
 from gance.vector_sources.vector_types import ConcatenatedVectors
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("numba").setLevel(logging.WARNING)
-
-
-class NetworksFile(BaseModel):
-    """
-    Describes a `NetworksFile`, a .json file full paths to pickled StyleGAN networks.
-    """
-
-    networks: List[FilePath]
 
 
 @click.group()
@@ -62,48 +42,6 @@ def cli() -> None:
 
     :return: None
     """
-
-
-def _parse_network_paths(
-    networks_directory: Optional[str], networks: Optional[List[str]], networks_json: Optional[str]
-) -> List[Path]:
-    """
-    Given the user's input from the CLI, get a list of the networks to be used in the run.
-    :param networks_directory: A string representing a path to a directory that contains network
-    files. Optionally given.
-    :param networks: Paths (as strings) leading directly to networks. Optionally given.
-    :param networks_json: Path to a json file with a list of network paths.
-    :return: Path objects leading to the networks. Sorted by filename.
-    :raises ValueError: If something goes wrong with a parse.
-    """
-
-    all_networks = []
-
-    if networks_directory is not None:
-        networks_directory_path = Path(networks_directory)
-        all_networks += sorted_networks_in_directory(networks_directory=networks_directory_path)
-
-    if networks is not None:
-        all_networks += list(map(Path, networks))
-
-    if networks_json is not None:
-        LOGGER.info(f"Loading network JSON: {networks_json}")
-        try:
-            with open(networks_json) as f:
-                all_networks += list(map(Path, NetworksFile(**json.load(f)).networks))
-        except pydantic.error_wrappers.ValidationError as e:
-            raise ValueError("Ran into formatting problem with networks JSON.") from e
-        except Exception as e:
-            raise ValueError("Couldn't open networks JSON.") from e
-
-    if not all_networks:
-        raise ValueError("No networks given, cannot continue.")
-
-    LOGGER.info("Discovered networks: ")
-    for path in all_networks:
-        LOGGER.info(f"\t{path}")
-
-    return all_networks
 
 
 def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -348,7 +286,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     """
 
     input_locals = locals()
-    network_paths = _parse_network_paths(
+    network_paths = parse_network_paths(
         networks_directory=networks_directory, networks=network_path, networks_json=networks_json
     )
 
@@ -432,27 +370,11 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
 )
 @optgroup.group(
     "Eye-Tracking Overlay Parameters",
-    cls=AllOptionGroup,
+    cls=AllOptionGroup,  # All options are required or none can be given.
     help=(
         "Controls how eye-containing sections of the target images get overlaid on "
         "top of the output images. "
     ),
-)
-@optgroup.option(
-    "-w",
-    "--complexity-change-rolling-sum-window",
-    type=click.IntRange(min=0),
-    help="The number of frames to window the music complexity computation to.",
-    default=30,
-    show_default=True,
-)
-@optgroup.option(
-    "-t",
-    "--complexity-change-threshold",
-    type=click.IntRange(min=0),
-    help="If complexity is under this value, an overlay computation is enabled.",
-    default=100,
-    show_default=True,
 )
 @optgroup.option(
     "-p",
@@ -460,10 +382,9 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     type=click.IntRange(min=0),
     help=(
         "Minimum distance between perceptual hashes of the bounding box region of the synthesized "
-        "image and its corresponding target frame to enable an overlay computation. "
+        "image and its corresponding target frame to enable an overlay computation. Ex: 30"
     ),
-    default=30,
-    show_default=True,
+    default=None,
 )
 @optgroup.option(
     "-b",
@@ -472,10 +393,9 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     help=(
         "For pairs of synthesized images and their corresponding targets that both contain eye "
         "bounding boxes, this value is the minimum distance in pixels between "
-        "the origins of those bounding boxes to enable an overlay computation."
+        "the origins of those bounding boxes to enable an overlay computation. Ex: 100"
     ),
-    default=100,
-    show_default=True,
+    default=None,
 )
 @optgroup.option(
     "-t",
@@ -484,10 +404,9 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     help=(
         "For sequences of adjacent frames that could contain an overlay, "
         "this parameter is the minimum number of overlay frames in a row to be included in the "
-        "output video."
+        "output video. Ex: 10"
     ),
-    default=10,
-    show_default=True,
+    default=None,
 )
 def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     wav: List[str],
@@ -506,11 +425,9 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     run_config: Optional[str],
     projection_file_path: str,
     blend_depth: int,
-    complexity_change_rolling_sum_window: int,
-    complexity_change_threshold: int,
-    phash_distance: int,
-    bbox_distance: float,
-    track_length: int,
+    phash_distance: Optional[int],
+    bbox_distance: Optional[float],
+    track_length: Optional[int],
 ) -> None:
     """
     Transform audio data, combine it with final latents from a projection file,
@@ -536,8 +453,6 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :param run_config: See click help.
     :param projection_file_path: See click help.
     :param blend_depth: See click help.
-    :param complexity_change_rolling_sum_window: See click help.
-    :param complexity_change_threshold: See click help.
     :param phash_distance: See click help.
     :param bbox_distance: See click help.
     :param track_length: See click help.
@@ -545,226 +460,32 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     """
 
     input_locals = locals()
-    network_paths = _parse_network_paths(
+    network_paths = parse_network_paths(
         networks_directory=networks_directory, networks=network_path, networks_json=networks_json
     )
 
     write_input_args(output_path=run_config, input_locals=input_locals, network_paths=network_paths)
 
-    create_debug_visualization = debug_path is not None
-
-    audio_paths = list(map(Path, wav))
-
-    with MultiNetwork(
-        network_paths=network_paths
-    ) as multi_networks, projection_file_reader.load_projection_file(
-        Path(projection_file_path)
-    ) as reader:
-
-        final_latents = projection_file_reader.final_latents_matrices_label(reader)
-
-        final_latents_in_file = (
-            underlying_length(final_latents.data) / multi_networks.expected_vector_length
-        )
-        processed_frames_in_file = reader.projection_attributes.projection_frame_count
-        projection_complete = reader.projection_attributes.complete
-
-        LOGGER.info(
-            f"Reading projection file. Complete: {projection_complete}, "
-            f"Final Latent Count: {final_latents_in_file}, "
-            f"Processed Frames: {processed_frames_in_file}"
-        )
-
-        if not projection_complete or abs(final_latents_in_file - processed_frames_in_file) > 2:
-            raise ValueError("Invalid Projection File, cannot continue.")
-
-        frame_multiplier = divisor.divide_no_remainder(
-            numerator=output_fps,
-            denominator=reader.projection_attributes.projection_fps,
-        )
-
-        time_series_audio_vectors = cast(
-            ConcatenatedVectors,
-            music.read_wavs_scale_for_video(
-                wavs=audio_paths,
-                vector_length=multi_networks.expected_vector_length,
-                target_num_vectors=int(frame_multiplier * final_latents_in_file),
-            ).wav_data,
-        )
-
-        synthesis_output = vector_synthesis(
-            networks=multi_networks,
-            data=alpha_blend_projection_file(
-                final_latents_matrices_label=final_latents,
-                alpha=alpha,
-                fft_roll_enabled=fft_roll_enabled,
-                fft_amplitude_range=fft_amplitude_range,
-                blend_depth=blend_depth,
-                time_series_audio_vectors=time_series_audio_vectors,
-                vector_length=multi_networks.expected_vector_length,
-                network_indices=multi_networks.network_indices,
-            ),
-            default_vector_length=multi_networks.expected_vector_length,
-            enable_3d=False,
-            enable_2d=create_debug_visualization,
-            frames_to_visualize=frames_to_visualize,
-            network_index_window_width=debug_window,
-            video_height=output_side_length,
-        )
-
-        music_complexity_overlay_mask = vector_reduction.rolling_sum_results_layers(
-            vector_reduction.absolute_value_results_layers(
-                results_layers=ResultLayers(
-                    result=DataLabel(
-                        data=vector_reduction.derive_results_layers(
-                            vector_reduction.reduce_vector_gzip_compression_rolling_average(
-                                time_series_audio_vectors=time_series_audio_vectors,
-                                vector_length=multi_networks.expected_vector_length,
-                            ),
-                            order=1,
-                        ).result.data,
-                        label="Gzipped audio, smoothed, averaged, 1st order derivation.",
-                    ),
-                ),
-            ),
-            window_length=complexity_change_rolling_sum_window,
-        )
-
-        skip_mask: List[bool] = list(
-            pd.Series(music_complexity_overlay_mask.result.data).fillna(np.inf)
-            > complexity_change_threshold
-        )
-
-        foreground_iterators = iter(
-            iterator_on_disk(
-                iterator=more_itertools.repeat_each(
-                    reader.target_images,
-                    frame_multiplier,
-                ),
-                copies=1,
-                serializer=HDF5_SERIALIZER,
-            )
-        )
-
-        background_iterators = iter(
-            iterator_on_disk(
-                iterator=synthesis_output.synthesized_images,
-                copies=1,
-                serializer=HDF5_SERIALIZER,
-            )
-        )
-
-        overlay_results = overlay.overlay_eye_tracking.compute_eye_tracking_overlay(
-            foreground_images=next(foreground_iterators),
-            background_images=next(background_iterators),
-            min_phash_distance=phash_distance,
-            min_bbox_distance=bbox_distance,
-            skip_mask=skip_mask,
-        )
-
-        logging.info("Starting to compute mask to filter out short sequences of overlay frames.")
-
-        boxes_list = list(overlay_results.bbox_lists)
-
-        long_tracks_mask = vector_reduction.track_length_filter(
-            bool_tracks=(
-                ~pd.Series(skip_mask) & pd.Series((box is not None for box in boxes_list))
-            ),
-            track_length=track_length,
-        )
-
-        final_frames: Iterator[Tuple[RGBInt8ImageType, RGBInt8ImageType]] = (
-            (
-                overlay.overlay_common.write_boxes_onto_image(
-                    foreground_image=foreground,
-                    background_image=background,
-                    bounding_boxes=bounding_boxes,
-                )
-                if in_long_track
-                else background,
-                foreground,
-            )
-            for (bounding_boxes, foreground, background, in_long_track) in zip(
-                boxes_list,
-                next(foreground_iterators),
-                next(background_iterators),
-                long_tracks_mask,
-            )
-        )
-
-        finals, foregrounds = transpose(final_frames)
-
-        finals = video_common.write_source_to_disk_forward(
-            source=finals,
-            video_path=Path(output_path),
-            video_fps=output_fps,
-            audio_paths=audio_paths,
-        )
-
-        if create_debug_visualization:
-
-            visualization = overlay.overlay_visualization.visualize_overlay_computation(
-                overlay=overlay_results.contexts,
-                frames_per_context=debug_window,
-                video_square_side_length=output_side_length,
-                horizontal_lines=overlay.overlay_visualization.VisualizeOverlayThresholds(
-                    phash_line=phash_distance, bbox_distance_line=bbox_distance
-                ),
-            )
-
-            music_overlay_mask_visualization = visualize_vector_reduction.visualize_result_layers(
-                result_layers=music_complexity_overlay_mask,
-                frames_per_context=debug_window,
-                video_height=output_side_length,
-                title="Overlay binary mask",
-                horizontal_line=complexity_change_threshold,
-            )
-
-            video_common.write_source_to_disk_consume(
-                source=(
-                    cv2.vconcat(
-                        [
-                            cv2.hconcat(
-                                [
-                                    final,
-                                    background,
-                                    foreground,
-                                ]
-                            ),
-                            cv2.hconcat(
-                                [
-                                    music_overlay_mask_visualization_image,
-                                    overlay_visualization_frame,
-                                    visualization_image,
-                                ]
-                            ),
-                        ]
-                    )
-                    for (
-                        final,
-                        foreground,
-                        background,
-                        overlay_visualization_frame,
-                        visualization_image,
-                        music_overlay_mask_visualization_image,
-                    ) in zip(
-                        finals,
-                        foregrounds,
-                        more_itertools.repeat_each(
-                            reader.final_images,
-                            frame_multiplier,
-                        ),
-                        visualization,
-                        synthesis_output.visualization_images,
-                        music_overlay_mask_visualization,
-                    )
-                ),
-                video_path=Path(debug_path),
-                video_fps=output_fps,
-                audio_paths=audio_paths,
-            )
-        else:
-            more_itertools.consume(finals)
+    projection_file_blend_api(
+        wav=wav,
+        output_path=output_path,
+        network_paths=network_paths,
+        frames_to_visualize=frames_to_visualize,
+        output_fps=output_fps,
+        output_side_length=output_side_length,
+        debug_path=debug_path,
+        debug_window=debug_window,
+        alpha=alpha,
+        fft_roll_enabled=fft_roll_enabled,
+        fft_amplitude_range=fft_amplitude_range,
+        projection_file_path=projection_file_path,
+        blend_depth=blend_depth,
+        complexity_change_rolling_sum_window=None,
+        complexity_change_threshold=None,
+        phash_distance=phash_distance,
+        bbox_distance=bbox_distance,
+        track_length=track_length,
+    )
 
 
 if __name__ == "__main__":

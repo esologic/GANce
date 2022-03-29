@@ -2,7 +2,7 @@
 Functions to be able to load networks from disk and interact with them.
 Working with these networks can be messy and this module tries to only expose the important things.
 """
-
+import json
 import logging
 import multiprocessing
 import os
@@ -17,6 +17,8 @@ from typing import Any, Callable, List, NamedTuple, Optional, Union  # pylint: d
 
 import numpy as np
 import PIL
+import pydantic
+from pydantic import BaseModel, FilePath
 from typing_extensions import Protocol
 
 from gance import process_common
@@ -623,3 +625,61 @@ class MultiNetwork:
         :return: Indices
         """
         return [index for index, _ in enumerate(self._network_paths)]
+
+    @property
+    def network_paths(self: "MultiNetwork") -> List[Path]:
+        """
+        Exposes the network paths for reading.
+        :return: Paths to the network files
+        """
+        return self._network_paths
+
+
+def parse_network_paths(
+    networks_directory: Optional[str], networks: Optional[List[str]], networks_json: Optional[str]
+) -> List[Path]:
+    """
+    Given the user's input from the CLI, get a list of the networks to be used in the run.
+    :param networks_directory: A string representing a path to a directory that contains network
+    files. Optionally given.
+    :param networks: Paths (as strings) leading directly to networks. Optionally given.
+    :param networks_json: Path to a json file with a list of network paths.
+    :return: Path objects leading to the networks. Sorted by filename.
+    :raises ValueError: If something goes wrong with a parse.
+    """
+
+    all_networks = []
+
+    if networks_directory is not None:
+        networks_directory_path = Path(networks_directory)
+        all_networks += sorted_networks_in_directory(networks_directory=networks_directory_path)
+
+    if networks is not None:
+        all_networks += list(map(Path, networks))
+
+    if networks_json is not None:
+        LOGGER.info(f"Loading network JSON: {networks_json}")
+        try:
+            with open(networks_json) as f:
+                all_networks += list(map(Path, NetworksFile(**json.load(f)).networks))
+        except pydantic.error_wrappers.ValidationError as e:
+            raise ValueError("Ran into formatting problem with networks JSON.") from e
+        except Exception as e:
+            raise ValueError("Couldn't open networks JSON.") from e
+
+    if not all_networks:
+        raise ValueError("No networks given, cannot continue.")
+
+    LOGGER.info("Discovered networks: ")
+    for path in all_networks:
+        LOGGER.info(f"\t{path}")
+
+    return all_networks
+
+
+class NetworksFile(BaseModel):
+    """
+    Describes a `NetworksFile`, a .json file full paths to pickled StyleGAN networks.
+    """
+
+    networks: List[FilePath]

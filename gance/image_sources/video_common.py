@@ -278,6 +278,7 @@ def write_source_to_disk_forward(
             temp_video_path = Path(file.name)
             yield from setup_iteration(temp_video_path)
             file.flush()
+            LOGGER.info(f"Finalizing {video_path}")
             add_wavs_to_video(
                 video_path=temp_video_path, audio_paths=audio_paths, output_path=video_path
             )
