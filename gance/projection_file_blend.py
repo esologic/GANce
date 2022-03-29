@@ -266,9 +266,6 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
             blended_output, foregrounds = transpose(final_frames_and_foregrounds)
         else:
             blended_output = next(background_iterators)
-            blended_output = list(blended_output)
-            print("Blended output Length", len(blended_output))
-            blended_output = iter(blended_output)
             foregrounds = None
 
         blended_output = video_common.write_source_to_disk_forward(
@@ -279,7 +276,6 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
         )
 
         if create_debug_visualization:
-
             overlay_visualization = (
                 overlay.overlay_visualization.visualize_overlay_computation(
                     overlay=overlay_results.contexts,
