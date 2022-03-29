@@ -7,6 +7,7 @@ ffmpeg-python
 h5py==2.10.0
 inquirer==2.7.0
 ImageHash==4.2.1
+jinja2==3.0.3
 librosa==0.8.1
 lz==0.11.1
 matplotlib

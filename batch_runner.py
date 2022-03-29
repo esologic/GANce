@@ -1,8 +1,9 @@
 from pathlib import Path
 from typing import List, NamedTuple
-
-from music_into_networks import _projection_file_blend_api
+import subprocess
 from gance.network_interface.network_functions import MultiNetwork, parse_network_paths
+import os
+from jinja2 import Template
 
 
 class BatchVariation(NamedTuple):
@@ -96,35 +97,39 @@ if __name__ == "__main__":
         ),
     ]
 
-    output_dir = Path("./gance/assets/output/final_runs/4/")
+    output_dir = Path("./gance/assets/output/final_runs/5/")
     output_dir.mkdir(exist_ok=True)
 
-    network_paths = parse_network_paths(
-        networks_directory=None, networks=None, networks_json="./prod_networks.json"
-    )
+    commands = [
+        " ".join(
+            [
+                "./venv/bin/python /home/gpu/gance/music_into_networks.py projection-file-blend",
+                *[f'--wav "{wav}"' for wav in command_parameters.wavs],
+                f"--output-path {str(output_dir.joinpath(f'{command_parameters.name}.mp4'))}",
+                f"--networks-json ./prod_networks.json",
+                f"--output-fps 60",
+                f"--output-side-length 1024",
+                f"--debug-path {str(output_dir.joinpath(f'{command_parameters.name}_debug.mp4'))}",
+                f"--debug-window 300",
+                f"--alpha 0.25",
+                f"--fft-roll-enabled",
+                f"--fft-amplitude-range -7 7",
+                f"--run-config {str(output_dir.joinpath(f'{command_parameters.name}.json'))}",
+                f"--projection-file-path {command_parameters.projection_file_path}",
+                f"--blend-depth 10",
+                f"--complexity-change-rolling-sum-window 30",
+                f"--complexity-change-threshold 5000",
+                f"--phash-distance 25",
+                f"--bbox-distance 50",
+                f"--track-length 5",
+            ]
+        )
+        + os.linesep
+        for command_parameters in inputs
+    ]
 
-    with MultiNetwork(network_paths=network_paths) as multi_networks:
+    with open("./batch.sh.jinja2") as f:
+        template = Template(f.read())
 
-        for batch in inputs:
-
-            _projection_file_blend_api(
-                wav=batch.wavs,
-                output_path=str(output_dir.joinpath(f"{batch.name}.mp4")),
-                multi_networks=multi_networks,
-                frames_to_visualize=None,
-                output_fps=60,
-                output_side_length=1024,
-                debug_path=str(output_dir.joinpath(f"{batch.name}_debug.mp4")),
-                debug_window=300,
-                alpha=0.5,
-                fft_roll_enabled=True,
-                fft_amplitude_range=(-5, 5),
-                run_config=str(output_dir.joinpath(f"{batch.name}.json")),
-                projection_file_path=batch.projection_file_path,
-                blend_depth=10,
-                complexity_change_rolling_sum_window=30,
-                complexity_change_threshold=5000,
-                phash_distance=25,
-                bbox_distance=50,
-                track_length=5,
-            )
+        with open("./batch.sh", "w") as f:
+            f.write(template.render(commands=" ".join(commands)))
