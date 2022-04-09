@@ -304,3 +304,19 @@ def write_source_to_disk_consume(
             source=source, video_path=video_path, video_fps=video_fps, audio_paths=audio_paths
         )
     )
+
+
+def resize_source(source: ImageSourceType, resolution: ImageResolution) -> ImageSourceType:
+    """
+    For each item in the input source, scale it to the given resolution.
+    :param source: Contains Images.
+    :param resolution: Desired resolution.
+    :return: A new source of scaled images.
+    """
+
+    yield from (
+        cv2.resize(image, (resolution.height, resolution.width))
+        if image_resolution(image) != resolution
+        else image
+        for image in source
+    )

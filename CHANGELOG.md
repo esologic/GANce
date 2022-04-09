@@ -1,5 +1,12 @@
 # Changelog
 
+0.20.1 - (2022-04-09)
+------------------
+
+* Fixed `--log` argument in `music_into_network.py` commands.
+* Fixed ability to set output side length in `music_into_network.py` commands.
+
+
 0.20.0 - (2022-03-29)
 ------------------
 

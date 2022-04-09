@@ -20,7 +20,8 @@ from gance.data_into_network_visualization.network_visualization import vector_s
 from gance.data_into_network_visualization.visualization_common import DataLabel, ResultLayers
 from gance.data_into_network_visualization.visualization_inputs import alpha_blend_projection_file
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
-from gance.image_sources import video_common
+from gance.image_sources import image_sources_common, video_common
+from gance.image_sources.image_sources_common import ImageResolution
 from gance.iterator_on_disk import HDF5_SERIALIZER, iterator_on_disk
 from gance.logger_common import LOGGER
 from gance.network_interface.network_functions import MultiNetwork
@@ -49,6 +50,42 @@ def _create_iterators_on_disk(
             )
         )
         for iterator in iterators
+    )
+
+
+def horizontal_concat_images(images: Iterator[RGBInt8ImageType]) -> RGBInt8ImageType:
+    """
+    Helper function. Adds logging.
+    :param images: To concatenate.
+    :return: Concatenated image.
+    """
+    images_as_list = list(images)
+    LOGGER.debug(
+        f"Horizontally concatenating {len(images_as_list)} images, "
+        f"sizes: {[image_sources_common.image_resolution(image) for image in images_as_list]}"
+    )
+    output: RGBInt8ImageType = cv2.hconcat(images_as_list)
+    return output
+
+
+def scale_square_source(
+    source: ImageSourceType, output_side_length: int, frame_multiplier: int
+) -> ImageSourceType:
+    """
+    Scale the resolution and number of frames in a given source.
+    :param source: To scale.
+    :param output_side_length: Square frames will be resized to this side length.
+    :param frame_multiplier: Every frame will be duplicated this many times.
+    :return: Scaled source.
+    """
+    return cast(
+        ImageSourceType,
+        more_itertools.repeat_each(
+            video_common.resize_source(
+                source, ImageResolution(output_side_length, output_side_length)
+            ),
+            frame_multiplier,
+        ),
     )
 
 
@@ -177,12 +214,10 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
 
         foreground_iterators, background_iterators = _create_iterators_on_disk(
             iterators=(
-                cast(
-                    ImageSourceType,
-                    more_itertools.repeat_each(
-                        reader.target_images,
-                        frame_multiplier,
-                    ),
+                scale_square_source(
+                    source=reader.target_images,
+                    output_side_length=output_side_length,
+                    frame_multiplier=frame_multiplier,
                 ),
                 synthesis_output.synthesized_images,
             ),
@@ -291,16 +326,17 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
 
             video_common.write_source_to_disk_consume(
                 source=(
-                    cv2.hconcat(list(images))
+                    horizontal_concat_images(images)
                     for images in zip(
                         *filter(
                             lambda optional_iterable: optional_iterable is not None,
                             [
                                 blended_output,
                                 foregrounds,
-                                more_itertools.repeat_each(
-                                    reader.final_images,
-                                    frame_multiplier,
+                                scale_square_source(
+                                    source=reader.final_images,
+                                    output_side_length=output_side_length,
+                                    frame_multiplier=frame_multiplier,
                                 ),
                                 synthesis_output.visualization_images,
                                 overlay_visualization,
