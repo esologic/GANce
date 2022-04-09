@@ -1,8 +1,7 @@
+import os
 from pathlib import Path
 from typing import List, NamedTuple
-import subprocess
-from gance.network_interface.network_functions import MultiNetwork, parse_network_paths
-import os
+
 from jinja2 import Template
 
 
@@ -23,20 +22,6 @@ if __name__ == "__main__":
             ],
             projection_file_path="./gance/assets/projection_files/prod_intro_sub_domain_node_work-2.hdf5",
             name="intro_subdomain_nodework",
-        ),
-        BatchVariation(
-            wavs=[
-                "./gance/assets/audio/masters/06 - leaveit - pass 02 (pass 2).wav",
-            ],
-            projection_file_path="./gance/assets/projection_files/resumed_prod_leave_it-1.hdf5",
-            name="leave_it",
-        ),
-        BatchVariation(
-            wavs=[
-                "./gance/assets/audio/masters/12 - buzzz (pass 2).wav",
-            ],
-            projection_file_path="./gance/assets/projection_files/resumed_buzzzz_1.hdf5",
-            name="buzzz",
         ),
         BatchVariation(
             wavs=[
@@ -84,6 +69,11 @@ if __name__ == "__main__":
             name="foam_forethought_titan",
         ),
         BatchVariation(
+            wavs=["./gance/assets/audio/masters/07 - fourth dance theme (pass 2).wav"],
+            projection_file_path="./gance/assets/projection_files/third_fourth.hdf5",
+            name="fourth_dance_theme",
+        ),
+        BatchVariation(
             wavs=[
                 "./gance/assets/audio/masters/15 - NOVA (end 2) (pass 2).wav",
             ],
@@ -91,13 +81,22 @@ if __name__ == "__main__":
             name="nova",
         ),
         BatchVariation(
-            wavs=["./gance/assets/audio/masters/07 - fourth dance theme (pass 2).wav"],
-            projection_file_path="./gance/assets/projection_files/third_fourth.hdf5",
-            name="fourth_dance_theme",
+            wavs=[
+                "./gance/assets/audio/masters/12 - buzzz (pass 2).wav",
+            ],
+            projection_file_path="./gance/assets/projection_files/resumed_buzzzz_1.hdf5",
+            name="buzzz",
+        ),
+        BatchVariation(
+            wavs=[
+                "./gance/assets/audio/masters/06 - leaveit - pass 02 (pass 2).wav",
+            ],
+            projection_file_path="./gance/assets/projection_files/resumed_prod_leave_it-1.hdf5",
+            name="leave_it",
         ),
     ]
 
-    output_dir = Path("./gance/assets/output/final_runs/5/")
+    output_dir = Path("./gance/assets/output/final_runs/7/")
     output_dir.mkdir(exist_ok=True)
 
     commands = [
@@ -106,17 +105,16 @@ if __name__ == "__main__":
                 "./venv/bin/python /home/gpu/gance/music_into_networks.py projection-file-blend",
                 *[f'--wav "{wav}"' for wav in command_parameters.wavs],
                 f"--output-path {str(output_dir.joinpath(f'{command_parameters.name}.mp4'))}",
+                f"--run-config {str(output_dir.joinpath(f'{command_parameters.name}.json'))}",
+                f"--log log.txt",
+                f"--projection-file-path {command_parameters.projection_file_path}",
                 f"--networks-json ./prod_networks.json",
                 f"--output-fps 60",
-                f"--output-side-length 1024",
-                f"--debug-path {str(output_dir.joinpath(f'{command_parameters.name}_debug.mp4'))}",
-                f"--debug-window 300",
+                f"--output-side-length 1080",
                 f"--alpha 0.25",
                 f"--fft-roll-enabled",
-                f"--fft-amplitude-range -7 7",
-                f"--run-config {str(output_dir.joinpath(f'{command_parameters.name}.json'))}",
-                f"--projection-file-path {command_parameters.projection_file_path}",
-                f"--blend-depth 10",
+                f"--fft-amplitude-range -5 5",
+                f"--blend-depth 12",
                 f"--phash-distance 25",
                 f"--bbox-distance 50",
                 f"--track-length 5",

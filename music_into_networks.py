@@ -10,9 +10,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import click
 import more_itertools
+from click import BadParameter, Context, Parameter
 from click_option_group import AllOptionGroup, RequiredAnyOptionGroup, optgroup
 from cv2 import cv2
 
+from gance import cli_common
 from gance.assets import OUTPUT_DIRECTORY
 from gance.data_into_network_visualization.network_visualization import vector_synthesis
 from gance.data_into_network_visualization.visualization_inputs import (
@@ -42,6 +44,21 @@ def cli() -> None:
 
     :return: None
     """
+
+
+def logging_setup(ctx: Optional[Context], param: Optional[Parameter], logfile_path: str) -> str:
+    """
+
+    :param ctx:
+    :param param:
+    :param logfile_path:
+    :return:
+    """
+
+    root_logger = logging.getLogger()
+    file_handler = logging.FileHandler(filename=logfile_path)
+    root_logger.addHandler(file_handler)
+    return logfile_path
 
 
 def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -218,6 +235,13 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 default=None,
                 show_default=True,
             ),
+            click.option(
+                "--log",
+                help="Logs will be written to this path as well as stdout.",
+                type=click.Path(file_okay=True, writable=True, dir_okay=False, resolve_path=True),
+                required=False,
+                callback=logging_setup,
+            ),
         ]
     ):
         func = option(func)
@@ -262,6 +286,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
     run_config: Optional[str],
+    log: Optional[str],
 ) -> None:
     """
     Transform audio data, combine it with smoothed random noise, and feed the result into a network
@@ -428,6 +453,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     phash_distance: Optional[int],
     bbox_distance: Optional[float],
     track_length: Optional[int],
+    log: Optional[str],
 ) -> None:
     """
     Transform audio data, combine it with final latents from a projection file,
