@@ -314,9 +314,12 @@ def resize_source(source: ImageSourceType, resolution: ImageResolution) -> Image
     :return: A new source of scaled images.
     """
 
+    def resize_image(image: RGBInt8ImageType) -> RGBInt8ImageType:
+        output: RGBInt8ImageType = cv2.resize(image, (resolution.height, resolution.width))
+        # Not really sure if this is needed, but it shouldn't cause harm.
+        del image
+        return output
+
     yield from (
-        cv2.resize(image, (resolution.height, resolution.width))
-        if image_resolution(image) != resolution
-        else image
-        for image in source
+        resize_image(image) if image_resolution(image) != resolution else image for image in source
     )

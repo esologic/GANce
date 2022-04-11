@@ -10,11 +10,10 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import click
 import more_itertools
-from click import BadParameter, Context, Parameter
+from click import Context, Parameter
 from click_option_group import AllOptionGroup, RequiredAnyOptionGroup, optgroup
 from cv2 import cv2
 
-from gance import cli_common
 from gance.assets import OUTPUT_DIRECTORY
 from gance.data_into_network_visualization.network_visualization import vector_synthesis
 from gance.data_into_network_visualization.visualization_inputs import (
@@ -46,18 +45,22 @@ def cli() -> None:
     """
 
 
-def logging_setup(ctx: Optional[Context], param: Optional[Parameter], logfile_path: str) -> str:
+def logging_setup(  # pylint: disable=unused-argument
+    ctx: Optional[Context], param: Optional[Parameter], logfile_path: Optional[str]
+) -> str:
+    """
+    Click callback function to set up logging.
+    :param ctx: Click context, unused.
+    :param param: Click parameter, unused.
+    :param logfile_path: Optional path to the log file.
+    :return: The path to the logfile.
     """
 
-    :param ctx:
-    :param param:
-    :param logfile_path:
-    :return:
-    """
+    if logfile_path is not None:
+        root_logger = logging.getLogger()
+        file_handler = logging.FileHandler(filename=logfile_path)
+        root_logger.addHandler(file_handler)
 
-    root_logger = logging.getLogger()
-    file_handler = logging.FileHandler(filename=logfile_path)
-    root_logger.addHandler(file_handler)
     return logfile_path
 
 
@@ -271,7 +274,7 @@ def write_input_args(
 
 @cli.command()  # type: ignore
 @common_command_options
-def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
+def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals,unused-argument
     wav: List[str],
     output_path: str,
     networks_directory: Optional[str],
@@ -307,6 +310,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :param fft_roll_enabled: See click help.
     :param fft_amplitude_range: See click help.
     :param run_config: See click help.
+    :param log: See click help.
     :return: None
     """
 
@@ -433,7 +437,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     ),
     default=None,
 )
-def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
+def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals,unused-argument
     wav: List[str],
     output_path: str,
     networks_directory: Optional[str],
@@ -448,12 +452,12 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
     run_config: Optional[str],
+    log: Optional[str],
     projection_file_path: str,
     blend_depth: int,
     phash_distance: Optional[int],
     bbox_distance: Optional[float],
     track_length: Optional[int],
-    log: Optional[str],
 ) -> None:
     """
     Transform audio data, combine it with final latents from a projection file,
@@ -477,6 +481,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :param fft_roll_enabled: See click help.
     :param fft_amplitude_range: See click help.
     :param run_config: See click help.
+    :param log: See click help.
     :param projection_file_path: See click help.
     :param blend_depth: See click help.
     :param phash_distance: See click help.
