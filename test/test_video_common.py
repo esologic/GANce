@@ -90,3 +90,39 @@ def test_add_wav_to_video(tmpdir: LocalPath) -> None:
         audio_paths=[WAV_CLAPS_PATH, WAV_CLAPS_PATH, WAV_CLAPS_PATH],
         output_path=temp_dir.joinpath("output_double.mp4"),
     )
+
+
+@pytest.mark.parametrize("use_ffmpeg", [True, False])
+def test__create_video_writer_resolution(tmpdir: LocalPath, use_ffmpeg: bool) -> None:
+    """
+
+    :param tmpdir:
+    :param use_ffmpeg:
+    :return: None
+    """
+    video_frames = video_common.frames_in_video(video_path=SAMPLE_FACE_VIDEO_PATH)
+
+    output_path = Path(tmpdir).joinpath("output.mp4")
+
+    writer = video_common._create_video_writer_resolution(  # pylint: disable=protected-access
+        output_path,
+        video_fps=video_frames.original_fps,
+        resolution=video_frames.original_resolution,
+        use_ffmpeg=use_ffmpeg,
+    )
+
+    original_frames = 1
+    for frame in video_frames.frames:
+        writer.write(frame)
+        original_frames += 1
+
+    writer.release()
+
+    try:
+        assert (
+            len(list(video_common.frames_in_video(video_path=output_path).frames))
+            == original_frames
+        )
+    except AssertionError:
+        print("stop")
+    assert output_path.stat().st_size >= 9000000

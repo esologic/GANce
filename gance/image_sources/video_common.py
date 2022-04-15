@@ -5,13 +5,14 @@ Common functionality for dealing with video files.
 import itertools
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Iterator, List, NamedTuple, Optional, Tuple
+from typing import Callable, Iterator, List, NamedTuple, Optional
 
 import ffmpeg
 import more_itertools
 import numpy as np
 from cv2 import cv2
 from ffmpeg.nodes import FilterableStream
+from vidgear.gears import WriteGear
 
 from gance import divisor
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
@@ -76,9 +77,22 @@ def add_wavs_to_video(video_path: Path, audio_paths: List[Path], output_path: Pa
     )
 
 
+class VideoOutputController(NamedTuple):
+    """
+    Interface for something to write videos with.
+    Mimics `cv2.VideoWriter`.
+    """
+
+    # Adds a frame to the video.
+    write: Callable[[RGBInt8ImageType], None]
+
+    # Finalizes the video, you should be able to open and read the video after calling this.
+    release: Callable[[], None]
+
+
 def _create_video_writer_resolution(
-    video_path: Path, video_fps: float, resolution: ImageResolution
-) -> cv2.VideoWriter:
+    video_path: Path, video_fps: float, resolution: ImageResolution, use_ffmpeg: bool
+) -> VideoOutputController:
     """
     Create a video writer of a given FPS and resolution.
     :param video_path: Resulting file path.
@@ -87,12 +101,47 @@ def _create_video_writer_resolution(
     :return: The writer.
     """
 
-    return cv2.VideoWriter(
-        str(video_path),
-        cv2.VideoWriter_fourcc(*"mp4v"),
-        video_fps,
-        (resolution.width, resolution.height),
-    )
+    if use_ffmpeg:
+        output_params = {
+            "-movflags": "+faststart",
+            "-vcodec": "libx264",
+            "-crf": 0,
+            "-level": "4.0",
+            "-coder": "1",
+            "-pix_fmt": "yuv420p",
+            "-vf": f"scale={resolution.width}:{resolution.height}",
+            "-r": str(video_fps),
+        }
+        ffmpeg_writer = WriteGear(
+            output_filename=str(video_path), compression_mode=True, **output_params
+        )
+
+        def write_frame(image: RGBInt8ImageType) -> None:
+            """
+            Helper function to avoid other inputs.
+            :param image: To write.
+            :return: None
+            """
+            ffmpeg_writer.write(image)
+
+        return VideoOutputController(
+            write=write_frame,
+            release=ffmpeg_writer.close,
+        )
+    else:
+        opencv_writer = cv2.VideoWriter(
+            str(video_path),
+            cv2.VideoWriter_fourcc(*"mp4v"),
+            video_fps,
+            (resolution.width, resolution.height),
+        )
+
+        def frame_writer(image: RGBInt8ImageType) -> None:
+            if image_resolution(image) != resolution:
+                raise ValueError("Incoming frame did not match output resolution!")
+            opencv_writer.write(image)
+
+        return VideoOutputController(write=frame_writer, release=opencv_writer.release)
 
 
 def create_video_writer(
@@ -101,7 +150,8 @@ def create_video_writer(
     video_height: int,
     num_squares_width: int,
     num_squares_height: int = 1,
-) -> cv2.VideoWriter:
+    use_ffmpeg: bool = False,
+) -> VideoOutputController:
     """
     Helper function to configure the VideoWriter which writes frames to a video file.
     :param video_path: Path to the file on disk.
@@ -112,6 +162,7 @@ def create_video_writer(
     that will be written in each frame.
     :param num_squares_height: Like `num_squares_width`, but for height. Sets the height of
     the video in units of `video_height`.
+    :param use_ffmpeg: Will be forwarded to library function.
     :return: The openCV `VideoWriter` object.
     """
 
@@ -121,6 +172,7 @@ def create_video_writer(
         resolution=ImageResolution(
             width=video_height * num_squares_width, height=video_height * num_squares_height
         ),
+        use_ffmpeg=use_ffmpeg,
     )
 
 
@@ -131,7 +183,7 @@ class VideoFrames(NamedTuple):
 
     original_fps: float
     total_frame_count: int
-    original_resolution: Tuple[int, int]
+    original_resolution: ImageResolution
     frames: Iterator[RGBInt8ImageType]
 
 
@@ -159,7 +211,7 @@ def frames_in_video(
     video_path: Path,
     video_fps: Optional[float] = None,
     reduce_fps_to: Optional[float] = None,
-    width_height: Optional[Tuple[int, int]] = None,
+    width_height: Optional[ImageResolution] = None,
 ) -> VideoFrames:
     """
     Creates an interface to read each frame from a video into local memory for
@@ -191,7 +243,7 @@ def frames_in_video(
 
     take_every = reduce_fps_take_every(original_fps=fps, new_fps=reduce_fps_to)
 
-    original_width_height = (
+    original_width_height = ImageResolution(
         int(vid_capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
         int(vid_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
     )
@@ -210,7 +262,11 @@ def frames_in_video(
             ret, frame = vid_capture.read()
             if ret:
                 image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                output = image if not resize else cv2.resize(image, width_height)
+                output = (
+                    image
+                    if not resize
+                    else cv2.resize(image, (width_height.width, width_height.height))
+                )
                 yield output
             else:
                 break
@@ -228,6 +284,7 @@ def write_source_to_disk_forward(
     video_path: Path,
     video_fps: float,
     audio_paths: Optional[List[Path]] = None,
+    use_ffmpeg: bool = False,
 ) -> ImageSourceType:
     """
     Consume an image source, write it out to disk.
@@ -252,7 +309,10 @@ def write_source_to_disk_forward(
             raise
 
         writer = _create_video_writer_resolution(
-            video_path=output_path, video_fps=video_fps, resolution=image_resolution(first_frame)
+            video_path=output_path,
+            video_fps=video_fps,
+            resolution=image_resolution(first_frame),
+            use_ffmpeg=use_ffmpeg,
         )
 
         def write_frame(frame: RGBInt8ImageType) -> None:

@@ -64,11 +64,12 @@ def horizontal_concat_images(images: Iterator[RGBInt8ImageType]) -> RGBInt8Image
         f"Horizontally concatenating {len(images_as_list)} images, "
         f"sizes: {[image_sources_common.image_resolution(image) for image in images_as_list]}"
     )
-    return cv2.hconcat(images_as_list)
+    output: RGBInt8ImageType = cv2.hconcat(images_as_list)
+    return output
 
 
 def scale_square_source(
-    source: ImageSourceType, output_side_length, frame_multiplier
+    source: ImageSourceType, output_side_length: int, frame_multiplier: int
 ) -> ImageSourceType:
     """
     Scale the resolution and number of frames in a given source.

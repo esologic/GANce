@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from gance.image_sources import video_common
+from gance.image_sources.video_common import ImageResolution
 from gance.iterator_on_disk import iterator_on_disk
 
 
@@ -20,7 +21,7 @@ from gance.iterator_on_disk import iterator_on_disk
         [0, 1, 2, 3],
         list(
             video_common.frames_in_video(
-                video_path=SAMPLE_FACE_VIDEO_PATH, width_height=(10, 10)
+                video_path=SAMPLE_FACE_VIDEO_PATH, width_height=ImageResolution(10, 10)
             ).frames
         ),
     ],
