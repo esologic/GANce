@@ -8,6 +8,7 @@ from test.assets import (
     SAMPLE_FACE_VIDEO_EXPECTED_FPS,
     SAMPLE_FACE_VIDEO_EXPECTED_FRAMES_COUNT,
     SAMPLE_FACE_VIDEO_PATH,
+    SAMPLE_FACE_VIDEO_SHORT_PATH,
     WAV_CLAPS_PATH,
 )
 from typing import Optional
@@ -92,15 +93,20 @@ def test_add_wav_to_video(tmpdir: LocalPath) -> None:
     )
 
 
+@pytest.mark.parametrize("test_video_file", [SAMPLE_FACE_VIDEO_PATH, SAMPLE_FACE_VIDEO_SHORT_PATH])
 @pytest.mark.parametrize("use_ffmpeg", [True, False])
-def test__create_video_writer_resolution(tmpdir: LocalPath, use_ffmpeg: bool) -> None:
+def test__create_video_writer_resolution(
+    tmpdir: LocalPath, test_video_file: Path, use_ffmpeg: bool
+) -> None:
     """
-
-    :param tmpdir:
-    :param use_ffmpeg:
+    Reads a video from disk, and then re-writes it using the standard output function to make sure
+    thinks like resolution and framerate are maintained as expected.
+    :param tmpdir: Test fixture.
+    :param test_video_file: Path to the video to re-write.
+    :param use_ffmpeg: Input flag.
     :return: None
     """
-    video_frames = video_common.frames_in_video(video_path=SAMPLE_FACE_VIDEO_PATH)
+    video_frames = video_common.frames_in_video(video_path=test_video_file)
 
     output_path = Path(tmpdir).joinpath("output.mp4")
 
@@ -111,18 +117,15 @@ def test__create_video_writer_resolution(tmpdir: LocalPath, use_ffmpeg: bool) ->
         use_ffmpeg=use_ffmpeg,
     )
 
-    original_frames = 1
+    original_frames = 0
     for frame in video_frames.frames:
         writer.write(frame)
         original_frames += 1
 
     writer.release()
 
-    try:
-        assert (
-            len(list(video_common.frames_in_video(video_path=output_path).frames))
-            == original_frames
-        )
-    except AssertionError:
-        print("stop")
-    assert output_path.stat().st_size >= 9000000
+    re_read = video_common.frames_in_video(video_path=output_path)
+
+    assert len(list(re_read.frames)) == original_frames
+    assert re_read.original_fps == video_frames.original_fps
+    assert re_read.original_resolution == video_frames.original_resolution

@@ -103,6 +103,7 @@ def _create_video_writer_resolution(
 
     if use_ffmpeg:
         output_params = {
+            "-input_framerate": video_fps,
             "-movflags": "+faststart",
             "-vcodec": "libx264",
             "-crf": 0,
@@ -110,7 +111,6 @@ def _create_video_writer_resolution(
             "-coder": "1",
             "-pix_fmt": "yuv420p",
             "-vf": f"scale={resolution.width}:{resolution.height}",
-            "-r": str(video_fps),
         }
         ffmpeg_writer = WriteGear(
             output_filename=str(video_path), compression_mode=True, **output_params
