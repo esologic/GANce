@@ -34,7 +34,8 @@ def _write_video(video_path: Path, audio: FilterableStream, output_path: Path) -
             audio,  # get only audio channel
             str(output_path),
             vcodec="copy",
-            acodec="aac",
+            acodec="flac",
+            audio_bitrate=200,
             strict="experimental",
         ),
         quiet=True,
@@ -98,19 +99,23 @@ def _create_video_writer_resolution(
     :param video_path: Resulting file path.
     :param video_fps: FPS of the video.
     :param resolution: Size of the resulting video.
+    :param use_ffmpeg: If true, `ffmpeg` will be invoked directly via the VidGears library,
+    this will create a much larger, much higher quality output.
     :return: The writer.
     """
 
     if use_ffmpeg:
+
+        # See: https://video.stackexchange.com/a/24481
         output_params = {
             "-input_framerate": video_fps,
-            "-movflags": "+faststart",
+            "-vf": f"yadif,scale={resolution.width}:{resolution.height}",
             "-vcodec": "libx264",
-            "-crf": 0,
-            "-level": "4.0",
-            "-coder": "1",
-            "-pix_fmt": "yuv420p",
-            "-vf": f"scale={resolution.width}:{resolution.height}",
+            "-crf": 18,
+            "-bf": 2,
+            "-use_editlist": 0,
+            "-movflags": "+faststart",
+            "-pix_fmt": "yuv422p",
         }
         ffmpeg_writer = WriteGear(
             output_filename=str(video_path), compression_mode=True, **output_params
@@ -292,6 +297,7 @@ def write_source_to_disk_forward(
     :param video_path: Output video path.
     :param video_fps: Frames/Second of the output video.
     :param audio_paths: If given, the audio files will be written to the output video.
+    :param use_ffmpeg: Will be forwarded to library function.
     :return: None
     """
 
@@ -349,6 +355,7 @@ def write_source_to_disk_consume(
     video_path: Path,
     video_fps: float,
     audio_paths: Optional[List[Path]] = None,
+    use_ffmpeg: bool = False,
 ) -> None:
     """
     Consume an image source, write it out to disk.
@@ -356,12 +363,17 @@ def write_source_to_disk_consume(
     :param video_path: Output video path.
     :param video_fps: FPS of the output video.
     :param audio_paths: If given, the audio file at this path will be written to the output video.
+    :param use_ffmpeg: Will be forwarded to library function.
     :return: None
     """
 
     more_itertools.consume(
         write_source_to_disk_forward(
-            source=source, video_path=video_path, video_fps=video_fps, audio_paths=audio_paths
+            source=source,
+            video_path=video_path,
+            video_fps=video_fps,
+            audio_paths=audio_paths,
+            use_ffmpeg=use_ffmpeg,
         )
     )
 

@@ -106,7 +106,9 @@ def bounding_box_distance(
     )
 
 
-def _draw_mask(resolution: ImageResolution, bounding_boxes: List[BoundingBox]) -> "Image":
+def _draw_mask(  # pylint: disable=too-many-locals
+    resolution: ImageResolution, bounding_boxes: List[BoundingBox]
+) -> "Image":
     """
     Draw bounding boxes as a white mask. Edges of bounding boxes are
     included in mask.
@@ -122,11 +124,15 @@ def _draw_mask(resolution: ImageResolution, bounding_boxes: List[BoundingBox]) -
 
         x, y, w, h = bounding_box
 
+        # These pads need to scale with the input size.
+        y_pad = resolution.width * 0.058
+        x_pad = resolution.height * 0.098
+
         y_center = y + (h / 2)
-        y_lower = y_center + 60
-        y_upper = y_center - 60
-        x_left = x - 100
-        x_right = x + (w + 100)
+        y_lower = y_center + y_pad
+        y_upper = y_center - y_pad
+        x_left = x - x_pad
+        x_right = x + (w + x_pad)
 
         draw.polygon(
             [(x_left, y_lower), (x_right, y_lower), (x_right, y_upper), (x_left, y_upper)],

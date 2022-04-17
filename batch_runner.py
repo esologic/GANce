@@ -18,6 +18,13 @@ if __name__ == "__main__":
     inputs = [
         BatchVariation(
             wavs=[
+                "./gance/assets/audio/masters/15 - NOVA (end 2) (pass 2).wav",
+            ],
+            projection_file_path="./gance/assets/projection_files/resumed_prod_nova_3-1.hdf5",
+            name="nova",
+        ),
+        BatchVariation(
+            wavs=[
                 "./gance/assets/audio/masters/01 - yellow intro (pass 2).wav",
                 "./gance/assets/audio/masters/02 - sub domain grass 4th (pass 2).wav",
                 "./gance/assets/audio/masters/03 - NOD3 .work (pass 2).wav",
@@ -84,13 +91,6 @@ if __name__ == "__main__":
         ),
         BatchVariation(
             wavs=[
-                "./gance/assets/audio/masters/15 - NOVA (end 2) (pass 2).wav",
-            ],
-            projection_file_path="./gance/assets/projection_files/resumed_prod_nova_3-1.hdf5",
-            name="nova",
-        ),
-        BatchVariation(
-            wavs=[
                 "./gance/assets/audio/masters/16 - birds of solaris (pass 2).wav",
             ],
             projection_file_path="./gance/assets/projection_files/prod_birds_of_solaris-1.hdf5",
@@ -98,7 +98,7 @@ if __name__ == "__main__":
         ),
     ]
 
-    output_dir = Path("./gance/assets/output/final_runs/final_final/")
+    output_dir = Path("./gance/assets/output/final_runs/final_final_max_quality/")
     output_dir.mkdir(exist_ok=True)
 
     commands = [
@@ -107,12 +107,14 @@ if __name__ == "__main__":
                 "./venv/bin/python /home/gpu/gance/music_into_networks.py projection-file-blend",
                 *[f'--wav "{wav}"' for wav in command_parameters.wavs],
                 f"--output-path {str(output_dir.joinpath(f'{command_parameters.name}.mp4'))}",
+                f"--debug-path {str(output_dir.joinpath(f'{command_parameters.name}_debug.mp4'))}",
+                f"--debug-window 200",
                 f"--run-config {str(output_dir.joinpath(f'{command_parameters.name}.json'))}",
                 f"--log log.txt",
                 f"--projection-file-path {command_parameters.projection_file_path}",
                 f"--networks-json ./prod_networks.json",
                 f"--output-fps 60",
-                f"--output-side-length 1080",
+                f"--output-side-length 2160",
                 f"--alpha 0.25",
                 f"--fft-roll-enabled",
                 f"--fft-amplitude-range -5 5",

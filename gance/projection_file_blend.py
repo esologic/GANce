@@ -214,11 +214,13 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
 
         foreground_iterators, background_iterators = _create_iterators_on_disk(
             iterators=(
+                # Foreground iterator, the projection targets.
                 scale_square_source(
                     source=reader.target_images,
                     output_side_length=output_side_length,
                     frame_multiplier=frame_multiplier,
                 ),
+                # Background iterator, the network outputs.
                 synthesis_output.synthesized_images,
             ),
             num_copies=sum([overlay_enabled]),
@@ -308,6 +310,7 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
             video_path=Path(output_path),
             video_fps=output_fps,
             audio_paths=audio_paths,
+            use_ffmpeg=True,
         )
 
         if create_debug_visualization:
@@ -356,6 +359,7 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
                 video_path=Path(debug_path),
                 video_fps=output_fps,
                 audio_paths=audio_paths,
+                use_ffmpeg=True,
             )
         else:
             more_itertools.consume(blended_output)
