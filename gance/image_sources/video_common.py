@@ -92,20 +92,20 @@ class VideoOutputController(NamedTuple):
 
 
 def _create_video_writer_resolution(
-    video_path: Path, video_fps: float, resolution: ImageResolution, use_ffmpeg: bool
+    video_path: Path, video_fps: float, resolution: ImageResolution, high_quality: bool
 ) -> VideoOutputController:
     """
     Create a video writer of a given FPS and resolution.
     :param video_path: Resulting file path.
     :param video_fps: FPS of the video.
     :param resolution: Size of the resulting video.
-    :param use_ffmpeg: If true, `ffmpeg` will be invoked directly via the VidGears library,
+    :param high_quality: If true, `ffmpeg` will be invoked directly via the VidGears library,
     this will create a much larger, much higher quality output.
     :return: The writer.
     """
 
-    if use_ffmpeg:
-
+    if high_quality:
+        # Tries to best match YouTube's compression.
         # See: https://video.stackexchange.com/a/24481
         output_params = {
             "-input_framerate": video_fps,
@@ -123,7 +123,7 @@ def _create_video_writer_resolution(
 
         def write_frame(image: RGBInt8ImageType) -> None:
             """
-            Helper function to avoid other inputs.
+            Helper function to satisfy mypy.
             :param image: To write.
             :return: None
             """
@@ -142,6 +142,14 @@ def _create_video_writer_resolution(
         )
 
         def frame_writer(image: RGBInt8ImageType) -> None:
+            """
+            Helper function to satisfy mypy.
+            Adds a check to make sure the input image matches the expected
+            resolution of the output. If this doesn't happen, openCV will
+            silently create a video without frames.
+            :param image: To write.
+            :return: None
+            """
             if image_resolution(image) != resolution:
                 raise ValueError("Incoming frame did not match output resolution!")
             opencv_writer.write(image)
@@ -155,7 +163,7 @@ def create_video_writer(
     video_height: int,
     num_squares_width: int,
     num_squares_height: int = 1,
-    use_ffmpeg: bool = False,
+    high_quality: bool = False,
 ) -> VideoOutputController:
     """
     Helper function to configure the VideoWriter which writes frames to a video file.
@@ -167,7 +175,7 @@ def create_video_writer(
     that will be written in each frame.
     :param num_squares_height: Like `num_squares_width`, but for height. Sets the height of
     the video in units of `video_height`.
-    :param use_ffmpeg: Will be forwarded to library function.
+    :param high_quality: Will be forwarded to library function.
     :return: The openCV `VideoWriter` object.
     """
 
@@ -177,7 +185,7 @@ def create_video_writer(
         resolution=ImageResolution(
             width=video_height * num_squares_width, height=video_height * num_squares_height
         ),
-        use_ffmpeg=use_ffmpeg,
+        high_quality=high_quality,
     )
 
 
@@ -289,7 +297,7 @@ def write_source_to_disk_forward(
     video_path: Path,
     video_fps: float,
     audio_paths: Optional[List[Path]] = None,
-    use_ffmpeg: bool = False,
+    high_quality: bool = False,
 ) -> ImageSourceType:
     """
     Consume an image source, write it out to disk.
@@ -297,7 +305,7 @@ def write_source_to_disk_forward(
     :param video_path: Output video path.
     :param video_fps: Frames/Second of the output video.
     :param audio_paths: If given, the audio files will be written to the output video.
-    :param use_ffmpeg: Will be forwarded to library function.
+    :param high_quality: Flag will be forwarded to library function.
     :return: None
     """
 
@@ -318,7 +326,7 @@ def write_source_to_disk_forward(
             video_path=output_path,
             video_fps=video_fps,
             resolution=image_resolution(first_frame),
-            use_ffmpeg=use_ffmpeg,
+            high_quality=high_quality,
         )
 
         def write_frame(frame: RGBInt8ImageType) -> None:
@@ -355,7 +363,7 @@ def write_source_to_disk_consume(
     video_path: Path,
     video_fps: float,
     audio_paths: Optional[List[Path]] = None,
-    use_ffmpeg: bool = False,
+    high_quality: bool = False,
 ) -> None:
     """
     Consume an image source, write it out to disk.
@@ -363,7 +371,7 @@ def write_source_to_disk_consume(
     :param video_path: Output video path.
     :param video_fps: FPS of the output video.
     :param audio_paths: If given, the audio file at this path will be written to the output video.
-    :param use_ffmpeg: Will be forwarded to library function.
+    :param high_quality: Flag will be forwarded to library function.
     :return: None
     """
 
@@ -373,7 +381,7 @@ def write_source_to_disk_consume(
             video_path=video_path,
             video_fps=video_fps,
             audio_paths=audio_paths,
-            use_ffmpeg=use_ffmpeg,
+            high_quality=high_quality,
         )
     )
 

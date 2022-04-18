@@ -310,7 +310,7 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
             video_path=Path(output_path),
             video_fps=output_fps,
             audio_paths=audio_paths,
-            use_ffmpeg=True,
+            high_quality=True,
         )
 
         if create_debug_visualization:
@@ -359,7 +359,7 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
                 video_path=Path(debug_path),
                 video_fps=output_fps,
                 audio_paths=audio_paths,
-                use_ffmpeg=True,
+                high_quality=True,
             )
         else:
             more_itertools.consume(blended_output)

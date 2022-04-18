@@ -94,16 +94,16 @@ def test_add_wav_to_video(tmpdir: LocalPath) -> None:
 
 
 @pytest.mark.parametrize("test_video_file", [SAMPLE_FACE_VIDEO_PATH, SAMPLE_FACE_VIDEO_SHORT_PATH])
-@pytest.mark.parametrize("use_ffmpeg", [True, False])
+@pytest.mark.parametrize("high_quality", [True, False])
 def test__create_video_writer_resolution(
-    tmpdir: LocalPath, test_video_file: Path, use_ffmpeg: bool
+    tmpdir: LocalPath, test_video_file: Path, high_quality: bool
 ) -> None:
     """
     Reads a video from disk, and then re-writes it using the standard output function to make sure
     thinks like resolution and framerate are maintained as expected.
     :param tmpdir: Test fixture.
     :param test_video_file: Path to the video to re-write.
-    :param use_ffmpeg: Input flag.
+    :param high_quality: Input flag.
     :return: None
     """
     video_frames = video_common.frames_in_video(video_path=test_video_file)
@@ -114,7 +114,7 @@ def test__create_video_writer_resolution(
         output_path,
         video_fps=video_frames.original_fps,
         resolution=video_frames.original_resolution,
-        use_ffmpeg=use_ffmpeg,
+        high_quality=high_quality,
     )
 
     original_frames = 0
