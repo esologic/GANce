@@ -15,7 +15,7 @@ import click
 import gance.projection.projector_file_writer
 from gance import cli_common
 from gance.cli_common import DEFAULT_TWO_TUPLE, EXTENSION_HDF5, EXTENSION_MP4
-from gance.image_sources.video_common import ImageResolution, add_wavs_to_video
+from gance.image_sources.video_common import add_wavs_to_video
 from gance.logger_common import LOGGER, LOGGER_DATE_FORMAT, LOGGER_FORMAT
 from gance.projection import projection_visualization
 
@@ -151,7 +151,7 @@ def _process_io(  # pylint: disable=too-many-arguments,too-many-locals
             # Click needs the tuple of `None`'s we don't want that though.
             projection_width_height=None
             if projection_width_height == DEFAULT_TWO_TUPLE
-            else ImageResolution(*projection_width_height),
+            else projection_width_height,
             projection_fps=projection_fps,
             steps_per_projection=steps_per_projection,
             num_frames_to_project=num_frames_to_project,

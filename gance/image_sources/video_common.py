@@ -5,7 +5,7 @@ Common functionality for dealing with video files.
 import itertools
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Callable, Iterator, List, NamedTuple, Optional
+from typing import Callable, Iterator, List, NamedTuple, Optional, cast
 
 import ffmpeg
 import more_itertools
@@ -133,6 +133,7 @@ def _create_video_writer_resolution(
             write=write_frame,
             release=ffmpeg_writer.close,
         )
+
     else:
         opencv_writer = cv2.VideoWriter(
             str(video_path),
@@ -396,10 +397,33 @@ def resize_source(source: ImageSourceType, resolution: ImageResolution) -> Image
 
     def resize_image(image: RGBInt8ImageType) -> RGBInt8ImageType:
         output: RGBInt8ImageType = cv2.resize(image, (resolution.height, resolution.width))
+        # The image in `source` has now been 'consumed', and can't be used again.
+        # We delete this frame here to avoid memory leaks.
         # Not really sure if this is needed, but it shouldn't cause harm.
         del image
+
+        # The scaled image.
         return output
 
     yield from (
         resize_image(image) if image_resolution(image) != resolution else image for image in source
+    )
+
+
+def scale_square_source(
+    source: ImageSourceType, output_side_length: int, frame_multiplier: int
+) -> ImageSourceType:
+    """
+    Scale the resolution and number of frames in a given source.
+    :param source: To scale.
+    :param output_side_length: Square frames will be resized to this side length.
+    :param frame_multiplier: Every frame will be duplicated this many times.
+    :return: Scaled source.
+    """
+    return cast(
+        ImageSourceType,
+        more_itertools.repeat_each(
+            resize_source(source, ImageResolution(output_side_length, output_side_length)),
+            frame_multiplier,
+        ),
     )

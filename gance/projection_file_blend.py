@@ -8,7 +8,6 @@ import logging
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple, cast
 
-import cv2
 import more_itertools
 import numpy as np
 import pandas as pd
@@ -20,8 +19,9 @@ from gance.data_into_network_visualization.network_visualization import vector_s
 from gance.data_into_network_visualization.visualization_common import DataLabel, ResultLayers
 from gance.data_into_network_visualization.visualization_inputs import alpha_blend_projection_file
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
-from gance.image_sources import image_sources_common, video_common
-from gance.image_sources.image_sources_common import ImageResolution
+from gance.image_sources import video_common
+from gance.image_sources.still_image_common import horizontal_concat_images
+from gance.image_sources.video_common import scale_square_source
 from gance.iterator_on_disk import HDF5_SERIALIZER, iterator_on_disk
 from gance.logger_common import LOGGER
 from gance.network_interface.network_functions import MultiNetwork
@@ -50,42 +50,6 @@ def _create_iterators_on_disk(
             )
         )
         for iterator in iterators
-    )
-
-
-def horizontal_concat_images(images: Iterator[RGBInt8ImageType]) -> RGBInt8ImageType:
-    """
-    Helper function. Adds logging.
-    :param images: To concatenate.
-    :return: Concatenated image.
-    """
-    images_as_list = list(images)
-    LOGGER.debug(
-        f"Horizontally concatenating {len(images_as_list)} images, "
-        f"sizes: {[image_sources_common.image_resolution(image) for image in images_as_list]}"
-    )
-    output: RGBInt8ImageType = cv2.hconcat(images_as_list)
-    return output
-
-
-def scale_square_source(
-    source: ImageSourceType, output_side_length: int, frame_multiplier: int
-) -> ImageSourceType:
-    """
-    Scale the resolution and number of frames in a given source.
-    :param source: To scale.
-    :param output_side_length: Square frames will be resized to this side length.
-    :param frame_multiplier: Every frame will be duplicated this many times.
-    :return: Scaled source.
-    """
-    return cast(
-        ImageSourceType,
-        more_itertools.repeat_each(
-            video_common.resize_source(
-                source, ImageResolution(output_side_length, output_side_length)
-            ),
-            frame_multiplier,
-        ),
     )
 
 

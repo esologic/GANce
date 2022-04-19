@@ -3,12 +3,15 @@ Functionality for working with still images.
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 
+import cv2
 import numpy as np
 from PIL import Image
 
 from gance.gance_types import RGBInt8ImageType
+from gance.image_sources import image_sources_common
+from gance.logger_common import LOGGER
 
 PNG = "png"
 
@@ -40,3 +43,18 @@ def read_image(image_path: Path, mode: Optional[str] = None) -> RGBInt8ImageType
 
     # Verified by hand that this cast is valid
     return RGBInt8ImageType(np.asarray(im))
+
+
+def horizontal_concat_images(images: Iterator[RGBInt8ImageType]) -> RGBInt8ImageType:
+    """
+    Helper function. Adds logging.
+    :param images: To concatenate.
+    :return: Concatenated image.
+    """
+    images_as_list = list(images)
+    LOGGER.debug(
+        f"Horizontally concatenating {len(images_as_list)} images, "
+        f"sizes: {[image_sources_common.image_resolution(image) for image in images_as_list]}"
+    )
+    output: RGBInt8ImageType = cv2.hconcat(images_as_list)
+    return output

@@ -43,7 +43,8 @@ from typing_extensions import Protocol
 
 from gance.gance_types import RGBInt8ImageType
 from gance.hash_file import hash_file
-from gance.image_sources.video_common import ImageResolution, frames_in_video
+from gance.image_sources.image_sources_common import ImageResolution
+from gance.image_sources.video_common import frames_in_video
 from gance.logger_common import LOGGER
 from gance.network_interface.network_functions import load_network_network, wrap_loaded_network
 from gance.process_common import COMPLETE_SENTINEL, cleanup_worker, empty_queue_sentinel
@@ -618,7 +619,7 @@ def project_video_to_file(  # pylint: disable=too-many-locals,too-many-arguments
     path_to_network: Path,
     projection_file_path: Path,
     video_fps: Optional[float] = None,
-    projection_width_height: Optional[ImageResolution] = None,
+    projection_width_height: Optional[Tuple[int, int]] = None,
     projection_fps: Optional[float] = None,
     steps_per_projection: Optional[int] = None,
     num_frames_to_project: Optional[int] = None,
@@ -657,7 +658,7 @@ def project_video_to_file(  # pylint: disable=too-many-locals,too-many-arguments
         video = frames_in_video(
             video_path=path_to_video,
             video_fps=video_fps,
-            width_height=projection_width_height,
+            width_height=ImageResolution(*projection_width_height),
             reduce_fps_to=projection_fps,
         )
     except ValueError as e:
@@ -701,10 +702,7 @@ def project_video_to_file(  # pylint: disable=too-many-locals,too-many-arguments
             version_number=LATEST_VERSION,
             complete=complete,
             original_target_path=str(path_to_video),
-            original_width_height=(
-                video.original_resolution.width,
-                video.original_resolution.height,
-            ),
+            original_width_height=video.original_resolution,
             projection_width_height=projection_width_height,
             target_md5_hash=target_hash,
             original_network_path=str(path_to_network),

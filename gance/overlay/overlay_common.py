@@ -125,6 +125,7 @@ def _draw_mask(  # pylint: disable=too-many-locals
         x, y, w, h = bounding_box
 
         # These pads need to scale with the input size.
+        # Eventually would like to pass these kinds of magic numbers in.
         y_pad = resolution.width * 0.058
         x_pad = resolution.height * 0.098
 
