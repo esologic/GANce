@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import click
 import more_itertools
+from click import Context, Parameter
 from click_option_group import AllOptionGroup, RequiredAnyOptionGroup, optgroup
 from cv2 import cv2
 
@@ -42,6 +43,25 @@ def cli() -> None:
 
     :return: None
     """
+
+
+def logging_setup(  # pylint: disable=unused-argument
+    ctx: Optional[Context], param: Optional[Parameter], logfile_path: Optional[str]
+) -> str:
+    """
+    Click callback function to set up logging.
+    :param ctx: Click context, unused.
+    :param param: Click parameter, unused.
+    :param logfile_path: Optional path to the log file.
+    :return: The path to the logfile.
+    """
+
+    if logfile_path is not None:
+        root_logger = logging.getLogger()
+        file_handler = logging.FileHandler(filename=logfile_path)
+        root_logger.addHandler(file_handler)
+
+    return logfile_path
 
 
 def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -218,6 +238,13 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 default=None,
                 show_default=True,
             ),
+            click.option(
+                "--log",
+                help="Logs will be written to this path as well as stdout.",
+                type=click.Path(file_okay=True, writable=True, dir_okay=False, resolve_path=True),
+                required=False,
+                callback=logging_setup,
+            ),
         ]
     ):
         func = option(func)
@@ -247,7 +274,7 @@ def write_input_args(
 
 @cli.command()  # type: ignore
 @common_command_options
-def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
+def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals,unused-argument
     wav: List[str],
     output_path: str,
     networks_directory: Optional[str],
@@ -262,6 +289,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
     run_config: Optional[str],
+    log: Optional[str],
 ) -> None:
     """
     Transform audio data, combine it with smoothed random noise, and feed the result into a network
@@ -282,6 +310,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :param fft_roll_enabled: See click help.
     :param fft_amplitude_range: See click help.
     :param run_config: See click help.
+    :param log: See click help.
     :return: None
     """
 
@@ -330,6 +359,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
             video_path=Path(output_path),
             video_fps=output_fps,
             audio_paths=audio_paths,
+            high_quality=True,
         )
 
         if synthesis_output.visualization_images is not None and debug_path is not None:
@@ -343,6 +373,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
                 video_path=Path(debug_path),
                 video_fps=output_fps,
                 audio_paths=audio_paths,
+                high_quality=True,
             )
         else:
             # This causes the video to be written.
@@ -408,7 +439,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals
     ),
     default=None,
 )
-def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
+def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals,unused-argument
     wav: List[str],
     output_path: str,
     networks_directory: Optional[str],
@@ -423,6 +454,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
     run_config: Optional[str],
+    log: Optional[str],
     projection_file_path: str,
     blend_depth: int,
     phash_distance: Optional[int],
@@ -451,6 +483,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :param fft_roll_enabled: See click help.
     :param fft_amplitude_range: See click help.
     :param run_config: See click help.
+    :param log: See click help.
     :param projection_file_path: See click help.
     :param blend_depth: See click help.
     :param phash_distance: See click help.

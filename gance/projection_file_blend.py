@@ -8,7 +8,6 @@ import logging
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple, cast
 
-import cv2
 import more_itertools
 import numpy as np
 import pandas as pd
@@ -21,6 +20,8 @@ from gance.data_into_network_visualization.visualization_common import DataLabel
 from gance.data_into_network_visualization.visualization_inputs import alpha_blend_projection_file
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.image_sources import video_common
+from gance.image_sources.still_image_common import horizontal_concat_images
+from gance.image_sources.video_common import scale_square_source
 from gance.iterator_on_disk import HDF5_SERIALIZER, iterator_on_disk
 from gance.logger_common import LOGGER
 from gance.network_interface.network_functions import MultiNetwork
@@ -177,13 +178,13 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
 
         foreground_iterators, background_iterators = _create_iterators_on_disk(
             iterators=(
-                cast(
-                    ImageSourceType,
-                    more_itertools.repeat_each(
-                        reader.target_images,
-                        frame_multiplier,
-                    ),
+                # Foreground iterator, the projection targets.
+                scale_square_source(
+                    source=reader.target_images,
+                    output_side_length=output_side_length,
+                    frame_multiplier=frame_multiplier,
                 ),
+                # Background iterator, the network outputs.
                 synthesis_output.synthesized_images,
             ),
             num_copies=sum([overlay_enabled]),
@@ -273,6 +274,7 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
             video_path=Path(output_path),
             video_fps=output_fps,
             audio_paths=audio_paths,
+            high_quality=True,
         )
 
         if create_debug_visualization:
@@ -291,16 +293,17 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
 
             video_common.write_source_to_disk_consume(
                 source=(
-                    cv2.hconcat(list(images))
+                    horizontal_concat_images(images)
                     for images in zip(
                         *filter(
                             lambda optional_iterable: optional_iterable is not None,
                             [
                                 blended_output,
                                 foregrounds,
-                                more_itertools.repeat_each(
-                                    reader.final_images,
-                                    frame_multiplier,
+                                scale_square_source(
+                                    source=reader.final_images,
+                                    output_side_length=output_side_length,
+                                    frame_multiplier=frame_multiplier,
                                 ),
                                 synthesis_output.visualization_images,
                                 overlay_visualization,
@@ -320,6 +323,7 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
                 video_path=Path(debug_path),
                 video_fps=output_fps,
                 audio_paths=audio_paths,
+                high_quality=True,
             )
         else:
             more_itertools.consume(blended_output)

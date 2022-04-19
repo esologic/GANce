@@ -43,6 +43,7 @@ from typing_extensions import Protocol
 
 from gance.gance_types import RGBInt8ImageType
 from gance.hash_file import hash_file
+from gance.image_sources.image_sources_common import ImageResolution
 from gance.image_sources.video_common import frames_in_video
 from gance.logger_common import LOGGER
 from gance.network_interface.network_functions import load_network_network, wrap_loaded_network
@@ -657,7 +658,7 @@ def project_video_to_file(  # pylint: disable=too-many-locals,too-many-arguments
         video = frames_in_video(
             video_path=path_to_video,
             video_fps=video_fps,
-            width_height=projection_width_height,
+            width_height=ImageResolution(*projection_width_height),
             reduce_fps_to=projection_fps,
         )
     except ValueError as e:

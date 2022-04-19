@@ -8,6 +8,7 @@ from test.assets import (
     SAMPLE_FACE_VIDEO_EXPECTED_FPS,
     SAMPLE_FACE_VIDEO_EXPECTED_FRAMES_COUNT,
     SAMPLE_FACE_VIDEO_PATH,
+    SAMPLE_FACE_VIDEO_SHORT_PATH,
     WAV_CLAPS_PATH,
 )
 from typing import Optional
@@ -90,3 +91,41 @@ def test_add_wav_to_video(tmpdir: LocalPath) -> None:
         audio_paths=[WAV_CLAPS_PATH, WAV_CLAPS_PATH, WAV_CLAPS_PATH],
         output_path=temp_dir.joinpath("output_double.mp4"),
     )
+
+
+@pytest.mark.parametrize("test_video_file", [SAMPLE_FACE_VIDEO_PATH, SAMPLE_FACE_VIDEO_SHORT_PATH])
+@pytest.mark.parametrize("high_quality", [True, False])
+def test__create_video_writer_resolution(
+    tmpdir: LocalPath, test_video_file: Path, high_quality: bool
+) -> None:
+    """
+    Reads a video from disk, and then re-writes it using the standard output function to make sure
+    thinks like resolution and framerate are maintained as expected.
+    :param tmpdir: Test fixture.
+    :param test_video_file: Path to the video to re-write.
+    :param high_quality: Input flag.
+    :return: None
+    """
+    video_frames = video_common.frames_in_video(video_path=test_video_file)
+
+    output_path = Path(tmpdir).joinpath("output.mp4")
+
+    writer = video_common._create_video_writer_resolution(  # pylint: disable=protected-access
+        output_path,
+        video_fps=video_frames.original_fps,
+        resolution=video_frames.original_resolution,
+        high_quality=high_quality,
+    )
+
+    original_frames = 0
+    for frame in video_frames.frames:
+        writer.write(frame)
+        original_frames += 1
+
+    writer.release()
+
+    re_read = video_common.frames_in_video(video_path=output_path)
+
+    assert len(list(re_read.frames)) == original_frames
+    assert re_read.original_fps == video_frames.original_fps
+    assert re_read.original_resolution == video_frames.original_resolution

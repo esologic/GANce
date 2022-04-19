@@ -5,13 +5,14 @@ Common functionality for dealing with video files.
 import itertools
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Iterator, List, NamedTuple, Optional, Tuple
+from typing import Callable, Iterator, List, NamedTuple, Optional, cast
 
 import ffmpeg
 import more_itertools
 import numpy as np
 from cv2 import cv2
 from ffmpeg.nodes import FilterableStream
+from vidgear.gears import WriteGear
 
 from gance import divisor
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
@@ -33,7 +34,8 @@ def _write_video(video_path: Path, audio: FilterableStream, output_path: Path) -
             audio,  # get only audio channel
             str(output_path),
             vcodec="copy",
-            acodec="aac",
+            acodec="flac",
+            audio_bitrate=200,
             strict="experimental",
         ),
         quiet=True,
@@ -76,23 +78,84 @@ def add_wavs_to_video(video_path: Path, audio_paths: List[Path], output_path: Pa
     )
 
 
+class VideoOutputController(NamedTuple):
+    """
+    Interface for something to write videos with.
+    Mimics `cv2.VideoWriter`.
+    """
+
+    # Adds a frame to the video.
+    write: Callable[[RGBInt8ImageType], None]
+
+    # Finalizes the video, you should be able to open and read the video after calling this.
+    release: Callable[[], None]
+
+
 def _create_video_writer_resolution(
-    video_path: Path, video_fps: float, resolution: ImageResolution
-) -> cv2.VideoWriter:
+    video_path: Path, video_fps: float, resolution: ImageResolution, high_quality: bool
+) -> VideoOutputController:
     """
     Create a video writer of a given FPS and resolution.
     :param video_path: Resulting file path.
     :param video_fps: FPS of the video.
     :param resolution: Size of the resulting video.
+    :param high_quality: If true, `ffmpeg` will be invoked directly via the VidGears library,
+    this will create a much larger, much higher quality output.
     :return: The writer.
     """
 
-    return cv2.VideoWriter(
-        str(video_path),
-        cv2.VideoWriter_fourcc(*"mp4v"),
-        video_fps,
-        (resolution.width, resolution.height),
-    )
+    if high_quality:
+        # Tries to best match YouTube's compression.
+        # See: https://video.stackexchange.com/a/24481
+        output_params = {
+            "-input_framerate": video_fps,
+            "-vf": f"yadif,scale={resolution.width}:{resolution.height}",
+            "-vcodec": "libx264",
+            "-crf": 18,
+            "-bf": 2,
+            "-use_editlist": 0,
+            "-movflags": "+faststart",
+            "-pix_fmt": "yuv422p",
+        }
+        ffmpeg_writer = WriteGear(
+            output_filename=str(video_path), compression_mode=True, **output_params
+        )
+
+        def write_frame(image: RGBInt8ImageType) -> None:
+            """
+            Helper function to satisfy mypy.
+            :param image: To write.
+            :return: None
+            """
+            ffmpeg_writer.write(image)
+
+        return VideoOutputController(
+            write=write_frame,
+            release=ffmpeg_writer.close,
+        )
+
+    else:
+        opencv_writer = cv2.VideoWriter(
+            str(video_path),
+            cv2.VideoWriter_fourcc(*"mp4v"),
+            video_fps,
+            (resolution.width, resolution.height),
+        )
+
+        def frame_writer(image: RGBInt8ImageType) -> None:
+            """
+            Helper function to satisfy mypy.
+            Adds a check to make sure the input image matches the expected
+            resolution of the output. If this doesn't happen, openCV will
+            silently create a video without frames.
+            :param image: To write.
+            :return: None
+            """
+            if image_resolution(image) != resolution:
+                raise ValueError("Incoming frame did not match output resolution!")
+            opencv_writer.write(image)
+
+        return VideoOutputController(write=frame_writer, release=opencv_writer.release)
 
 
 def create_video_writer(
@@ -101,7 +164,8 @@ def create_video_writer(
     video_height: int,
     num_squares_width: int,
     num_squares_height: int = 1,
-) -> cv2.VideoWriter:
+    high_quality: bool = False,
+) -> VideoOutputController:
     """
     Helper function to configure the VideoWriter which writes frames to a video file.
     :param video_path: Path to the file on disk.
@@ -112,6 +176,7 @@ def create_video_writer(
     that will be written in each frame.
     :param num_squares_height: Like `num_squares_width`, but for height. Sets the height of
     the video in units of `video_height`.
+    :param high_quality: Will be forwarded to library function.
     :return: The openCV `VideoWriter` object.
     """
 
@@ -121,6 +186,7 @@ def create_video_writer(
         resolution=ImageResolution(
             width=video_height * num_squares_width, height=video_height * num_squares_height
         ),
+        high_quality=high_quality,
     )
 
 
@@ -131,7 +197,7 @@ class VideoFrames(NamedTuple):
 
     original_fps: float
     total_frame_count: int
-    original_resolution: Tuple[int, int]
+    original_resolution: ImageResolution
     frames: Iterator[RGBInt8ImageType]
 
 
@@ -159,7 +225,7 @@ def frames_in_video(
     video_path: Path,
     video_fps: Optional[float] = None,
     reduce_fps_to: Optional[float] = None,
-    width_height: Optional[Tuple[int, int]] = None,
+    width_height: Optional[ImageResolution] = None,
 ) -> VideoFrames:
     """
     Creates an interface to read each frame from a video into local memory for
@@ -191,7 +257,7 @@ def frames_in_video(
 
     take_every = reduce_fps_take_every(original_fps=fps, new_fps=reduce_fps_to)
 
-    original_width_height = (
+    original_width_height = ImageResolution(
         int(vid_capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
         int(vid_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
     )
@@ -210,7 +276,11 @@ def frames_in_video(
             ret, frame = vid_capture.read()
             if ret:
                 image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                output = image if not resize else cv2.resize(image, width_height)
+                output = (
+                    image
+                    if not resize
+                    else cv2.resize(image, (width_height.width, width_height.height))
+                )
                 yield output
             else:
                 break
@@ -228,6 +298,7 @@ def write_source_to_disk_forward(
     video_path: Path,
     video_fps: float,
     audio_paths: Optional[List[Path]] = None,
+    high_quality: bool = False,
 ) -> ImageSourceType:
     """
     Consume an image source, write it out to disk.
@@ -235,6 +306,7 @@ def write_source_to_disk_forward(
     :param video_path: Output video path.
     :param video_fps: Frames/Second of the output video.
     :param audio_paths: If given, the audio files will be written to the output video.
+    :param high_quality: Flag will be forwarded to library function.
     :return: None
     """
 
@@ -252,7 +324,10 @@ def write_source_to_disk_forward(
             raise
 
         writer = _create_video_writer_resolution(
-            video_path=output_path, video_fps=video_fps, resolution=image_resolution(first_frame)
+            video_path=output_path,
+            video_fps=video_fps,
+            resolution=image_resolution(first_frame),
+            high_quality=high_quality,
         )
 
         def write_frame(frame: RGBInt8ImageType) -> None:
@@ -289,6 +364,7 @@ def write_source_to_disk_consume(
     video_path: Path,
     video_fps: float,
     audio_paths: Optional[List[Path]] = None,
+    high_quality: bool = False,
 ) -> None:
     """
     Consume an image source, write it out to disk.
@@ -296,11 +372,58 @@ def write_source_to_disk_consume(
     :param video_path: Output video path.
     :param video_fps: FPS of the output video.
     :param audio_paths: If given, the audio file at this path will be written to the output video.
+    :param high_quality: Flag will be forwarded to library function.
     :return: None
     """
 
     more_itertools.consume(
         write_source_to_disk_forward(
-            source=source, video_path=video_path, video_fps=video_fps, audio_paths=audio_paths
+            source=source,
+            video_path=video_path,
+            video_fps=video_fps,
+            audio_paths=audio_paths,
+            high_quality=high_quality,
         )
+    )
+
+
+def resize_source(source: ImageSourceType, resolution: ImageResolution) -> ImageSourceType:
+    """
+    For each item in the input source, scale it to the given resolution.
+    :param source: Contains Images.
+    :param resolution: Desired resolution.
+    :return: A new source of scaled images.
+    """
+
+    def resize_image(image: RGBInt8ImageType) -> RGBInt8ImageType:
+        output: RGBInt8ImageType = cv2.resize(image, (resolution.height, resolution.width))
+        # The image in `source` has now been 'consumed', and can't be used again.
+        # We delete this frame here to avoid memory leaks.
+        # Not really sure if this is needed, but it shouldn't cause harm.
+        del image
+
+        # The scaled image.
+        return output
+
+    yield from (
+        resize_image(image) if image_resolution(image) != resolution else image for image in source
+    )
+
+
+def scale_square_source(
+    source: ImageSourceType, output_side_length: int, frame_multiplier: int
+) -> ImageSourceType:
+    """
+    Scale the resolution and number of frames in a given source.
+    :param source: To scale.
+    :param output_side_length: Square frames will be resized to this side length.
+    :param frame_multiplier: Every frame will be duplicated this many times.
+    :return: Scaled source.
+    """
+    return cast(
+        ImageSourceType,
+        more_itertools.repeat_each(
+            resize_source(source, ImageResolution(output_side_length, output_side_length)),
+            frame_multiplier,
+        ),
     )
