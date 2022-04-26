@@ -12,7 +12,6 @@ import click
 import more_itertools
 from click import Context, Parameter
 from click_option_group import AllOptionGroup, RequiredAnyOptionGroup, optgroup
-from cv2 import cv2
 
 from gance.assets import OUTPUT_DIRECTORY
 from gance.data_into_network_visualization.network_visualization import vector_synthesis
@@ -20,6 +19,7 @@ from gance.data_into_network_visualization.visualization_inputs import (
     alpha_blend_vectors_max_rms_power_audio,
 )
 from gance.image_sources import video_common
+from gance.image_sources.still_image_common import horizontal_concat_images
 from gance.logger_common import LOGGER
 from gance.network_interface.network_functions import MultiNetwork, parse_network_paths
 from gance.projection_file_blend import projection_file_blend_api
@@ -204,6 +204,16 @@ def common_command_options(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 ),
                 type=click.IntRange(min=0),
             ),
+            optgroup.option(
+                "--debug-side-length",
+                help=(
+                    "Debug video is scaled to this height. Width is going to change depending on "
+                    "other input settings, but this parameter limits the height."
+                ),
+                type=click.IntRange(min=1),
+                default=None,
+                show_default=True,
+            ),
             click.option(
                 "--alpha",
                 help="Alpha blending coefficient.",
@@ -285,6 +295,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals,unused-ar
     output_side_length: int,
     debug_path: Optional[str],
     debug_window: Optional[int],
+    debug_side_length: Optional[int],
     alpha: float,
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
@@ -306,6 +317,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals,unused-ar
     :param output_side_length: See click help.
     :param debug_path: See click help.
     :param debug_window: See click help.
+    :param debug_side_length: See click help.
     :param alpha: See click help.
     :param fft_roll_enabled: See click help.
     :param fft_amplitude_range: See click help.
@@ -351,11 +363,14 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals,unused-ar
             enable_2d=debug_path is not None,
             frames_to_visualize=frames_to_visualize,
             network_index_window_width=debug_window,
-            video_height=output_side_length,
+            visualization_height=debug_side_length,
         )
 
         forwarded_hero_frames = video_common.write_source_to_disk_forward(
-            source=synthesis_output.synthesized_images,
+            source=video_common.scale_square_source(
+                source=synthesis_output.synthesized_images,
+                output_side_length=output_side_length,
+            ),
             video_path=Path(output_path),
             video_fps=output_fps,
             audio_paths=audio_paths,
@@ -365,9 +380,15 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals,unused-ar
         if synthesis_output.visualization_images is not None and debug_path is not None:
             video_common.write_source_to_disk_consume(
                 source=(
-                    cv2.hconcat(*frames)
+                    horizontal_concat_images(*frames)
                     for frames in (
-                        zip(forwarded_hero_frames, synthesis_output.visualization_images)
+                        zip(
+                            video_common.scale_square_source(
+                                source=forwarded_hero_frames,
+                                output_side_length=debug_side_length,
+                            ),
+                            synthesis_output.visualization_images,
+                        )
                     )
                 ),
                 video_path=Path(debug_path),
@@ -450,6 +471,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     output_side_length: int,
     debug_path: Optional[str],
     debug_window: Optional[int],
+    debug_side_length: Optional[int],
     alpha: float,
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
@@ -479,6 +501,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
     :param output_side_length: See click help.
     :param debug_path: See click help.
     :param debug_window: See click help.
+    :param debug_side_length: See click help.
     :param alpha: See click help.
     :param fft_roll_enabled: See click help.
     :param fft_amplitude_range: See click help.
@@ -508,6 +531,7 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
         output_side_length=output_side_length,
         debug_path=debug_path,
         debug_window=debug_window,
+        debug_side_length=debug_side_length,
         alpha=alpha,
         fft_roll_enabled=fft_roll_enabled,
         fft_amplitude_range=fft_amplitude_range,

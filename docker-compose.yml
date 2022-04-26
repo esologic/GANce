@@ -1,17 +1,16 @@
 services:
   gance-develop:
-    container_name: gance-develop
     build:
       context: .
       dockerfile: develop.Dockerfile
     ports:
-      - "2222:22"
+      - "22"
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0']
+              count: 1
               capabilities: [gpu]
     volumes:
       - type: bind

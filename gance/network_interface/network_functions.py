@@ -486,7 +486,7 @@ class MultiNetwork:
     networks are loaded/unloaded into memory/GPU on demand.
     """
 
-    def __init__(self: "MultiNetwork", network_paths: List[Path]) -> None:
+    def __init__(self: "MultiNetwork", network_paths: List[Path], load: bool = False) -> None:
         """
         :param network_paths: The list of candidate networks.
         """
@@ -498,6 +498,9 @@ class MultiNetwork:
         # called.
         self._currently_loaded_network: Optional[NetworkInterfaceInProcess] = None
         self._expected_vector_length: Optional[int] = None
+
+        if load:
+            self.load()
 
     @property  # type: ignore
     @_raise_exception_if_unloaded
