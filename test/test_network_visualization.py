@@ -24,7 +24,7 @@ def get_network_output(
     enable_2d: bool,
     video_fps: float,
     network_enabled: bool,
-    video_side_length: int,
+    visualization_height: int,
 ) -> Tuple[int, SynthesisOutput]:
     """
     Modify only the test-relevant components of the visualization run.
@@ -32,7 +32,7 @@ def get_network_output(
     :param enable_2d: 2D network panel will be added.
     :param video_fps: FPS of resulting video stream.
     :param network_enabled: If network images will be added.
-    :param video_side_length: Controls resolution of output video.
+    :param visualization_height: Controls resolution of the output visualization.
     :return: Tuple, (number of expected output frames, streams of frames)
     """
 
@@ -61,9 +61,9 @@ def get_network_output(
             data=data,
             networks=multi_networks if network_enabled else None,
             default_vector_length=multi_networks.expected_vector_length,
-            video_height=video_side_length,  # Param doesn't matter for test.
             enable_3d=enable_3d,
             enable_2d=enable_2d,
+            visualization_height=visualization_height,
         )
 
 
@@ -96,7 +96,7 @@ def assert_all_none(frames: OptionalImageSourceType) -> int:
     [15.0, 30.0, 60.0],
 )
 @pytest.mark.parametrize(
-    "video_side_length",
+    "visualization_height",
     [100, 300, 512, 1024],
 )
 def test_vector_synthesis_integration(
@@ -104,7 +104,7 @@ def test_vector_synthesis_integration(
     enable_2d: bool,
     video_fps: float,
     network_enabled: bool,
-    video_side_length: int,
+    visualization_height: int,
 ) -> None:
     """
     Integration style test, to verify that this function works as expected by examining
@@ -123,7 +123,7 @@ def test_vector_synthesis_integration(
                 enable_2d=enable_2d,
                 video_fps=video_fps,
                 network_enabled=network_enabled,
-                video_side_length=video_side_length,
+                visualization_height=visualization_height,
             )
     else:
         expected_num_frames, network_output = get_network_output(
@@ -131,15 +131,15 @@ def test_vector_synthesis_integration(
             enable_2d=enable_2d,
             video_fps=video_fps,
             network_enabled=network_enabled,
-            video_side_length=video_side_length,
+            visualization_height=visualization_height,
         )
 
         if enable_3d or enable_2d:
             visualization_frames = list(network_output.visualization_images)
             for frame in visualization_frames:
                 resolution = image_sources_common.image_resolution(frame)
-                assert resolution.height == video_side_length
-                assert resolution.width == video_side_length * (enable_2d + enable_3d)
+                assert resolution.height == visualization_height
+                assert resolution.width == visualization_height * (enable_2d + enable_3d)
             assert expected_num_frames == len(visualization_frames)
         else:
             assert network_output.visualization_images is None
@@ -148,8 +148,8 @@ def test_vector_synthesis_integration(
             network_frames = list(network_output.synthesized_images)
             for frame in network_frames:
                 resolution = image_sources_common.image_resolution(frame)
-                assert resolution.height == video_side_length
-                assert resolution.width == video_side_length
+                assert resolution.height == 1024
+                assert resolution.width == 1024
             assert expected_num_frames == len(network_frames)
         else:
             assert network_output.synthesized_images is None

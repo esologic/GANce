@@ -5,6 +5,7 @@ Also tools to visualize these vectors against the network outputs.
 
 import json
 import logging
+import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
@@ -400,6 +401,8 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals,unused-ar
             # This causes the video to be written.
             more_itertools.consume(forwarded_hero_frames)
 
+    sys.exit(0)
+
 
 @cli.command()  # pylint: disable=too-many-arguments
 @common_command_options
@@ -543,6 +546,8 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
         bbox_distance=bbox_distance,
         track_length=track_length,
     )
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":

@@ -121,9 +121,7 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
 
     multi_networks = MultiNetwork(network_paths=network_paths, load=True)
 
-    with projection_file_reader.load_projection_file(
-        Path(projection_file_path)
-    ) as reader:
+    with projection_file_reader.load_projection_file(Path(projection_file_path)) as reader:
 
         final_latents = projection_file_reader.final_latents_matrices_label(reader)
 
