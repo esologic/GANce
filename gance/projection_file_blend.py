@@ -21,7 +21,7 @@ from gance.data_into_network_visualization.visualization_inputs import alpha_ble
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.image_sources import video_common
 from gance.image_sources.still_image_common import horizontal_concat_images
-from gance.image_sources.video_common import scale_square_source
+from gance.image_sources.video_common import scale_square_source_duplicate
 from gance.iterator_on_disk import HDF5_SERIALIZER, iterator_on_disk
 from gance.logger_common import LOGGER
 from gance.network_interface.network_functions import MultiNetwork
@@ -182,13 +182,13 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
         foreground_iterators, background_iterators = _create_iterators_on_disk(
             iterators=(
                 # Foreground iterator, the projection targets.
-                scale_square_source(
+                scale_square_source_duplicate(
                     source=reader.target_images,
                     output_side_length=output_side_length,
                     frame_multiplier=frame_multiplier,
                 ),
                 # Background iterator, the network outputs.
-                scale_square_source(
+                scale_square_source_duplicate(
                     source=synthesis_output.synthesized_images,
                     output_side_length=output_side_length,
                 ),
@@ -304,13 +304,13 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
                         *filter(
                             lambda optional_iterable: optional_iterable is not None,
                             [
-                                scale_square_source(
+                                scale_square_source_duplicate(
                                     source=blended_output, output_side_length=debug_side_length
                                 ),
-                                scale_square_source(
+                                scale_square_source_duplicate(
                                     source=foregrounds, output_side_length=debug_side_length
                                 ),
-                                scale_square_source(
+                                scale_square_source_duplicate(
                                     source=reader.final_images,
                                     output_side_length=debug_side_length,
                                     frame_multiplier=frame_multiplier,

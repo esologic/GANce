@@ -27,6 +27,5 @@ scikit-image
 scikit-learn
 scipy==1.3.3
 sentinels==1.0.0
-tenacity==8.0.1
 tensorflow-gpu==1.14
 vidgear==0.2.4

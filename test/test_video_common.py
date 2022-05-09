@@ -149,7 +149,7 @@ def test_write_large_video(side_length: int, frame_count: int, tmpdir: LocalPath
 
         while True:
             video = video_common.frames_in_video(video_path=SAMPLE_FACE_VIDEO_PATH)
-            scaled_frames = video_common.scale_square_source(
+            scaled_frames = video_common.scale_square_source_duplicate(
                 source=video.frames, output_side_length=side_length, frame_multiplier=1
             )
             for frame in scaled_frames:

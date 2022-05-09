@@ -3,7 +3,7 @@ Functionality for working with still images.
 """
 
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterable, Optional
 
 import cv2
 import numpy as np
@@ -45,7 +45,7 @@ def read_image(image_path: Path, mode: Optional[str] = None) -> RGBInt8ImageType
     return RGBInt8ImageType(np.asarray(im))
 
 
-def horizontal_concat_images(images: Iterator[RGBInt8ImageType]) -> RGBInt8ImageType:
+def horizontal_concat_images(images: Iterable[RGBInt8ImageType]) -> RGBInt8ImageType:
     """
     Helper function. Adds logging.
     :param images: To concatenate.

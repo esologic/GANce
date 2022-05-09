@@ -5,7 +5,6 @@ Also tools to visualize these vectors against the network outputs.
 
 import json
 import logging
-import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
@@ -368,7 +367,7 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals,unused-ar
         )
 
         forwarded_hero_frames = video_common.write_source_to_disk_forward(
-            source=video_common.scale_square_source(
+            source=video_common.scale_square_source_duplicate(
                 source=synthesis_output.synthesized_images,
                 output_side_length=output_side_length,
             ),
@@ -381,10 +380,10 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals,unused-ar
         if synthesis_output.visualization_images is not None and debug_path is not None:
             video_common.write_source_to_disk_consume(
                 source=(
-                    horizontal_concat_images(*frames)
+                    horizontal_concat_images(frames)
                     for frames in (
                         zip(
-                            video_common.scale_square_source(
+                            video_common.scale_square_source_duplicate(
                                 source=forwarded_hero_frames,
                                 output_side_length=debug_side_length,
                             ),
@@ -400,8 +399,6 @@ def noise_blend(  # pylint: disable=too-many-arguments,too-many-locals,unused-ar
         else:
             # This causes the video to be written.
             more_itertools.consume(forwarded_hero_frames)
-
-    sys.exit(0)
 
 
 @cli.command()  # pylint: disable=too-many-arguments
@@ -546,8 +543,6 @@ def projection_file_blend(  # pylint: disable=too-many-arguments,too-many-locals
         bbox_distance=bbox_distance,
         track_length=track_length,
     )
-
-    sys.exit(0)
 
 
 if __name__ == "__main__":

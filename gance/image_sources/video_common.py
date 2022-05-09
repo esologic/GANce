@@ -13,7 +13,6 @@ import more_itertools
 import numpy as np
 from cv2 import cv2
 from ffmpeg.nodes import FilterableStream
-from tenacity import retry, stop_after_attempt
 from vidgear.gears import WriteGear
 
 from gance import divisor
@@ -123,7 +122,6 @@ def _create_video_writer_resolution(
             output_filename=str(video_path), compression_mode=True, **output_params
         )
 
-        @retry(stop=stop_after_attempt(50))
         def write_frame(image: RGBInt8ImageType) -> None:
             """
             Helper function to satisfy mypy.
@@ -431,7 +429,7 @@ def resize_source(source: ImageSourceType, resolution: ImageResolution) -> Image
     )
 
 
-def scale_square_source(
+def scale_square_source_duplicate(
     source: ImageSourceType, output_side_length: int, frame_multiplier: int = 1
 ) -> ImageSourceType:
     """

@@ -489,6 +489,7 @@ class MultiNetwork:
     def __init__(self: "MultiNetwork", network_paths: List[Path], load: bool = False) -> None:
         """
         :param network_paths: The list of candidate networks.
+        :param load: If True, the default model is loaded on creation of this object.
         """
 
         self._network_paths: List[Path] = network_paths
