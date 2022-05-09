@@ -18,7 +18,7 @@ OUTPUT_DIRECTORY = _ASSETS_DIRECTORY.joinpath("output")
 
 _NETWORKS_DIRECTORY = _ASSETS_DIRECTORY.joinpath("networks")
 
-PRODUCTION_network_PATH = _NETWORKS_DIRECTORY.joinpath("production_network.pkl")
+PRODUCTION_NETWORK_PATH = _NETWORKS_DIRECTORY.joinpath("production_network.pkl")
 
 TRAINING_SAMPLE_NETWORKS_DIRECTORY = _NETWORKS_DIRECTORY.joinpath("training_sample")
 TRAINING_COMPLETE_NETWORKS_DIRECTORY = _NETWORKS_DIRECTORY.joinpath("training_complete")

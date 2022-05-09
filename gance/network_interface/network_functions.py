@@ -90,16 +90,22 @@ def fix_cuda_path() -> None:
             os.environ["PATH"] += ":" + path_string
 
 
-def load_network_network(network_path: Path, call_init_function: bool) -> Network:
+def load_network_network(
+    network_path: Path, call_init_function: bool, gpu_index: Optional[int] = None
+) -> Network:
     """
     Load the network from a file.
     :param network_path: Path to the network.
     :param call_init_function: If true, will init the tensorflow session.
+    :param gpu_index: If given, the network will be loaded on this GPU. Allows for multiple networks
+    to be loaded simultaneously across multiple GPUs.
     :return: The network.
     """
 
     if call_init_function:
         fix_cuda_path()
+        os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_index)  # (or "1" or "2")
         dnnlib.tflib.init_tf()
 
     # Once you load this thing it does all kinds of bullshit under the hood, and it's almost
@@ -192,16 +198,20 @@ def wrap_loaded_network(network: Network) -> NetworkInterface:
     )
 
 
-def create_network_interface(network_path: Path, call_init_function: bool) -> NetworkInterface:
+def create_network_interface(
+    network_path: Path, call_init_function: bool, gpu_index: Optional[int] = None
+) -> NetworkInterface:
     """
     Creates the interface to be able to send vectors to and get images out of the network.
     :param network_path: Path to the networks `.pkl` file on disk.
     :param call_init_function: If True, this function will call `dnnlib.tflib.init_tf()`,
     which is required to unpickle the network. It's possible caller has already done this which is
     why it's optional.
+    :param gpu_index: If given, the network will be loaded on this GPU. Allows for multiple networks
+    to be loaded simultaneously across multiple GPUs.
     :return:
     """
-    return wrap_loaded_network(load_network_network(network_path, call_init_function))
+    return wrap_loaded_network(load_network_network(network_path, call_init_function, gpu_index))
 
 
 class NetworkInterfaceInProcess(NamedTuple):
