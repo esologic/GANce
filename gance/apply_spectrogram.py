@@ -9,6 +9,7 @@ import numpy as np
 from skimage import util
 from sklearn.preprocessing import minmax_scale
 
+import gance.iterator_common
 from gance.vector_sources.vector_sources_common import (
     scale_vectors_to_length_resample,
     smooth_across_vectors,
@@ -69,7 +70,7 @@ def compute_spectrogram(
     slices = util.view_as_windows(data, window_shape=(m,), step=num_frequency_bins)
     win = np.hanning(m + 1)[:-1]
     slices = slices * win
-    slices = slices.T
+    slices = gance.iterator_common.T
     fft = np.fft.fft(slices, axis=0)
 
     if truncate:

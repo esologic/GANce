@@ -18,6 +18,7 @@ from vidgear.gears import WriteGear
 from gance import divisor
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.image_sources.image_sources_common import ImageResolution, image_resolution
+from gance.iterator_common import first_item_from_iterator
 from gance.logger_common import LOGGER
 
 
@@ -322,11 +323,7 @@ def write_source_to_disk_forward(
         :return: The frames to yield.
         """
 
-        try:
-            first_frame = next(source)
-        except StopIteration:
-            LOGGER.error("Frame source was empty, nothing to write to disk.")
-            raise
+        first_frame, frame_source = first_item_from_iterator(source)
 
         writer = _create_video_writer_resolution(
             video_path=output_path,
@@ -343,7 +340,7 @@ def write_source_to_disk_forward(
             """
             writer.write(cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB))
 
-        for index, image in enumerate(itertools.chain([first_frame], source)):
+        for index, image in enumerate(frame_source):
             LOGGER.info(f"Writing frame #{index} to file: {video_path}")
             write_frame(image)
             yield image

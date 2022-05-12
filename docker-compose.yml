@@ -11,7 +11,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0']
+              device_ids: ['0,', '1', '2', '3']
               capabilities: [gpu]
     volumes:
       - type: bind
@@ -26,31 +26,3 @@ services:
         source: ./test/assets
         target: /home/gpu/gance/test/assets
         read_only: true
-  gance-develop-1:
-    container_name: gance-develop-1
-    build:
-      context: .
-      dockerfile: develop.Dockerfile
-    ports:
-      - "2223:22"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ['1', '2']
-              capabilities: [gpu]
-    volumes:
-      - type: bind
-        source: ./gance/assets/
-        target: /home/gpu/gance/gance/assets/
-        read_only: true
-      - type: bind
-        source: /home/devon/development_share/yac_output
-        target: /home/gpu/gance/gance/assets/output
-        read_only: false
-      - type: bind
-        source: ./test/assets
-        target: /home/gpu/gance/test/assets
-        read_only: true
-
