@@ -325,8 +325,6 @@ def create_network_interface_process(
         :return: None
         """
 
-        logging.info("Starting stop function.")
-
         # signals the process to stop processing input
         stop_event.set()
 
@@ -334,15 +332,11 @@ def create_network_interface_process(
         input_queue.put(COMPLETE_SENTINEL)
         empty_queue_sentinel(output_queue)
 
-        logging.info("GPU output queue empty.")
-
         try:
             process_common.cleanup_worker(process=process)
         except ValueError as e:
             LOGGER.error("Couldn't clean up network interface worker process")
             raise e
-
-        logging.info("Stop function completed.")
 
     def handle_generic(data: Union[SingleVector, SingleMatrix]) -> RGBInt8ImageType:
         """
@@ -435,6 +429,7 @@ def _network_worker(
     logging.debug("Set vector length.")
     logging.debug("Ready to start processing vectors.")
 
+    # Tell the main process that it's okay to read the vector length value.
     vector_length_ready_event.set()
 
     queue_needs_cleaning = True
@@ -473,14 +468,14 @@ def _network_worker(
             logging.info("Found unexpected exception during run")
             break
 
-    LOGGER.info("Shutting down GPU worker.")
+    logging.info("Shutting down GPU worker.")
 
     if queue_needs_cleaning:
         empty_queue_sentinel(input_queue)
 
     output_queue.put(COMPLETE_SENTINEL)
 
-    LOGGER.info("GPU worker exited.")
+    logging.info("GPU worker exited.")
 
 
 @typing.no_type_check

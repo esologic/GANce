@@ -2,6 +2,7 @@
 Common operations on iterators, which are the canonical representation of videos, data sources etc
 throughout this application.
 """
+
 import itertools
 from typing import Iterator, Tuple, TypeVar
 

@@ -100,8 +100,8 @@ def test_multi_network_unloaded_leads_to_errors(load: bool, mocker: MockFixture)
 @pytest.mark.timeout(60)
 def test_network_interface_process_stop() -> None:
     """
-
-    :return:
+    Check to make sure an image can be created and then shut down.
+    :return: None
     """
 
     network_interface_process = create_network_interface_process(
