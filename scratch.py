@@ -47,23 +47,24 @@ def main_multi() -> None:
 
 
 def main() -> None:
+    """
 
-    queue = collections.deque(maxlen=50)
+    :return:
+    """
+
+    queue = collections.deque(maxlen=50)  # type: ignore
 
     with gance.network_interface.fast_synthesizer.fast_synthesizer(
         data_source=itertools.repeat(np.zeros(shape=(512,))),
         network_path=Path("gance/assets/networks/production_network.pkl"),
+        num_gpus=4,
     ) as frames:
 
-        for index, item in enumerate(frames):
+        for _, _ in enumerate(frames):
             queue.append(datetime.datetime.now())
 
             if len(queue) == 50:
                 print(len(queue) / ((queue[-1] - queue[0]).total_seconds()))
-
-
-            if index == 200:
-                raise ValueError("FUCKER!!")
 
         print("out here")
 

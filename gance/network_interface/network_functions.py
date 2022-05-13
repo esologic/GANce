@@ -105,7 +105,6 @@ def load_network_network(
 
     if call_init_function:
         fix_cuda_path()
-
         if gpu_index is not None:
             os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
             os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
@@ -283,12 +282,7 @@ def create_network_interface_process(
     process.start()
 
     # Wait around until the network has been loaded
-
-    try:
-        print('Press Ctrl+C to exit')
-        started_event.wait()
-    except KeyboardInterrupt:
-        print('got Ctrl+C')
+    started_event.wait()
 
     # Only one object is going to to be put here up until this point, so the single `get()` is safe.
     startup_result: Union[str, Exception] = error_queue.get()
