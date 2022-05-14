@@ -2,7 +2,7 @@
 # You need to be logged into the container as root to be able to use `nvcc` commands.
 FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu18.04
 
-# TODO - we should be able to drop this:
+# TODO - we should be able to drop this eventually:
 # https://developer.nvidia.com/blog/updating-the-cuda-linux-gpg-repository-key/
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
 

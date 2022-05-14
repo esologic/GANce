@@ -256,8 +256,8 @@ def create_network_interface_process(network_path: Path) -> NetworkInterfaceInPr
             "output_queue": output_queue,
             "error_queue": error_queue,
             "stop_event": stop_event,
-            "started_event": started_event,
             "vector_length_ready_event": vector_length_ready_event,
+            "started_event": started_event,
         },
     )
 

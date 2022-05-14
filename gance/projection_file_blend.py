@@ -174,6 +174,8 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
             frames_to_visualize=frames_to_visualize,
             network_index_window_width=debug_window,
             visualization_height=debug_side_length,
+            # Added this to try and clean up after network was used during a run, but it only
+            # worked slightly. May need to revisit this later.
             unload_networks_when_complete=True,
         )
 
@@ -333,6 +335,8 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
                 video_path=Path(debug_path),
                 video_fps=output_fps,
                 audio_paths=audio_paths,
+                # Because this video can be shaped very weird, we use the quality version
+                # that can support all possible resolutions.
                 high_quality=False,
             )
         else:

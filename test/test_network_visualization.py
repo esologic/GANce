@@ -120,11 +120,11 @@ def get_network_output(
 )
 @pytest.mark.parametrize(
     "video_fps",
-    [15.0, 30.0],
+    [15.0, 30.0, 60.0],
 )
 @pytest.mark.parametrize(
     "visualization_height",
-    [512, 1024],
+    [100, 300, 512, 1024],
 )
 @pytest.mark.parametrize(
     "force_optimize_synthesis_order",
