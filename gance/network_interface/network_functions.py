@@ -244,6 +244,7 @@ def create_network_interface_process(network_path: Path) -> NetworkInterfaceInPr
     error_queue: "Queue[Union[str, Exception]]" = multiprocessing.Queue()
 
     started_event = multiprocessing.Event()
+    vector_length_ready_event = multiprocessing.Event()
     stop_event = multiprocessing.Event()
 
     process = multiprocessing.Process(
@@ -256,14 +257,14 @@ def create_network_interface_process(network_path: Path) -> NetworkInterfaceInPr
             "error_queue": error_queue,
             "stop_event": stop_event,
             "started_event": started_event,
+            "vector_length_ready_event": vector_length_ready_event,
         },
     )
 
     process.start()
 
-    while not started_event.is_set():
-        # Wait around until the network has been loaded
-        pass
+    # Wait around until the network has been loaded
+    started_event.wait()
 
     # Only one object is going to to be put here up until this point, so the single `get()` is safe.
     startup_result: Union[str, Exception] = error_queue.get()
@@ -277,12 +278,11 @@ def create_network_interface_process(network_path: Path) -> NetworkInterfaceInPr
         raise startup_result  # type: ignore
 
     # Wait for the network to be loaded
-    while True:
-        with vector_length_value.get_lock():
-            vector_length = int(vector_length_value.value)
-            logging.debug(f"Got lock in top, vector length {vector_length}")
-            if vector_length != LENGTH_SENTINEL:
-                break
+    vector_length_ready_event.wait()
+
+    with vector_length_value.get_lock():
+        vector_length = int(vector_length_value.value)
+        logging.debug(f"Got lock in top, vector length {vector_length}")
 
     logging.debug("network Loaded")
 
@@ -298,12 +298,7 @@ def create_network_interface_process(network_path: Path) -> NetworkInterfaceInPr
         :return: The resulting image.
         """
         input_queue.put(_NetworkInput(is_a_vector, data))
-
-        while True:
-            try:
-                return RGBInt8ImageType(output_queue.get_nowait())
-            except Empty:
-                pass
+        return RGBInt8ImageType(output_queue.get())
 
     def stop_function() -> None:
         """
@@ -352,6 +347,7 @@ def _network_worker(
     output_queue: "Queue[Union[str, RGBInt8ImageType]]",
     error_queue: "Queue[Union[str, Exception]]",
     started_event: Any,
+    vector_length_ready_event: Any,
     stop_event: Any,
 ) -> None:
     """
@@ -370,10 +366,12 @@ def _network_worker(
     :param output_queue: Image destination.
     :param error_queue: Errors that occur on network load are put into there. TODO: could
     also use this as a way to communicate errors that occur during runtime.
-    :param stop_event: A `multiprocessing.Event`, it will be `.set()` to signal that this
-    worker should exit.
     :param started_event: Another event, used to signal that the network has been loaded and
     is accepting input vectors.
+    :param vector_length_ready_event: Event to signal to parent that vector length is ready
+    for reading.
+    :param stop_event: A `multiprocessing.Event`, it will be `.set()` to signal that this
+    worker should exit.
     :return: None
     """
 
@@ -409,6 +407,9 @@ def _network_worker(
 
     logging.debug("Set vector length.")
     logging.debug("Ready to start processing vectors.")
+
+    # Tell the main process that it's okay to read the vector length value.
+    vector_length_ready_event.set()
 
     queue_needs_cleaning = True
 
