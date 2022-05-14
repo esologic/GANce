@@ -658,7 +658,9 @@ def project_video_to_file(  # pylint: disable=too-many-locals,too-many-arguments
         video = frames_in_video(
             video_path=path_to_video,
             video_fps=video_fps,
-            width_height=ImageResolution(*projection_width_height),
+            width_height=ImageResolution(*projection_width_height)
+            if projection_width_height is not None
+            else None,
             reduce_fps_to=projection_fps,
         )
     except ValueError as e:

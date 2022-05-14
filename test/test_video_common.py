@@ -2,6 +2,7 @@
 Test of critical functions of video reader using known files.
 """
 
+import itertools
 from pathlib import Path
 from test.assets import (
     BATCH_2_IMAGE_1_PATH,
@@ -129,3 +130,35 @@ def test__create_video_writer_resolution(
     assert len(list(re_read.frames)) == original_frames
     assert re_read.original_fps == video_frames.original_fps
     assert re_read.original_resolution == video_frames.original_resolution
+
+
+@pytest.mark.parametrize("side_length", [100, 1080, 1440, 2160])
+@pytest.mark.parametrize("frame_count", [1000, 10000, 20000])
+def test_write_large_video(side_length: int, frame_count: int, tmpdir: LocalPath) -> None:
+    """
+    A test to ensure that there are no problems when writing 10's of thousands of
+    large frames to a file.
+    :return: None
+    """
+
+    def yield_forever() -> video_common.ImageSourceType:
+        """
+        Helper function, keep reloading the video from disk.
+        :return: An infinite loop of the frames in the input.
+        """
+
+        while True:
+            video = video_common.frames_in_video(video_path=SAMPLE_FACE_VIDEO_PATH)
+            scaled_frames = video_common.scale_square_source_duplicate(
+                source=video.frames, output_side_length=side_length, frame_multiplier=1
+            )
+            for frame in scaled_frames:
+                yield frame
+
+    infinite_video = yield_forever()
+    limited = itertools.islice(infinite_video, frame_count)
+    video_common.write_source_to_disk_consume(
+        source=limited,
+        video_fps=30,
+        video_path=Path(tmpdir).joinpath(f"video_{side_length}_{frame_count}.mp4"),
+    )

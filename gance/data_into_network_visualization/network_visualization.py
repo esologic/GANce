@@ -463,12 +463,13 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
     data: VisualizationInput,
     networks: Optional[MultiNetwork],
     default_vector_length: Optional[int] = 1024,
-    video_height: Optional[int] = 1024,
+    visualization_height: Optional[int] = None,
     enable_3d: bool = False,
     enable_2d: bool = True,
     frames_to_visualize: Optional[int] = None,
     network_index_window_width: Optional[int] = None,
     force_optimize_synthesis_order: bool = True,
+    unload_networks_when_complete: bool = False,
 ) -> SynthesisOutput:
     """
     Given an input array, for each possible input vector in the array, feed these vectors into
@@ -484,15 +485,17 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
     video file in the order they should be displayed. The intermediate pickled objects are all
     created in a `TemporaryDirectory` and are destroyed after they fall out of scope.
 
+    The resulting synthesized images are returned at their original size, exactly as they came
+    out of the network. It is up to consumers to resize as needed.
+
     Note: This is the most complicated function in the whole project.
 
     :param data: The data array to visualize.
     :param networks: The face-generating network.
     :param default_vector_length: If no network is given, this will be used as the length
     of the "input vector"s.
-    :param video_height: The individual matplotlib plots, as well as the output from the network
-    are both squares with a side length of this many pixels.
-    :param video_fps: The frames per second of the output video.
+    :param visualization_height: Side length of the resulting matplotlib visualization. If not
+    given, the side length of the resulting synthesized images will be used.
     :param enable_3d: If True, a 3d visualization of the input vectors will be created alongside
     the output of the network (if the `networks` is not None).
     :param enable_2d: If True, a 2d visualization of the combination of the input vectors
@@ -503,6 +506,8 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
     is how many indices should be displayed at once.
     :param force_optimize_synthesis_order: If the snythesis order optimization should
     be done or not.
+    :param unload_networks_when_complete: When all inputs have been fed into the model, unload
+    it to conserve memory.
     :return: `output_video_path`, but now the video will actually be there.
     """
 
@@ -563,9 +568,13 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
             vector_length=vector_length,
         )
 
+        visualization_side_length = (
+            visualization_height if visualization_height is not None else vector_length
+        )
+
         data_visualizations_resolution = (
-            video_height * sum([1 if enable_2d else 0, 1 if enable_3d else 0]),
-            video_height,
+            visualization_side_length * sum([1 if enable_2d else 0, 1 if enable_3d else 0]),
+            visualization_side_length,
         )
 
         for index, frame_input in enumerate(frame_inputs):
@@ -613,13 +622,9 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
 
             return cast(
                 RGBInt8ImageType,
-                cv2.resize(
-                    # This is the call that uses the network.
-                    networks.indexed_create_image_generic(
-                        index=frame_input.network_index,
-                        data=frame_input.combined_sample.data,
-                    ),
-                    (video_height, video_height),
+                networks.indexed_create_image_generic(
+                    index=frame_input.network_index,
+                    data=frame_input.combined_sample.data,
                 ),
             )
 
@@ -663,13 +668,17 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
             )
 
             # The `sorted` operation here is what causes the frames to render.
-            return map(
+            yield from map(
                 load_network_image_and_delete,
                 sorted(files_on_disk, key=lambda frame_path: frame_path[0].frame_index),
             )
         else:
             LOGGER.info("Will synthesis order will not be optimized")
-            return map(render_network_frame_in_memory, frame_inputs)
+            yield from map(render_network_frame_in_memory, frame_inputs)
+
+        if unload_networks_when_complete:
+            LOGGER.info("Synthesis complete, unloading networks.")
+            networks.unload()
 
     return SynthesisOutput(
         synthesized_images=create_network_frames(next(input_sources))

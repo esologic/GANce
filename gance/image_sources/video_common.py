@@ -3,6 +3,7 @@ Common functionality for dealing with video files.
 """
 
 import itertools
+import pprint
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Callable, Iterator, List, NamedTuple, Optional, cast
@@ -127,7 +128,11 @@ def _create_video_writer_resolution(
             :param image: To write.
             :return: None
             """
-            ffmpeg_writer.write(image)
+            try:
+                ffmpeg_writer.write(image)
+            except Exception as e:
+                LOGGER.exception(f"Ran into problem writing frame: {image}")
+                raise e
 
         return VideoOutputController(
             write=write_frame,
@@ -345,18 +350,22 @@ def write_source_to_disk_forward(
 
         writer.release()
 
-    if audio_paths is None:
-        yield from setup_iteration(video_path)
-    else:
-        # Don't write the video-only file to disk at the output path, instead
-        with NamedTemporaryFile(suffix=video_path.suffix) as file:
-            temp_video_path = Path(file.name)
-            yield from setup_iteration(temp_video_path)
-            file.flush()
-            LOGGER.info(f"Finalizing {video_path}")
-            add_wavs_to_video(
-                video_path=temp_video_path, audio_paths=audio_paths, output_path=video_path
-            )
+    try:
+        if audio_paths is None:
+            yield from setup_iteration(video_path)
+        else:
+            # Don't write the video-only file to disk at the output path, instead
+            with NamedTemporaryFile(suffix=video_path.suffix) as file:
+                temp_video_path = Path(file.name)
+                yield from setup_iteration(temp_video_path)
+                file.flush()
+                LOGGER.info(f"Finalizing {video_path}")
+                add_wavs_to_video(
+                    video_path=temp_video_path, audio_paths=audio_paths, output_path=video_path
+                )
+    except Exception as e:
+        LOGGER.exception(f"Ran into an exception writing out a video: {pprint.pformat(e)}")
+        raise e
 
 
 def write_source_to_disk_consume(
@@ -396,7 +405,17 @@ def resize_source(source: ImageSourceType, resolution: ImageResolution) -> Image
     """
 
     def resize_image(image: RGBInt8ImageType) -> RGBInt8ImageType:
-        output: RGBInt8ImageType = cv2.resize(image, (resolution.height, resolution.width))
+        """
+        Resizes an image to the input resolution.
+        Uses, `cv2.INTER_CUBIC`, which is visually good-looking but somewhat slow.
+        May want to be able to pass this in.
+        :param image: To scale.
+        :return: Scaled image.
+        """
+
+        output: RGBInt8ImageType = cv2.resize(
+            image, (resolution.height, resolution.width), interpolation=cv2.INTER_CUBIC
+        )
         # The image in `source` has now been 'consumed', and can't be used again.
         # We delete this frame here to avoid memory leaks.
         # Not really sure if this is needed, but it shouldn't cause harm.
@@ -410,8 +429,8 @@ def resize_source(source: ImageSourceType, resolution: ImageResolution) -> Image
     )
 
 
-def scale_square_source(
-    source: ImageSourceType, output_side_length: int, frame_multiplier: int
+def scale_square_source_duplicate(
+    source: ImageSourceType, output_side_length: int, frame_multiplier: int = 1
 ) -> ImageSourceType:
     """
     Scale the resolution and number of frames in a given source.
@@ -420,10 +439,17 @@ def scale_square_source(
     :param frame_multiplier: Every frame will be duplicated this many times.
     :return: Scaled source.
     """
-    return cast(
-        ImageSourceType,
-        more_itertools.repeat_each(
-            resize_source(source, ImageResolution(output_side_length, output_side_length)),
-            frame_multiplier,
-        ),
+
+    resized = resize_source(source, ImageResolution(output_side_length, output_side_length))
+
+    return (
+        cast(
+            ImageSourceType,
+            more_itertools.repeat_each(
+                resized,
+                frame_multiplier,
+            ),
+        )
+        if frame_multiplier != 1
+        else resized
     )

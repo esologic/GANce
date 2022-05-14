@@ -21,7 +21,7 @@ from gance.data_into_network_visualization.visualization_inputs import alpha_ble
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
 from gance.image_sources import video_common
 from gance.image_sources.still_image_common import horizontal_concat_images
-from gance.image_sources.video_common import scale_square_source
+from gance.image_sources.video_common import scale_square_source_duplicate
 from gance.iterator_on_disk import HDF5_SERIALIZER, iterator_on_disk
 from gance.logger_common import LOGGER
 from gance.network_interface.network_functions import MultiNetwork
@@ -62,6 +62,7 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
     output_side_length: int,
     debug_path: Optional[str],
     debug_window: Optional[int],
+    debug_side_length: Optional[int],
     alpha: float,
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
@@ -86,6 +87,7 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
     :param output_side_length: See click help.
     :param debug_path: See click help.
     :param debug_window: See click help.
+    :param debug_side_length: See click help.
     :param alpha: See click help.
     :param fft_roll_enabled: See click help.
     :param fft_amplitude_range: See click help.
@@ -117,11 +119,9 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
     if overlay_music_mask_enabled and not overlay_enabled:
         raise ValueError("Overlay music mask without overlay being enabled is not supported!")
 
-    with MultiNetwork(
-        network_paths=network_paths
-    ) as multi_networks, projection_file_reader.load_projection_file(
-        Path(projection_file_path)
-    ) as reader:
+    multi_networks = MultiNetwork(network_paths=network_paths, load=True)
+
+    with projection_file_reader.load_projection_file(Path(projection_file_path)) as reader:
 
         final_latents = projection_file_reader.final_latents_matrices_label(reader)
 
@@ -173,19 +173,27 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
             enable_2d=create_debug_visualization,
             frames_to_visualize=frames_to_visualize,
             network_index_window_width=debug_window,
-            video_height=output_side_length,
+            visualization_height=debug_side_length,
+            # Added this to try and clean up after network was used during a run, but it only
+            # worked slightly. May need to revisit this later.
+            unload_networks_when_complete=True,
         )
 
+        # Could be cuter here if going to/from disk starts to take longer than scaling/duplicating
+        # images.
         foreground_iterators, background_iterators = _create_iterators_on_disk(
             iterators=(
                 # Foreground iterator, the projection targets.
-                scale_square_source(
+                scale_square_source_duplicate(
                     source=reader.target_images,
                     output_side_length=output_side_length,
                     frame_multiplier=frame_multiplier,
                 ),
                 # Background iterator, the network outputs.
-                synthesis_output.synthesized_images,
+                scale_square_source_duplicate(
+                    source=synthesis_output.synthesized_images,
+                    output_side_length=output_side_length,
+                ),
             ),
             num_copies=sum([overlay_enabled]),
         )
@@ -282,7 +290,7 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
                 overlay.overlay_visualization.visualize_overlay_computation(
                     overlay=overlay_results.contexts,
                     frames_per_context=debug_window,
-                    video_square_side_length=output_side_length,
+                    video_square_side_length=debug_side_length,
                     horizontal_lines=overlay.overlay_visualization.VisualizeOverlayThresholds(
                         phash_line=phash_distance, bbox_distance_line=bbox_distance
                     ),
@@ -293,16 +301,20 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
 
             video_common.write_source_to_disk_consume(
                 source=(
-                    horizontal_concat_images(images)
+                    horizontal_concat_images(cast(Iterator[RGBInt8ImageType], images))
                     for images in zip(
                         *filter(
                             lambda optional_iterable: optional_iterable is not None,
                             [
-                                blended_output,
-                                foregrounds,
-                                scale_square_source(
+                                scale_square_source_duplicate(
+                                    source=blended_output, output_side_length=debug_side_length
+                                ),
+                                scale_square_source_duplicate(
+                                    source=foregrounds, output_side_length=debug_side_length
+                                ),
+                                scale_square_source_duplicate(
                                     source=reader.final_images,
-                                    output_side_length=output_side_length,
+                                    output_side_length=debug_side_length,
                                     frame_multiplier=frame_multiplier,
                                 ),
                                 synthesis_output.visualization_images,
@@ -310,7 +322,7 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
                                 visualize_vector_reduction.visualize_result_layers(
                                     result_layers=music_complexity_overlay_mask,
                                     frames_per_context=debug_window,
-                                    video_height=output_side_length,
+                                    video_height=debug_side_length,
                                     title="Overlay binary mask",
                                     horizontal_line=complexity_change_threshold,
                                 )
@@ -323,7 +335,9 @@ def projection_file_blend_api(  # pylint: disable=too-many-arguments,too-many-lo
                 video_path=Path(debug_path),
                 video_fps=output_fps,
                 audio_paths=audio_paths,
-                high_quality=True,
+                # Because this video can be shaped very weird, we use the quality version
+                # that can support all possible resolutions.
+                high_quality=False,
             )
         else:
             more_itertools.consume(blended_output)

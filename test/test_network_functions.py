@@ -14,6 +14,7 @@ from gance.network_interface.network_functions import (
     MultiNetwork,
     NetworkInterface,
     NetworkInterfaceInProcess,
+    create_network_interface_process,
 )
 from gance.vector_sources.vector_types import SingleMatrix, SingleVector
 
@@ -94,3 +95,24 @@ def test_multi_network_unloaded_leads_to_errors(load: bool, mocker: MockFixture)
             multi_network.indexed_create_image_vector(index=0, data=SingleVector(np.zeros((10,))))
         assert not patched_load.called
         assert not patched_stop.called
+
+
+@pytest.mark.gpu
+@pytest.mark.timeout(200)
+def test_network_interface_process_stop() -> None:
+    """
+    Check to make sure an image can be created and then shut down.
+    :return: None
+    """
+
+    network_interface_process = create_network_interface_process(
+        network_path=SAMPLE_BATCH_1_NETWORK_PATH
+    )
+    image = network_interface_process.network_interface.create_image_vector(
+        data=SingleVector(
+            np.zeros((network_interface_process.network_interface.expected_vector_length,))
+        )
+    )
+    assert image.shape == (1024, 1024, 3)
+    assert np.sum(image) > 0
+    network_interface_process.stop_function()
