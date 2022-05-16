@@ -385,10 +385,12 @@ def _network_worker(
     :param output_queue: Image destination.
     :param error_queue: Errors that occur on network load are put into there. TODO: could
     also use this as a way to communicate errors that occur during runtime.
-    :param stop_event: A `multiprocessing.Event`, it will be `.set()` to signal that this
-    worker should exit.
     :param started_event: Another event, used to signal that the network has been loaded and
     is accepting input vectors.
+    :param vector_length_ready_event: Event to signal to parent that vector length is ready
+    for reading.
+    :param stop_event: A `multiprocessing.Event`, it will be `.set()` to signal that this
+    worker should exit.
     :param gpu_index: If given, the network will be loaded on this GPU. Allows for multiple networks
     to be loaded simultaneously across multiple GPUs.
     :return: None
