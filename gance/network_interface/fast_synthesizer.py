@@ -101,6 +101,7 @@ def fast_synthesizer(
     # Default to the max possible GPUs.
     if num_gpus is None:
         num_gpus = len(list(nvsmi.get_gpus()))
+        logging.info(f"Found: {num_gpus} GPUs.")
 
     queue: "Queue[int]" = Queue()
     for item in range(num_gpus):
