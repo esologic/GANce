@@ -13,7 +13,11 @@ services:
             - driver: nvidia
               device_ids: ['0,', '1']
               capabilities: [gpu]
+    environment:
+      - DISPLAY=:0
+    ipc: host
     volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
       - type: bind
         source: ./gance/assets/
         target: /home/gpu/gance/gance/assets/

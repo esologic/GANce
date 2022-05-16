@@ -21,6 +21,8 @@ from gance.image_sources.image_sources_common import ImageResolution, image_reso
 from gance.iterator_common import first_item_from_iterator
 from gance.logger_common import LOGGER
 
+_DEFAULT_WINDOW_NAME = "Frames"
+
 
 def _write_video(video_path: Path, audio: FilterableStream, output_path: Path) -> None:
     """
@@ -393,6 +395,29 @@ def write_source_to_disk_consume(
     )
 
 
+def resize_image(image: RGBInt8ImageType, resolution: ImageResolution) -> RGBInt8ImageType:
+    """
+    Resizes an image to the input resolution.
+    Uses, `cv2.INTER_CUBIC`, which is visually good-looking but somewhat slow.
+    May want to be able to pass this in.
+    :param image: To scale.
+    :param resolution: Ouput resolution
+    :return: Scaled image.
+    """
+
+    output: RGBInt8ImageType = cv2.resize(
+        image, (resolution.height, resolution.width), interpolation=cv2.INTER_CUBIC
+    )
+
+    # The image in `source` has now been 'consumed', and can't be used again.
+    # We delete this frame here to avoid memory leaks.
+    # Not really sure if this is needed, but it shouldn't cause harm.
+    # del image
+
+    # The scaled image.
+    return output
+
+
 def resize_source(source: ImageSourceType, resolution: ImageResolution) -> ImageSourceType:
     """
     For each item in the input source, scale it to the given resolution.
@@ -401,28 +426,9 @@ def resize_source(source: ImageSourceType, resolution: ImageResolution) -> Image
     :return: A new source of scaled images.
     """
 
-    def resize_image(image: RGBInt8ImageType) -> RGBInt8ImageType:
-        """
-        Resizes an image to the input resolution.
-        Uses, `cv2.INTER_CUBIC`, which is visually good-looking but somewhat slow.
-        May want to be able to pass this in.
-        :param image: To scale.
-        :return: Scaled image.
-        """
-
-        output: RGBInt8ImageType = cv2.resize(
-            image, (resolution.height, resolution.width), interpolation=cv2.INTER_CUBIC
-        )
-        # The image in `source` has now been 'consumed', and can't be used again.
-        # We delete this frame here to avoid memory leaks.
-        # Not really sure if this is needed, but it shouldn't cause harm.
-        del image
-
-        # The scaled image.
-        return output
-
     yield from (
-        resize_image(image) if image_resolution(image) != resolution else image for image in source
+        resize_image(image, resolution) if image_resolution(image) != resolution else image
+        for image in source
     )
 
 
@@ -450,3 +456,42 @@ def scale_square_source_duplicate(
         if frame_multiplier != 1
         else resized
     )
+
+
+def display_frame_forward(
+    source: ImageSourceType,
+    window_name: str = _DEFAULT_WINDOW_NAME,
+    display_resolution: Optional[ImageResolution] = None,
+    full_screen: bool = False
+) -> ImageSourceType:
+    """
+
+    :param source:
+    :param window_name:
+    :param display_resolution: Change the input frames to this resolution before displaying. Doesn't
+    modify the output frames.
+    :return:
+    """
+
+    cv2.namedWindow(
+        window_name,
+        cv2.WINDOW_GUI_NORMAL | cv2.WINDOW_FULLSCREEN if full_screen else cv2.WINDOW_AUTOSIZE
+    )
+
+    if full_screen:
+        cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+    def display_frame(frame: RGBInt8ImageType) -> RGBInt8ImageType:
+        """
+
+        :param frame:
+        :return:
+        """
+        cv2.imshow(
+            window_name, cv2.cvtColor(resize_image(frame, display_resolution), cv2.COLOR_RGB2BGR)
+        )
+        cv2.waitKey(1)
+        return frame
+
+    yield from map(display_frame, source)
+    cv2.destroyWindow(window_name)

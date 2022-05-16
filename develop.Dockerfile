@@ -29,7 +29,8 @@ RUN mkdir -m 777 /home/gpu/gance
 COPY ./ /home/gpu/gance
 RUN apt-get update && apt-get install sudo -y && \
 chmod +x /home/gpu/gance/tools/create_venv.sh && \
-./home/gpu/gance/tools/create_venv.sh
+./home/gpu/gance/tools/create_venv.sh \
+RUN chmod -R 777 /home/gpu/gance
 
 RUN echo 'export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}' >> /home/gpu/.bashrc
 RUN echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64\${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' \
