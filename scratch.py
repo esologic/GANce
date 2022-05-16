@@ -11,39 +11,9 @@ from pathlib import Path
 import numpy as np
 
 import gance.network_interface.fast_synthesizer
+from gance.image_sources import video_common
+from gance.image_sources.image_sources_common import ImageResolution
 from gance.network_interface import network_functions
-
-
-def create_many_images(gpu: int) -> None:
-    """
-
-    :param gpu:
-    :return:
-    """
-
-    interface = network_functions.create_network_interface(
-        network_path=Path("gance/assets/networks/production_network.pkl"),
-        call_init_function=True,
-        gpu_index=gpu,
-    )
-
-    vector = np.zeros(shape=(512,))
-
-    while True:
-        interface.create_image_vector(data=vector)
-
-
-def main_multi() -> None:
-    """
-
-    :return:
-    """
-
-    p1 = multiprocessing.Process(target=create_many_images, args=(0,))
-    p2 = multiprocessing.Process(target=create_many_images, args=(1,))
-
-    p1.start()
-    p2.start()
 
 
 def main() -> None:
@@ -54,21 +24,22 @@ def main() -> None:
 
     queue = collections.deque(maxlen=50)  # type: ignore
 
+    def input_source():
+        while True:
+            yield np.random.rand(512)
+
     with gance.network_interface.fast_synthesizer.fast_synthesizer(
-        data_source=itertools.repeat(np.zeros(shape=(512,))),
+        data_source=input_source(),
         network_path=Path("gance/assets/networks/production_network.pkl"),
-        num_gpus=4,
     ) as frames:
 
-        for _, _ in enumerate(frames):
+        for _, frame in enumerate(
+            video_common.display_frame_forward(frames, display_resolution=ImageResolution(500, 500))
+        ):
             queue.append(datetime.datetime.now())
 
             if len(queue) == 50:
                 print(len(queue) / ((queue[-1] - queue[0]).total_seconds()))
-
-        print("out here")
-
-    print("further out here")
 
 
 if __name__ == "__main__":
