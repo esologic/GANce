@@ -98,7 +98,7 @@ def test_multi_network_unloaded_leads_to_errors(load: bool, mocker: MockFixture)
 
 
 @pytest.mark.gpu
-@pytest.mark.timeout(200)
+@pytest.mark.timeout(60)
 def test_network_interface_process_stop() -> None:
     """
     Check to make sure an image can be created and then shut down.
@@ -113,6 +113,6 @@ def test_network_interface_process_stop() -> None:
             np.zeros((network_interface_process.network_interface.expected_vector_length,))
         )
     )
-    assert image.shape == (1024, 1024, 3)
-    assert np.sum(image) > 0
+    assert image.size == (1024, 1024)
+    assert sum(image) > 0
     network_interface_process.stop_function()

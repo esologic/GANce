@@ -11,7 +11,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0']
+              device_ids: ['0,', '1']
               capabilities: [gpu]
     volumes:
       - type: bind
@@ -26,4 +26,3 @@ services:
         source: ./test/assets
         target: /home/gpu/gance/test/assets
         read_only: true
-

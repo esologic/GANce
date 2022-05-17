@@ -184,7 +184,7 @@ def blog_post_media() -> None:
     y_range = (-20, 20)
 
     network_interface = create_network_interface(
-        network_path=assets.PRODUCTION_network_PATH, call_init_function=True
+        network_path=assets.PRODUCTION_NETWORK_PATH, call_init_function=True
     )
 
     projection_file_latents = projection_file_reader.final_latents_at_frame(
@@ -339,7 +339,7 @@ def blog_post_media() -> None:
     visualize_projection_history(
         projection_file_path=assets.PROJECTION_FILE_PATH,
         output_video_path=output_dir.joinpath("projection_history.mp4"),
-        projection_network_path=assets.PRODUCTION_network_PATH,
+        projection_network_path=assets.PRODUCTION_NETWORK_PATH,
         network_not_matching_ok=False,
         start_frame_index=561,
         end_frame_index=562,

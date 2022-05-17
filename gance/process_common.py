@@ -2,6 +2,7 @@
 Common functionality related to moving compute to a child process.
 """
 
+from itertools import count
 from multiprocessing import Process, Queue  # pylint: disable=unused-import
 from queue import Empty
 from typing import Any, Union  # pylint: disable=unused-import
@@ -11,19 +12,24 @@ from gance.logger_common import LOGGER
 COMPLETE_SENTINEL = "It's Just Wind"
 
 
-def empty_queue_sentinel(queue: "Queue[Union[str, Any]]") -> None:
+def empty_queue_sentinel(queue: "Queue[Union[str, Any]]", sentinel_count: int = 1) -> None:
     """
     Assumes someone has put the sentinel value into the queue, and continuously pulls items out
     of the queue until it's found. Allows caller to be very sure that the input queue is empty
     and consumers can be `.join`ed.
     :param queue: The queue to empty and search.
+    :param sentinel_count: Number of sentinels we expect to find can be defined here.
     :return: None
     """
+    sentinels_found = count(1)
     while True:
         try:
             value = queue.get_nowait()
             if value == COMPLETE_SENTINEL:
-                break
+                current_count = next(sentinels_found)
+                LOGGER.info(f"Found sentinel {current_count}/{sentinel_count} during empty.")
+                if current_count == sentinel_count:
+                    return None
         except Empty:
             pass
 

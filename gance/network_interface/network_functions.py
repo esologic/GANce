@@ -90,16 +90,25 @@ def fix_cuda_path() -> None:
             os.environ["PATH"] += ":" + path_string
 
 
-def load_network_network(network_path: Path, call_init_function: bool) -> Network:
+def load_network_network(
+    network_path: Path, call_init_function: bool, gpu_index: Optional[int] = None
+) -> Network:
     """
     Load the network from a file.
     :param network_path: Path to the network.
     :param call_init_function: If true, will init the tensorflow session.
+    :param gpu_index: If given, the network will be loaded on this GPU. Allows for multiple networks
+    to be loaded simultaneously across multiple GPUs. Will have no effect if `call_init_function`
+    is False.
     :return: The network.
     """
 
     if call_init_function:
         fix_cuda_path()
+        if gpu_index is not None:
+            os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
+
         dnnlib.tflib.init_tf()
 
     # Once you load this thing it does all kinds of bullshit under the hood, and it's almost
@@ -192,16 +201,20 @@ def wrap_loaded_network(network: Network) -> NetworkInterface:
     )
 
 
-def create_network_interface(network_path: Path, call_init_function: bool) -> NetworkInterface:
+def create_network_interface(
+    network_path: Path, call_init_function: bool, gpu_index: Optional[int] = None
+) -> NetworkInterface:
     """
     Creates the interface to be able to send vectors to and get images out of the network.
     :param network_path: Path to the networks `.pkl` file on disk.
     :param call_init_function: If True, this function will call `dnnlib.tflib.init_tf()`,
     which is required to unpickle the network. It's possible caller has already done this which is
     why it's optional.
+    :param gpu_index: If given, the network will be loaded on this GPU. Allows for multiple networks
+    to be loaded simultaneously across multiple GPUs.
     :return:
     """
-    return wrap_loaded_network(load_network_network(network_path, call_init_function))
+    return wrap_loaded_network(load_network_network(network_path, call_init_function, gpu_index))
 
 
 class NetworkInterfaceInProcess(NamedTuple):
@@ -229,11 +242,15 @@ class _NetworkInput(NamedTuple):
     network_input: Union[SingleVector, SingleMatrix]
 
 
-def create_network_interface_process(network_path: Path) -> NetworkInterfaceInProcess:
+def create_network_interface_process(
+    network_path: Path, gpu_index: Optional[int] = None
+) -> NetworkInterfaceInProcess:
     """
     Wraps the loading of/ interfacing with a styleGAN2 network with in a subprocess, so the whole
     thing can be killed avoiding well known, and unsolved problems with memory leaks in tensorflow.
     :param network_path: Path to the networks `.pkl` file on disk.
+    :param gpu_index: If given, the network will be loaded on this GPU. Allows for multiple networks
+    to be loaded simultaneously across multiple GPUs.
     :return: A NamedTuple that defines the interface with the network and exposes a function to
     "delete" the network from local memory and video memory.
     """
@@ -256,8 +273,9 @@ def create_network_interface_process(network_path: Path) -> NetworkInterfaceInPr
             "output_queue": output_queue,
             "error_queue": error_queue,
             "stop_event": stop_event,
-            "vector_length_ready_event": vector_length_ready_event,
             "started_event": started_event,
+            "vector_length_ready_event": vector_length_ready_event,
+            "gpu_index": gpu_index,
         },
     )
 
@@ -345,10 +363,11 @@ def _network_worker(
     vector_length_value: Any,
     input_queue: "Queue[Union[str, _NetworkInput]]",
     output_queue: "Queue[Union[str, RGBInt8ImageType]]",
-    error_queue: "Queue[Union[str, Exception]]",
+    error_queue: "Queue[Union[str, BaseException]]",
     started_event: Any,
     vector_length_ready_event: Any,
     stop_event: Any,
+    gpu_index: Optional[int],
 ) -> None:
     """
     Used to create images from a network inside of a child process, (an `multiprocessing.Process`)
@@ -372,6 +391,8 @@ def _network_worker(
     for reading.
     :param stop_event: A `multiprocessing.Event`, it will be `.set()` to signal that this
     worker should exit.
+    :param gpu_index: If given, the network will be loaded on this GPU. Allows for multiple networks
+    to be loaded simultaneously across multiple GPUs.
     :return: None
     """
 
@@ -383,10 +404,12 @@ def _network_worker(
         # process only. Once these child processes are killed the tensorflow session goes away as
         # well.
         network_interface = create_network_interface(
-            network_path=network_path, call_init_function=True
+            network_path=network_path, call_init_function=True, gpu_index=gpu_index
         )
-        logging.debug("network successfully loaded in worker process.")
-    except Exception as e:  # pylint: disable=broad-except
+        logging.debug("Network successfully loaded in worker process.")
+    # Need to use `BaseException` here because signals from parent will be forwarded to this
+    # child process. `KeyboardInterrupt` must be handled etc.
+    except BaseException as e:  # pylint: disable=broad-except
         # Catch everything, this error will be consumed in the parent.
         startup_error = True
         error_queue.put(e)
@@ -402,7 +425,7 @@ def _network_worker(
         return None
 
     with vector_length_value.get_lock():
-        logging.debug("Got lock for vector length")
+        logging.debug("Got lock for vector length.")
         vector_length_value.value = network_interface.expected_vector_length
 
     logging.debug("Set vector length.")
@@ -435,16 +458,26 @@ def _network_worker(
                     )
                     # TODO - we need to actually bring down the worker at this point.
             elif network_input_or_sentinel == COMPLETE_SENTINEL:
+                logging.info("Got stop sentinel in GPU worker.")
                 queue_needs_cleaning = False
             else:
                 raise ValueError(f"Got bad object out of input queue: {network_input_or_sentinel}")
         except Empty:
             pass
+        # Need to use `BaseException` here because signals from parent will be forwarded to
+        # this child process. `KeyboardInterrupt` must be handled etc.
+        except BaseException:  # pylint: disable=broad-except
+            logging.info("Found unexpected exception during run")
+            break
+
+    logging.info("Shutting down GPU worker.")
 
     if queue_needs_cleaning:
         empty_queue_sentinel(input_queue)
 
     output_queue.put(COMPLETE_SENTINEL)
+
+    logging.info("GPU worker exited.")
 
 
 @typing.no_type_check
