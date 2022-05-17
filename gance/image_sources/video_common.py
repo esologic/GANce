@@ -462,7 +462,7 @@ def display_frame_forward(
     source: ImageSourceType,
     window_name: str = _DEFAULT_WINDOW_NAME,
     display_resolution: Optional[ImageResolution] = None,
-    full_screen: bool = False
+    full_screen: bool = False,
 ) -> ImageSourceType:
     """
 
@@ -475,7 +475,7 @@ def display_frame_forward(
 
     cv2.namedWindow(
         window_name,
-        cv2.WINDOW_GUI_NORMAL | cv2.WINDOW_FULLSCREEN if full_screen else cv2.WINDOW_AUTOSIZE
+        cv2.WINDOW_GUI_NORMAL | cv2.WINDOW_FULLSCREEN if full_screen else cv2.WINDOW_AUTOSIZE,
     )
 
     if full_screen:
