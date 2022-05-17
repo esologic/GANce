@@ -4,8 +4,6 @@ Temporary
 
 import collections
 import datetime
-import itertools
-import multiprocessing
 from pathlib import Path
 
 import numpy as np
@@ -13,18 +11,23 @@ import numpy as np
 import gance.network_interface.fast_synthesizer
 from gance.image_sources import video_common
 from gance.image_sources.image_sources_common import ImageResolution
-from gance.network_interface import network_functions
+from gance.image_sources.video_common import ImageSourceType
 
 
 def main() -> None:
     """
-
-    :return:
+    Temporary entrypoint.
+    :return: None
     """
 
     queue = collections.deque(maxlen=50)  # type: ignore
 
-    def input_source():
+    def input_source() -> ImageSourceType:
+        """
+        Create an never-ending input source.
+        :return: Unlimited randomized vectors.
+        """
+
         while True:
             yield np.random.rand(512)
 
@@ -33,7 +36,7 @@ def main() -> None:
         network_path=Path("gance/assets/networks/production_network.pkl"),
     ) as frames:
 
-        for _, frame in enumerate(
+        for _, _ in enumerate(
             video_common.display_frame_forward(frames, display_resolution=ImageResolution(500, 500))
         ):
             queue.append(datetime.datetime.now())
