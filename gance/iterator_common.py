@@ -3,6 +3,8 @@ Common operations on iterators, which are the canonical representation of videos
 throughout this application.
 """
 
+import collections
+import datetime
 import itertools
 from typing import Iterator, Tuple, TypeVar
 
@@ -27,3 +29,34 @@ def first_item_from_iterator(iterator: Iterator[T]) -> Tuple[T, Iterator[T]]:
         raise
 
     return first_item, itertools.chain([first_item], iterator)
+
+
+def items_per_second(source: Iterator[T]) -> Iterator[T]:
+    """
+    Prints logging around how often items are being extracted.
+    :param source: To forward.
+    :return: The input iterator.
+    """
+
+    queue_size = 60
+    queue_count = itertools.count()
+    queue = collections.deque(maxlen=queue_size)
+
+    def yield_item(item: T) -> T:
+        """
+        Return the input item, printing speed logging along the way.
+        :param item: To forward.
+        :return: The input item, unmodified.
+        """
+        queue.append(datetime.datetime.now())
+        if next(queue_count) >= queue_size:
+            LOGGER.info(
+                f"The last {queue_size} items were consumed at a rate of: "
+                f"{queue_size / ((queue[-1] - queue[0]).total_seconds())} items per second."
+            )
+
+        # Don't do anything to the input item.
+        return item
+
+    # TODO: check the difference between doing this and just returning the map.
+    yield from map(yield_item, source)

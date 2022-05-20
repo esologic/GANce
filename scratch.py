@@ -8,9 +8,14 @@ import itertools
 import multiprocessing
 from pathlib import Path
 
+import more_itertools
 import numpy as np
 
 import gance.network_interface.fast_synthesizer
+from gance import iterator_common
+from gance.data_into_network_visualization import vectors_to_image
+from gance.image_sources import video_common
+from gance.image_sources.image_sources_common import ImageResolution
 from gance.network_interface import network_functions
 
 
@@ -46,7 +51,7 @@ def main_multi() -> None:
     p2.start()
 
 
-def main() -> None:
+def main_gpu() -> None:
     """
 
     :return:
@@ -69,6 +74,23 @@ def main() -> None:
         print("out here")
 
     print("further out here")
+
+
+def main() -> None:
+    """
+
+    :return:
+    """
+
+    iterator = itertools.repeat(np.zeros(shape=(512,)))
+    timed = iterator_common.items_per_second(iterator)
+
+    data, images = vectors_to_image.visualize_data_source(
+        timed, resolution=ImageResolution(width=500, height=500)
+    )
+    images = video_common.display_frame_forward(images)
+
+    more_itertools.consume(images)
 
 
 if __name__ == "__main__":
