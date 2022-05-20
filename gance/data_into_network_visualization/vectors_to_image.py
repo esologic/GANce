@@ -5,14 +5,16 @@ Functions around visualizing sets of vectors, resulting in images.
 from contextlib import _GeneratorContextManager  # pylint: disable=unused-import
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple, Union
+from typing import Iterator, List, Optional, Tuple, Union, cast, overload
 
 import numpy as np
 from cv2 import cv2
+from lz.transposition import transpose
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from typing_extensions import Protocol
 
+from gance import iterator_common
 from gance.apply_spectrogram import compute_spectrogram, reshape_spectrogram_to_vectors
 from gance.data_into_network_visualization.vectors_3d import plot_vectors_3d
 from gance.data_into_network_visualization.visualization_common import (
@@ -20,9 +22,10 @@ from gance.data_into_network_visualization.visualization_common import (
     render_current_matplotlib_frame,
     standard_matplotlib_figure,
 )
-from gance.gance_types import RGBInt8ImageType
+from gance.gance_types import ImageSourceType, RGBInt8ImageType
+from gance.image_sources.image_sources_common import ImageResolution
 from gance.image_sources.video_common import create_video_writer
-from gance.vector_sources.vector_sources_common import is_vector, sub_vectors
+from gance.vector_sources.vector_sources_common import is_vector, sub_vectors, underlying_length
 from gance.vector_sources.vector_types import (
     MatricesLabel,
     SingleMatrix,
@@ -165,7 +168,10 @@ class SingleVectorViz(Protocol):
 
 
 def vector_visualizer(
-    y_min: float, y_max: float, title: str, output_width: int, output_height: int
+    title: str,
+    output_width: int,
+    output_height: int,
+    y_bounds: Optional[Tuple[float, float]] = None,
 ) -> SingleVectorViz:
     """
     Exposes a context manager that allows you to create a matplotlib visualization of x,y
@@ -182,7 +188,11 @@ def vector_visualizer(
     fig = standard_matplotlib_figure()
 
     axis = fig.add_subplot(1, 1, 1)
-    axis.set_ylim([y_min - 1, y_max + 1])
+
+    if y_bounds is not None:
+        y_min, y_max = y_bounds
+        axis.set_ylim([y_min - 1, y_max + 1])
+
     axis.set_title(title)
 
     @contextmanager
@@ -235,8 +245,7 @@ def vectors_to_video(
     """
 
     make_visualization = vector_visualizer(
-        y_min=labeled_data.data.min(),
-        y_max=labeled_data.data.max(),
+        y_bounds=(labeled_data.data.min(), labeled_data.data.max()),
         title=labeled_data.label,
         output_width=video_height,
         output_height=video_height,
@@ -257,3 +266,56 @@ def vectors_to_video(
     video.release()
 
     return output_path
+
+
+@overload
+def visualize_data_source(
+    source: Iterator[SingleVector], title_prefix: str, resolution: ImageResolution
+) -> Tuple[Iterator[SingleVector], ImageSourceType]:
+    ...
+
+
+@overload
+def visualize_data_source(
+    source: Iterator[SingleMatrix], title_prefix: str, resolution: ImageResolution
+) -> Tuple[Iterator[SingleMatrix], ImageSourceType]:
+    ...
+
+
+def visualize_data_source(
+    source: Union[Iterator[SingleVector], Iterator[SingleMatrix]],
+    title_prefix: str = "Iterator",
+    resolution: ImageResolution = ImageResolution(width=1000, height=1000),
+) -> Tuple[Union[Iterator[SingleVector], Iterator[SingleMatrix]], ImageSourceType]:
+    """
+    Infers vector length from the first item in `source`.
+    :param resolution:
+    :param source:
+    :param title_prefix:
+    :return:
+    """
+
+    first, source = iterator_common.first_item_from_iterator(source)
+
+    make_visualization = vector_visualizer(
+        output_width=resolution.width, output_height=resolution.height, title=""
+    )
+
+    x_values = np.arange(underlying_length(first))
+
+    def create_output() -> Iterator[Tuple[Union[SingleVector, SingleMatrix], RGBInt8ImageType]]:
+        """
+
+        :return:
+        """
+
+        for index, data in enumerate(source):
+            with make_visualization(
+                x_values=x_values, y_values=data, new_title=f"{title_prefix} item #{index}"
+            ) as visualization:
+                yield data, visualization
+
+    return cast(
+        Tuple[Union[Iterator[SingleVector], Iterator[SingleMatrix]], ImageSourceType],
+        transpose(create_output()),
+    )
