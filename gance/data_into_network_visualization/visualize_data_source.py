@@ -21,6 +21,7 @@ _visualizer: Optional[SingleVectorViz] = None
 def visualizer_initializer(output_width: int, output_height: int) -> None:
     """
     Sets up the `_visualizer` global variable for the given process.
+    Allows children within `imap` to quickly create a frame without setup.
     :return: None
     """
 
