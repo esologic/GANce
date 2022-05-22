@@ -11,6 +11,7 @@ from pathlib import Path
 import more_itertools
 import numpy as np
 
+import gance.data_into_network_visualization.visualize_data_source
 import gance.network_interface.fast_synthesizer
 from gance import iterator_common
 from gance.data_into_network_visualization import vectors_to_image
@@ -85,10 +86,14 @@ def main() -> None:
     iterator = itertools.repeat(np.zeros(shape=(512,)))
     timed = iterator_common.items_per_second(iterator)
 
-    data, images = vectors_to_image.visualize_data_source(
+    (
+        data,
+        output,
+    ) = gance.data_into_network_visualization.visualize_data_source.visualize_data_source(
         timed, resolution=ImageResolution(width=500, height=500)
     )
-    images = video_common.display_frame_forward(images)
+
+    images = video_common.display_frame_forward(output)
 
     more_itertools.consume(images)
 
