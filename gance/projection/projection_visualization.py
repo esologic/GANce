@@ -230,8 +230,7 @@ def visualize_final_latents(
         matrices_label = final_latents_matrices_label(reader)
 
         make_visualization = vector_visualizer(
-            y_min=matrices_label.data.min(),
-            y_max=matrices_label.data.max(),
+            y_bounds=(matrices_label.data.min(), matrices_label.data.max()),
             title=matrices_label.label,
             output_width=video_height,
             output_height=video_height,
@@ -295,8 +294,7 @@ def _setup_visualization(
     matrices_label = final_latents_matrices_label(projection_file_reader)
 
     make_visualization = vector_visualizer(
-        y_min=matrices_label.data.min(),
-        y_max=matrices_label.data.max(),
+        y_bounds=(matrices_label.data.min(), matrices_label.data.max()),
         title=matrices_label.label,
         output_width=video_height,
         output_height=video_height,

@@ -727,8 +727,7 @@ def vectors_single_network_visualization(  # pylint: disable=too-many-locals
     y_min, y_max = _y_bounds(data=vectors_label.data, y_range=y_range)
 
     make_visualization = vector_visualizer(
-        y_min=y_min,
-        y_max=y_max,
+        y_bounds=(y_min, y_max),
         title=vectors_label.label,
         output_width=video_height,
         output_height=video_height,
@@ -783,8 +782,7 @@ def single_vector_single_network_visualization(
     y_min, y_max = _y_bounds(data=vector, y_range=y_range)
 
     make_visualization = vector_visualizer(
-        y_min=y_min,
-        y_max=y_max,
+        y_bounds=(y_min, y_max),
         title=title,
         output_width=image_height,
         output_height=image_height,

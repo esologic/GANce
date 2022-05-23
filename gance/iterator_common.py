@@ -6,7 +6,7 @@ throughout this application.
 import collections
 import datetime
 import itertools
-from typing import Iterator, Tuple, TypeVar
+from typing import Deque, Iterator, Tuple, TypeVar
 
 from gance.logger_common import LOGGER
 
@@ -40,7 +40,7 @@ def items_per_second(source: Iterator[T]) -> Iterator[T]:
 
     queue_size = 60
     queue_count = itertools.count()
-    queue = collections.deque(maxlen=queue_size)
+    queue: Deque[datetime.datetime] = collections.deque(maxlen=queue_size)
 
     def yield_item(item: T) -> T:
         """
@@ -58,5 +58,4 @@ def items_per_second(source: Iterator[T]) -> Iterator[T]:
         # Don't do anything to the input item.
         return item
 
-    # TODO: check the difference between doing this and just returning the map.
-    yield from map(yield_item, source)
+    return map(yield_item, source)

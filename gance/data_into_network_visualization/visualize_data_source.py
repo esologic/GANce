@@ -1,3 +1,8 @@
+"""
+Functionality for visualizing an iterator of matrices/vectors.
+Uses the dark magic of an initialized multiprocessing pool also found in `fast_synthesis`.
+"""
+
 import multiprocessing
 from functools import partial
 from typing import Iterator, Optional, Tuple, Union, cast, overload
@@ -22,6 +27,8 @@ def visualizer_initializer(output_width: int, output_height: int) -> None:
     """
     Sets up the `_visualizer` global variable for the given process.
     Allows children within `imap` to quickly create a frame without setup.
+    :param output_width: width of output images.
+    :param output_height: height of output images.
     :return: None
     """
 
@@ -32,19 +39,29 @@ def visualizer_initializer(output_width: int, output_height: int) -> None:
 
 
 def _create_frame(
-    x_values, title_prefix, data_index
+    x_values: np.ndarray,
+    title_prefix: str,
+    index_data: Tuple[int, Union[SingleVector, SingleMatrix]],
 ) -> Tuple[Union[SingleVector, SingleMatrix], RGBInt8ImageType]:
     """
-
-    :return:
+    Creates a visualization image for the given input. Called within a child process.
+    :param x_values: x axis for the output image.
+    :param title_prefix: Will be prepended to the title, the name of the thing you're visualizing.
+    :param index_data: A tuple, the bit of data to visualize, and the index in the source iterator
+    it is. The int is consumed in the title of the resulting visualization.
+    :return: A tuple, (the data- the vector or matrix that created this frame,
+    the visualization image for that input data.)
     """
 
-    index, data = data_index
+    # Unpack. Would use a starmap if there was like an `istarmap`
+    index, data = index_data
 
+    # Use the global namespace `_visualizer` for the child process that is being called by
+    # this function.
     with _visualizer(
         x_values=x_values, y_values=data, new_title=f"{title_prefix} item #{index}"
     ) as visualization:
-        return data, visualization
+        return data, cast(RGBInt8ImageType, visualization)
 
 
 @overload
@@ -67,23 +84,33 @@ def visualize_data_source(
     resolution: ImageResolution = ImageResolution(width=1000, height=1000),
 ) -> Tuple[Union[Iterator[SingleVector], Iterator[SingleMatrix]], ImageSourceType]:
     """
+    Creates a visualization of the data in `source` as an iterator of images. Also forwards
+    input data so it can be consumed again.
     Infers vector length from the first item in `source`.
-    :param resolution:
-    :param source:
-    :param title_prefix:
-    :return:
+    :param resolution: Resolution of output visualization frames.
+    :param source: To visualize.
+    :param title_prefix: Will be prepended to the title of the resulting visualization images.
+    :return: Tuple of iterators. (The input data, images of visualizations of the input data)
     """
 
-    first, source = iterator_common.first_item_from_iterator(source)
+    # Used to set up shape of output
+    first, s = iterator_common.first_item_from_iterator(source)
 
-    x_values = np.arange(underlying_length(first))
+    # only need to create this once.
+    x_values = np.arange(underlying_length(cast(np.ndarray, first)))
 
-    def create_output():
-        # Really important here that `processes` always matches the GPU count.
-        # Note to future self: do not increase this number to try and go faster.
+    def create_output() -> Iterator[Tuple[Union[SingleVector, SingleMatrix], RGBInt8ImageType]]:
+        """
+        :return: Creates an iterator of tuples of the output.
+        """
         with multiprocessing.Pool(
             initializer=visualizer_initializer, initargs=(resolution.width, resolution.height)
         ) as p:
-            yield from p.imap(partial(_create_frame, x_values, title_prefix), enumerate(source))
+            yield from p.imap(partial(_create_frame, x_values, title_prefix), enumerate(s))
 
-    return transpose(create_output())
+    # Transpose from an iterator of tuples, to a tuple of iterators in the desired output
+    # type.
+    return cast(
+        Tuple[Union[Iterator[SingleVector], Iterator[SingleMatrix]], ImageSourceType],
+        transpose(create_output()),
+    )
