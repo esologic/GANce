@@ -133,7 +133,7 @@ def test__create_video_writer_resolution(
 
 
 @pytest.mark.parametrize("side_length", [100, 1080, 1440, 2160])
-@pytest.mark.parametrize("frame_count", [1000, 10000, 20000])
+@pytest.mark.parametrize("frame_count", [100, 1000])
 def test_write_large_video(side_length: int, frame_count: int, tmpdir: LocalPath) -> None:
     """
     A test to ensure that there are no problems when writing 10's of thousands of
