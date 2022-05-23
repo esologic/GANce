@@ -7,6 +7,7 @@ import datetime
 import itertools
 import multiprocessing
 from pathlib import Path
+from typing import Iterator
 
 import more_itertools
 import numpy as np
@@ -14,10 +15,10 @@ import numpy as np
 import gance.data_into_network_visualization.visualize_data_source
 import gance.network_interface.fast_synthesizer
 from gance import iterator_common
-from gance.data_into_network_visualization import vectors_to_image
 from gance.image_sources import video_common
 from gance.image_sources.image_sources_common import ImageResolution
 from gance.network_interface import network_functions
+from gance.vector_sources.vector_sources_common import SingleVector
 
 
 def create_many_images(gpu: int) -> None:
@@ -83,17 +84,21 @@ def main() -> None:
     :return:
     """
 
-    iterator = itertools.repeat(np.zeros(shape=(512,)))
+    def random_values() -> Iterator[SingleVector]:
+        while True:
+            yield np.random.rand(512)
+
+    iterator: Iterator[SingleVector] = random_values()
     timed = iterator_common.items_per_second(iterator)
 
     (
-        data,
-        output,
+        _,
+        images,
     ) = gance.data_into_network_visualization.visualize_data_source.visualize_data_source(
-        timed, resolution=ImageResolution(width=500, height=500)
+        timed, title_prefix="Sample Iterator", resolution=ImageResolution(width=500, height=500)
     )
 
-    images = video_common.display_frame_forward(output)
+    images = video_common.display_frame_forward(images)
 
     more_itertools.consume(images)
 

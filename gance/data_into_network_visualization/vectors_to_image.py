@@ -5,16 +5,14 @@ Functions around visualizing sets of vectors, resulting in images.
 from contextlib import _GeneratorContextManager  # pylint: disable=unused-import
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple, Union, cast, overload
+from typing import Iterator, List, Optional, Tuple, Union
 
 import numpy as np
 from cv2 import cv2
-from lz.transposition import transpose
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from typing_extensions import Protocol
 
-from gance import iterator_common
 from gance.apply_spectrogram import compute_spectrogram, reshape_spectrogram_to_vectors
 from gance.data_into_network_visualization.vectors_3d import plot_vectors_3d
 from gance.data_into_network_visualization.visualization_common import (
@@ -22,10 +20,9 @@ from gance.data_into_network_visualization.visualization_common import (
     render_current_matplotlib_frame,
     standard_matplotlib_figure,
 )
-from gance.gance_types import ImageSourceType, RGBInt8ImageType
-from gance.image_sources.image_sources_common import ImageResolution
+from gance.gance_types import RGBInt8ImageType
 from gance.image_sources.video_common import create_video_writer
-from gance.vector_sources.vector_sources_common import is_vector, sub_vectors, underlying_length
+from gance.vector_sources.vector_sources_common import is_vector, sub_vectors
 from gance.vector_sources.vector_types import (
     MatricesLabel,
     SingleMatrix,
@@ -176,11 +173,11 @@ def vector_visualizer(
     """
     Exposes a context manager that allows you to create a matplotlib visualization of x,y
     points. Initial call passes in one time setup params.
-    :param y_min: Min y value.
-    :param y_max: Max y value.
     :param title: Title of the figure.
     :param output_width: Width of output frame in pixels.
     :param output_height: Height of output frame in pixels.
+    :param y_bounds: A tuple, the (min, max) values of the input data. If not given, bounds
+    will be set to sensible values on write.
     :return: Context manager function to actually create the visualization frames.
     """
 
