@@ -1,0 +1,42 @@
+---
+- name: Install Docker
+  hosts: all
+  become: true
+  tasks:
+    - name: update apt-get repo and cache
+      apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+    - name: Install required system packages for Docker Install
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - lsb-release
+          - gnupg
+        state: latest
+        update_cache: true
+    - name: Add Docker signing key
+      ansible.builtin.apt_key:
+        url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+        state: present
+        keyring: /etc/apt/keyrings/docker.gpg
+    - name: Set DPKG architecture
+      set_fact:
+        dpkg_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else ansible_architecture }}"
+    - name: Add Docker repository into sources list
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ dpkg_arch }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+    - name: Install Docker
+      ansible.builtin.apt:
+        name:
+          - docker
+          - docker.io
+          - docker-compose
+          - docker-registry
+        state: latest
+        update_cache: true
+    - name: Make sure Docker is running
+      ansible.builtin.systemd:
+        state: started
+        name: docker
