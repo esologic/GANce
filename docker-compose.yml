@@ -15,7 +15,7 @@ services:
               capabilities: [gpu]
     volumes:
       - type: bind
-        source: ./gance/assets/
+        source: /home/devon/development_share/yac_assets
         target: /home/gpu/gance/gance/assets/
         read_only: true
       - type: bind

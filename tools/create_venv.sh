@@ -11,4 +11,4 @@ sudo apt-get install python3-opencv python3-venv build-essential cmake libgtk-3-
 python3 -m venv venv
 source ./venv/bin/activate
 pip install --upgrade pip
-pip install -r ./requirements/dev.txt -r ./requirements/prod.txt -r ./requirements/test.txt
+pip install -r ./requirements/prod.txt -r ./requirements/test.txt

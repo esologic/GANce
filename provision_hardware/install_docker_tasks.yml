@@ -36,6 +36,11 @@
       - docker-registry
     state: latest
     update_cache: true
+- name: Download latest docker-compose
+  get_url:
+    url: "https://github.com/docker/compose/releases/download/1.29.0/docker-compose-linux-{{ ansible_architecture }}"
+    dest: /usr/bin/docker-compose
+    mode: '+x'
 - name: Make sure Docker is running
   ansible.builtin.systemd:
     state: started
