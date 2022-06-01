@@ -126,7 +126,9 @@ def main() -> None:
     more_itertools.consume(
         zip(
             video_common.display_frame_forward(spectrogram_images, window_name="Spectrogram"),
-            video_common.display_frame_forward(concatenated_images, window_name="Concatenated Data"),
+            video_common.display_frame_forward(
+                concatenated_images, window_name="Concatenated Data"
+            ),
         )
     )
 

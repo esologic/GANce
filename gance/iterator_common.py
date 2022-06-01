@@ -66,13 +66,14 @@ def items_per_second(source: Iterator[T]) -> Iterator[T]:
 G = TypeVar("G")
 
 
-def apply_to_chunk(func: Callable[[List[T]], G], n: int, source: Iterator[T]) -> Iterator[T]:
+def apply_to_chunk(func: Callable[[List[T]], G], n: int, source: Iterator[T]) -> Iterator[G]:
     """
-
-    :param func:
-    :return:
+    For each chunk of `n` items in `source`, apply `func` to them and then yield the results per
+    each chunk calculation.
+    :param func: To apply to `source`
+    :param n: Num items per chunk, if `n` items aren't available, the max num items possible will
+    be used.
+    :param source: Input.
+    :return: An iterator of outputs from `func`.
     """
-
-    chunks = more_itertools.chunked(iterable=source, n=n)
-
-    return map(func, chunks)
+    return map(func, more_itertools.chunked(iterable=source, n=n))
