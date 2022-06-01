@@ -22,6 +22,34 @@ point.
 
 ## Getting Started
 
+### Creating Development/Usage Environment
+
+The specific hardware environment used to train networks and create videos has changed a few times
+during the project. There's a detailed description of one of these instances in [this post](https://www.esologic.com/introducing-gance/),
+but the important bit is that the hardware is centered around the [NVIDIA Tesla K80](https://www.nvidia.com/en-gb/data-center/tesla-k80/) GPU.
+The [NVIDIA docker](https://github.com/NVIDIA/nvidia-docker) runtime is used to expose these cards to the python code.
+
+In this repo, there's an ansible playbook that should be able to automatically configure your linux
+environment with the correct drivers and software to run the NVIDIA docker runtime.
+
+This playbook can be found in `provision_hardware`. You'll need to modify the `hosts.yml` file
+with the ip of your development environment. With this completed, and with the projects virtual 
+environment activated (meaning ansible is installed) run:
+
+```bash
+ansible-playbook install_nvidia_docker.yml -i hosts.yml
+```
+
+Now, you should be able to create docker containers that can use the GPU. To standup a development
+container, run:
+
+```bash
+sudo docker-compose up -d --build
+```
+
+The bind paths referencing `/home/devon/development_share/*` obviously aren't going exist on your
+system, and can be removed.
+
 ### Python Dependencies
 
 See the `requirements` directory for required Python modules for building, testing, developing etc.
@@ -44,7 +72,7 @@ There's also a bin script to do this:
 ## Developer Guide
 
 The following is documentation for developers that would like to contribute
-to GANCe.
+to GANce.
 
 ### Type System Limitations
 
