@@ -6,7 +6,9 @@ throughout this application.
 import collections
 import datetime
 import itertools
-from typing import Deque, Iterator, Tuple, TypeVar
+from typing import Callable, Deque, Iterator, List, Tuple, TypeVar
+
+import more_itertools
 
 from gance.logger_common import LOGGER
 
@@ -59,3 +61,18 @@ def items_per_second(source: Iterator[T]) -> Iterator[T]:
         return item
 
     return map(yield_item, source)
+
+
+G = TypeVar("G")
+
+
+def apply_to_chunk(func: Callable[[List[T]], G], n: int, source: Iterator[T]) -> Iterator[T]:
+    """
+
+    :param func:
+    :return:
+    """
+
+    chunks = more_itertools.chunked(iterable=source, n=n)
+
+    return map(func, chunks)
