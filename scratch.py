@@ -14,7 +14,7 @@ import numpy as np
 
 import gance.data_into_network_visualization.visualize_data_source
 import gance.network_interface.fast_synthesizer
-from gance import iterator_common
+from gance import apply_spectrogram, iterator_common
 from gance.image_sources import video_common
 from gance.image_sources.image_sources_common import ImageResolution
 from gance.network_interface import network_functions
@@ -85,22 +85,50 @@ def main() -> None:
     """
 
     def random_values() -> Iterator[SingleVector]:
-        while True:
-            yield np.random.rand(512)
+        """
 
-    iterator: Iterator[SingleVector] = random_values()
-    timed = iterator_common.items_per_second(iterator)
+        :return:
+        """
+
+        x = np.linspace(-np.pi, np.pi, 512)
+
+        while True:
+            yield np.sin(x)
+
+    top_input = random_values()
+
+    (
+        concatenated,
+        concatenated_images,
+    ) = gance.data_into_network_visualization.visualize_data_source.visualize_data_source(
+        iterator_common.apply_to_chunk(func=np.concatenate, n=10, source=top_input),
+        title_prefix="Concatenated",
+        resolution=ImageResolution(width=500, height=500),
+    )
+
+    spectrogram = map(
+        lambda data: apply_spectrogram.reshape_spectrogram_to_vectors(
+            apply_spectrogram.compute_spectrogram(data=data, num_frequency_bins=512 * 10),
+            vector_length=512,
+        ),
+        concatenated,
+    )
 
     (
         _,
-        images,
+        spectrogram_images,
     ) = gance.data_into_network_visualization.visualize_data_source.visualize_data_source(
-        timed, title_prefix="Sample Iterator", resolution=ImageResolution(width=500, height=500)
+        iterator_common.items_per_second(spectrogram),
+        title_prefix="Spectrogram",
+        resolution=ImageResolution(width=500, height=500),
     )
 
-    images = video_common.display_frame_forward(images)
-
-    more_itertools.consume(images)
+    more_itertools.consume(
+        zip(
+            video_common.display_frame_forward(spectrogram_images, window_name="Spectrogram"),
+            video_common.display_frame_forward(concatenated_images, window_name="Concatenated Data"),
+        )
+    )
 
 
 if __name__ == "__main__":
