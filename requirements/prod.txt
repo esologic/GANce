@@ -1,3 +1,4 @@
+
 click-option-group==0.5.3
 click==7.1.2
 dataclasses
@@ -12,7 +13,7 @@ lz==0.11.1
 matplotlib
 more-itertools==8.12.0
 mypy==0.812
-numpy==1.16.4  # this exact version is needed to make tensorflow/gpu happy!
+numpy==1.16  # this exact version is needed to make tensorflow/gpu happy!
 nvsmi==0.4.2
 objgraph==3.5.0
 opencv-python

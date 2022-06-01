@@ -1,0 +1,37 @@
+---
+- name: Install NVIDIA Docker 2
+  hosts: all
+  become: true
+  tasks:
+    - name: Install Plain Docker
+      import_tasks: install_docker_tasks.yml
+    - name: Install required system packages for NVIDIA Docker
+      ansible.builtin.apt:
+        name:
+          - nvidia-driver-440
+        state: latest
+        update_cache: true
+    - name: Ensure Keyring directory exists
+      file:
+        path: /etc/apt/keyrings/
+        state: directory
+    - name: Add NVIDIA signing key
+      ansible.builtin.apt_key:
+        url: "https://nvidia.github.io/libnvidia-container/gpgkey"
+        state: present
+        keyring: /etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg
+    - name: Add NVIDIA repository into sources list
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg] https://nvidia.github.io/libnvidia-container/stable/{{ ansible_distribution | lower }}{{ ansible_distribution_version }}/$(ARCH) /"
+        state: present
+        filename: nvidia-container-toolkit
+    - name: Install NVIDIA Docker 2
+      ansible.builtin.apt:
+        name:
+          - nvidia-docker2
+        state: latest
+        update_cache: true
+    - name: Restart Docker
+      ansible.builtin.systemd:
+        state: restarted
+        name: docker

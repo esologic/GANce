@@ -1,5 +1,12 @@
 # Changelog
 
+0.23.0 - (2022-06-??)
+------------------
+
+* Created an ansible playbook to provision new hardware with required dependencies for working
+on/using GANce.
+
+
 0.22.0 - (2022-05-??)
 ------------------
 
