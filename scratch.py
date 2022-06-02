@@ -9,7 +9,6 @@ import multiprocessing
 from pathlib import Path
 from typing import Iterator
 
-import more_itertools
 import numpy as np
 
 import gance.data_into_network_visualization.visualize_data_source
@@ -123,14 +122,16 @@ def main() -> None:
         resolution=ImageResolution(width=500, height=500),
     )
 
-    more_itertools.consume(
+    for index, _ in enumerate(
         zip(
             video_common.display_frame_forward(spectrogram_images, window_name="Spectrogram"),
             video_common.display_frame_forward(
                 concatenated_images, window_name="Concatenated Data"
             ),
         )
-    )
+    ):
+        if index == 200:
+            break
 
 
 if __name__ == "__main__":
