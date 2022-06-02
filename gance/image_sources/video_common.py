@@ -395,13 +395,16 @@ def write_source_to_disk_consume(
     )
 
 
-def resize_image(image: RGBInt8ImageType, resolution: ImageResolution) -> RGBInt8ImageType:
+def resize_image(
+    image: RGBInt8ImageType, resolution: ImageResolution, delete: bool = False
+) -> RGBInt8ImageType:
     """
     Resizes an image to the input resolution.
     Uses, `cv2.INTER_CUBIC`, which is visually good-looking but somewhat slow.
     May want to be able to pass this in.
     :param image: To scale.
-    :param resolution: Ouput resolution
+    :param resolution: Ouput resolution.
+    :param delete: If true, `del` will be used on `image` to force it's memory to be released.
     :return: Scaled image.
     """
 
@@ -412,7 +415,8 @@ def resize_image(image: RGBInt8ImageType, resolution: ImageResolution) -> RGBInt
     # The image in `source` has now been 'consumed', and can't be used again.
     # We delete this frame here to avoid memory leaks.
     # Not really sure if this is needed, but it shouldn't cause harm.
-    # del image
+    if delete:
+        del image
 
     # The scaled image.
     return output
@@ -427,7 +431,9 @@ def resize_source(source: ImageSourceType, resolution: ImageResolution) -> Image
     """
 
     yield from (
-        resize_image(image, resolution) if image_resolution(image) != resolution else image
+        resize_image(image, resolution, delete=True)
+        if image_resolution(image) != resolution
+        else image
         for image in source
     )
 
@@ -465,12 +471,14 @@ def display_frame_forward(
     full_screen: bool = False,
 ) -> ImageSourceType:
     """
-
-    :param source:
-    :param window_name:
+    Displays the the images in `source`, and forwards the image so they can be consumed again.
+    Uses an openCV `imshow` to reveal the image.
+    TODO: better docs.
+    :param source: To display.
+    :param window_name: Name of the window.
     :param display_resolution: Change the input frames to this resolution before displaying. Doesn't
     modify the output frames.
-    :return:
+    :return: Forwarded iterator, `source`.
     """
 
     cv2.namedWindow(
@@ -483,15 +491,23 @@ def display_frame_forward(
 
     def display_frame(frame: RGBInt8ImageType) -> RGBInt8ImageType:
         """
-
-        :param frame:
-        :return:
+        Helper function, actually show the image.
+        :param frame: To display.
+        :return: `frame`.
         """
         cv2.imshow(
-            window_name, cv2.cvtColor(resize_image(frame, display_resolution), cv2.COLOR_RGB2BGR)
+            window_name,
+            cv2.cvtColor(
+                resize_image(frame, display_resolution)
+                if display_resolution is not None
+                else frame,
+                cv2.COLOR_RGB2BGR,
+            ),
         )
         cv2.waitKey(1)
         return frame
 
+    # yield from is used so we can run things after the input has been exhausted to cleanup.
     yield from map(display_frame, source)
+
     cv2.destroyWindow(window_name)
