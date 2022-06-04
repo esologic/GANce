@@ -2,6 +2,9 @@
 # You need to be logged into the container as root to be able to use `nvcc` commands.
 FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu18.04
 
+# X11 output will be written to this display. Default value should work on many systems.
+ARG DISPLAY=':0'
+
 # TODO - we should be able to drop this:
 # https://developer.nvidia.com/blog/updating-the-cuda-linux-gpg-repository-key/
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
@@ -29,12 +32,13 @@ RUN mkdir -m 777 /home/gpu/gance
 COPY ./ /home/gpu/gance
 RUN apt-get update && apt-get install sudo -y && \
 chmod +x /home/gpu/gance/tools/create_venv.sh && \
-./home/gpu/gance/tools/create_venv.sh \
+./home/gpu/gance/tools/create_venv.sh
 RUN chmod -R 777 /home/gpu/gance
 
 RUN echo 'export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}' >> /home/gpu/.bashrc
 RUN echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64\${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' \
  >> /home/gpu/.bashrc
+RUN echo "export DISPLAY=${DISPLAY}" >> /home/gpu/.bashrc
 
 # Entry Point
 # To actually execute this, use `sudo docker-compose up -d --build gance-develop`.

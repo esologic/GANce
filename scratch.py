@@ -3,14 +3,13 @@ Temporary
 """
 
 import collections
-import datetime
 from pathlib import Path
+from time import sleep
 
 import numpy as np
 
 import gance.network_interface.fast_synthesizer
 from gance.image_sources import video_common
-from gance.image_sources.image_sources_common import ImageResolution
 from gance.image_sources.video_common import ImageSourceType
 
 
@@ -20,7 +19,7 @@ def main() -> None:
     :return: None
     """
 
-    queue = collections.deque(maxlen=50)  # type: ignore
+    queue = collections.deque(maxlen=50)  # type: ignore  # pylint: disable=unused-variable
 
     def input_source() -> ImageSourceType:
         """
@@ -36,13 +35,8 @@ def main() -> None:
         network_path=Path("gance/assets/networks/production_network.pkl"),
     ) as frames:
 
-        for _, _ in enumerate(
-            video_common.display_frame_forward(frames, display_resolution=ImageResolution(500, 500))
-        ):
-            queue.append(datetime.datetime.now())
-
-            if len(queue) == 50:
-                print(len(queue) / ((queue[-1] - queue[0]).total_seconds()))
+        for _, _ in enumerate(video_common.display_frame_forward_opencv(frames, full_screen=True)):
+            sleep(33 / 1000)
 
 
 if __name__ == "__main__":

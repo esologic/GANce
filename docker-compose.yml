@@ -13,9 +13,6 @@ services:
             - driver: nvidia
               device_ids: ['0,', '1', '2', '3']
               capabilities: [gpu]
-    environment:
-      - DISPLAY=:0
-    ipc: host
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - type: bind
