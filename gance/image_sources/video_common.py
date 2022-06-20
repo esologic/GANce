@@ -412,10 +412,10 @@ def resize_image(
         image, (resolution.height, resolution.width), interpolation=cv2.INTER_CUBIC
     )
 
-    # The image in `source` has now been 'consumed', and can't be used again.
-    # We delete this frame here to avoid memory leaks.
-    # Not really sure if this is needed, but it shouldn't cause harm.
     if delete:
+        # The image has now been 'consumed', and can't be used again.
+        # We delete this frame here to avoid memory leaks.
+        # Not really sure if this is needed, but it shouldn't cause harm.
         del image
 
     # The scaled image.
@@ -473,7 +473,6 @@ def display_frame_forward_opencv(
     """
     Displays the the images in `source`, and forwards the image so they can be consumed again.
     Uses an openCV `imshow` to reveal the image.
-    TODO: better docs.
     :param source: To display.
     :param window_name: Name of the window.
     :param display_resolution: Change the input frames to this resolution before displaying. Doesn't

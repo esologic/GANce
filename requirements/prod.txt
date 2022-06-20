@@ -16,7 +16,7 @@ mypy==0.812
 numpy==1.16  # this exact version is needed to make tensorflow/gpu happy!
 nvsmi==0.4.2
 objgraph==3.5.0
-opencv-contrib-python
+opencv-python
 pandas==1.1.5
 Pillow==6.2.1
 pooch==1.5.1  # To prevent warnings from scikit-image

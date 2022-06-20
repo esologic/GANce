@@ -3,40 +3,72 @@ Temporary
 """
 
 import collections
+import datetime
+import itertools
+import multiprocessing
 from pathlib import Path
-from time import sleep
 
 import numpy as np
 
 import gance.network_interface.fast_synthesizer
-from gance.image_sources import video_common
-from gance.image_sources.video_common import ImageSourceType
+from gance.network_interface import network_functions
+
+
+def create_many_images(gpu: int) -> None:
+    """
+
+    :param gpu:
+    :return:
+    """
+
+    interface = network_functions.create_network_interface(
+        network_path=Path("gance/assets/networks/production_network.pkl"),
+        call_init_function=True,
+        gpu_index=gpu,
+    )
+
+    vector = np.zeros(shape=(512,))
+
+    while True:
+        interface.create_image_vector(data=vector)
+
+
+def main_multi() -> None:
+    """
+
+    :return:
+    """
+
+    p1 = multiprocessing.Process(target=create_many_images, args=(0,))
+    p2 = multiprocessing.Process(target=create_many_images, args=(1,))
+
+    p1.start()
+    p2.start()
 
 
 def main() -> None:
     """
-    Temporary entrypoint.
-    :return: None
+
+    :return:
     """
 
-    queue = collections.deque(maxlen=50)  # type: ignore  # pylint: disable=unused-variable
-
-    def input_source() -> ImageSourceType:
-        """
-        Create an never-ending input source.
-        :return: Unlimited randomized vectors.
-        """
-
-        while True:
-            yield np.random.rand(512)
+    queue = collections.deque(maxlen=50)  # type: ignore
 
     with gance.network_interface.fast_synthesizer.fast_synthesizer(
-        data_source=input_source(),
+        data_source=itertools.repeat(np.zeros(shape=(512,))),
         network_path=Path("gance/assets/networks/production_network.pkl"),
+        num_gpus=4,
     ) as frames:
 
-        for _, _ in enumerate(video_common.display_frame_forward_opencv(frames, full_screen=True)):
-            sleep(33 / 1000)
+        for _, _ in enumerate(frames):
+            queue.append(datetime.datetime.now())
+
+            if len(queue) == 50:
+                print(len(queue) / ((queue[-1] - queue[0]).total_seconds()))
+
+        print("out here")
+
+    print("further out here")
 
 
 if __name__ == "__main__":
