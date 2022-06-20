@@ -2,11 +2,12 @@
 Given some styleGAN networks, load each network and synthesize a number of images with them.
 Interesting vectors can be reused with other networks.
 """
+import itertools
 from pathlib import Path
-from time import sleep
 
 import click
 import numpy as np
+from more_itertools import consume
 
 from gance.assets import PRODUCTION_NETWORK_PATH
 from gance.gance_types import ImageSourceType
@@ -45,7 +46,7 @@ def cli() -> None:
 )
 @click.option(
     "--fullscreen",
-    is_flage=True,
+    is_flag=True,
     default=False,
     help="If given, the images will be displayed in a fullscreen window.",
     show_default=True,
@@ -77,10 +78,11 @@ def random(network: str, num_gpus: int, fullscreen: bool) -> None:
         network_path=Path(network),
         num_gpus=num_gpus,
     ) as frames:
-        for _, _ in enumerate(
-            video_common.display_frame_forward_opencv(frames, full_screen=fullscreen)
-        ):
-            sleep(33 / 1000)
+        consume(
+            itertools.islice(
+                video_common.display_frame_forward_opencv(frames, full_screen=fullscreen), 500
+            )
+        )
 
 
 if __name__ == "__main__":

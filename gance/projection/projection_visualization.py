@@ -7,8 +7,8 @@ import os
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Tuple, Union
 
+import cv2
 import numpy as np
-from cv2 import cv2
 from matplotlib import colors as mcolors
 from matplotlib import pyplot as plt
 from scipy.interpolate import UnivariateSpline
