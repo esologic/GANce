@@ -4,9 +4,9 @@ Common types, constants, functions used in visualization, to avoid cyclic import
 import itertools
 from typing import Iterator, List, NamedTuple, Optional, Tuple, Union
 
-import cv2
 import numpy as np
 import PIL
+from cv2 import cv2
 from matplotlib import colors as mcolors
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes

@@ -113,6 +113,6 @@ def test_network_interface_process_stop() -> None:
             np.zeros((network_interface_process.network_interface.expected_vector_length,))
         )
     )
-    assert image.size == (1024, 1024)
-    assert sum(image) > 0
+    assert image.shape == (1024, 1024, 3)
+    assert np.sum(image) > 0
     network_interface_process.stop_function()

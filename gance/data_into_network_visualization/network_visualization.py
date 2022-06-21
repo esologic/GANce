@@ -8,9 +8,9 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Iterator, List, NamedTuple, Optional, Tuple, Union, cast
 
-import cv2
 import numpy as np
 import PIL
+from cv2 import cv2
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.collections import PathCollection

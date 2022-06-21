@@ -7,8 +7,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple, Union
 
-import cv2
 import numpy as np
+from cv2 import cv2
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from typing_extensions import Protocol

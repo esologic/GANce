@@ -5,6 +5,7 @@
 
 * Created an ansible playbook to provision new hardware with required dependencies for working
 on/using GANce.
+* Updated canonical python version to 3.7 to get around a multiprocessing bug.
 
 
 0.22.0 - (2022-05-??)

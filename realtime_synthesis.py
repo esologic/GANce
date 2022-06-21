@@ -80,7 +80,7 @@ def random(network: str, num_gpus: int, fullscreen: bool) -> None:
     ) as frames:
         consume(
             itertools.islice(
-                video_common.display_frame_forward_opencv(frames, full_screen=fullscreen), 500
+                video_common.display_frame_forward_opencv(frames, full_screen=fullscreen), None
             )
         )
 

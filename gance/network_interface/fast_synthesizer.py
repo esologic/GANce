@@ -9,13 +9,11 @@ import logging
 import multiprocessing
 from contextlib import contextmanager
 from functools import partial
-from itertools import count
 from multiprocessing import Queue, Semaphore
 from pathlib import Path
 from typing import Iterator, Optional, Union, overload
 
 import nvsmi
-from pympler import muppy, summary
 
 from gance import iterator_common
 from gance.gance_types import ImageSourceType, RGBInt8ImageType
@@ -26,10 +24,8 @@ from gance.vector_sources.vector_sources_common import SingleMatrix, SingleVecto
 # large objects that will also be accessible in the `i/map(func...` call.
 _network_interface: Optional[NetworkInterface] = None
 
-
+# Used to make sure items are produced at the rate they're consumed in the slow-consumer case.
 _output_control_semaphore: Optional[Semaphore] = None
-
-_frame_count: count = count()
 
 
 @overload
@@ -54,14 +50,8 @@ def synthesize_frame(
     :return: The resulting image.
     """
 
-    _output_control_semaphore.acquire()
-
-    frame_count = next(_frame_count)
-
-    if frame_count == 200:
-        all_objects = muppy.get_objects()
-        sum1 = summary.summarize(all_objects)
-        summary.print_(sum1)
+    if _output_control_semaphore is not None:
+        _output_control_semaphore.acquire()
 
     output = (
         _network_interface.create_image_vector(data)
@@ -105,6 +95,7 @@ def fast_synthesizer(
     data_source: Union[Iterator[SingleVector], Iterator[SingleMatrix]],
     network_path: Path,
     num_gpus: Optional[int] = None,
+    slow_consumer: bool = False,
 ) -> Iterator[ImageSourceType]:
     """
     Split the synthesis of the input data source across multiple GPUs, to get the fastest
@@ -115,6 +106,8 @@ def fast_synthesizer(
     :param network_path: Path to the pickled network to use for synthesis.
     :param num_gpus: The number of GPUs to spread the compute across. If not given, defaults
     to max possible count.
+    :param slow_consumer: If True, a semaphore will be used to make sure the producer pool
+    only creates new images at the rate they're consumed. This way, no memory leak can occur.
     :return: A context manager for the frame source, which are the outputs from the network in
     order.
     """
@@ -130,7 +123,7 @@ def fast_synthesizer(
     for item in range(num_gpus):
         queue.put(item)
 
-    output_control_semaphore = Semaphore(1000)
+    output_control_semaphore: Optional[Semaphore] = Semaphore() if slow_consumer else None
 
     # Really important here that `processes` always matches the GPU count.
     # Note to future self: do not increase this number to try and go faster.
@@ -146,9 +139,9 @@ def fast_synthesizer(
             back pressure causing a memory leak.
             :return: Outputs from the network in synthesis order.
             """
-
             for frame in p.imap(partial(synthesize_frame, is_vector(first_data)), inputs):
                 yield frame
-                output_control_semaphore.release()
+                if output_control_semaphore is not None:
+                    output_control_semaphore.release()
 
         yield locked_output()

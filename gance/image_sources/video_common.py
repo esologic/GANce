@@ -8,10 +8,10 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Callable, Iterator, List, NamedTuple, Optional, cast
 
-import cv2
 import ffmpeg
 import more_itertools
 import numpy as np
+from cv2 import cv2
 from ffmpeg.nodes import FilterableStream
 from vidgear.gears import WriteGear
 

@@ -12,13 +12,14 @@ lz==0.11.1
 matplotlib
 more-itertools==8.12.0
 mypy==0.812
-numpy==1.16  # this exact version is needed to make tensorflow/gpu happy!
+numpy==1.21
 nvsmi==0.4.2
 objgraph==3.5.0
-opencv-python
+opencv-python==4.5.5.64  # Specific version is pinned to be able to do `from cv2 import cv2`
 pandas==1.1.5
 Pillow==6.2.1
 pooch==1.5.1  # To prevent warnings from scikit-image
+protobuf==3.20  # To prevent warnings from Tensorflow on python3.7
 pyocclient==0.6
 Pympler==1.0.1
 pydantic==1.9.0
@@ -26,7 +27,7 @@ requests==2.22.0
 resampy==0.2.2
 scikit-image
 scikit-learn
-scipy==1.3.3
+scipy
 sentinels==1.0.0
-tensorflow-gpu==1.14
+tensorflow-gpu==1.15
 vidgear==0.2.4

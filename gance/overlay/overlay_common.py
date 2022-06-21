@@ -6,8 +6,8 @@ Do things like track eyes to interesting effect.
 import itertools
 from typing import Dict, Iterator, List, NamedTuple, Optional, Tuple, cast
 
-import cv2
 import numpy as np
+from cv2 import cv2
 from PIL import Image, ImageDraw
 from scipy.spatial import distance
 
