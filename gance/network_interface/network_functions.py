@@ -187,14 +187,6 @@ def wrap_loaded_network(network: Network) -> NetworkInterface:
             network.components.synthesis.run(reshape_input_for_network(data), **network_kwargs)
         )
 
-    @overload
-    def create_image_generic(data: SingleVector) -> RGBInt8ImageType:
-        ...
-
-    @overload
-    def create_image_generic(data: SingleMatrix) -> RGBInt8ImageType:
-        ...
-
     def create_image_generic(data: Union[SingleVector, SingleMatrix]) -> RGBInt8ImageType:
         """
         Checks the data to determine its type, then passes it to the corresponding function.

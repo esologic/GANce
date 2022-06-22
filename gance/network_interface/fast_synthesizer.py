@@ -76,7 +76,8 @@ def initializer(
     of inside the pool, not in the main thread.
     :param network_path: Path to the network to load.
     :param id_queue: Contains unused GPU indices, one is selected for this process.
-    :param output_control_semaphore:
+    :param output_control_semaphore: Used to make sure the output is consumed before creating more
+    input.
     :return: None
     """
 

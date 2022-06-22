@@ -6,6 +6,8 @@
 * Created an ansible playbook to provision new hardware with required dependencies for working
 on/using GANce.
 * Updated canonical python version to 3.7 to get around a multiprocessing bug.
+* Took a rough pass at improving the type system, after being able to update numpy to 1.21 and 
+tensorflow to 1.16 w/ the python upgrade. Still a lot to clean up here.
 
 
 0.22.0 - (2022-05-??)
