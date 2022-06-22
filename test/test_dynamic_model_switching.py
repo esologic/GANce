@@ -3,6 +3,7 @@ Tests to make sure rms reduction works as expected.
 """
 
 from test.assets import WAV_CLAPS_PATH
+from typing import cast
 
 import numpy as np
 
@@ -21,10 +22,11 @@ def test_reduce_vector_rms_alignment() -> None:
 
     vector_length = 1000
 
-    audio = ConcatenatedVectors(
+    audio = cast(
+        ConcatenatedVectors,
         read_wavs_scale_for_video(
             wavs=[WAV_CLAPS_PATH], vector_length=vector_length, frames_per_second=60.0
-        ).wav_data
+        ).wav_data,
     )
 
     single_audio_vector = sub_vectors(data=audio, vector_length=vector_length)[0]

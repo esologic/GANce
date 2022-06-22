@@ -13,9 +13,19 @@ from functools import partial, wraps
 from multiprocessing import Queue  # pylint: disable=unused-import
 from pathlib import Path
 from queue import Empty
-from typing import Any, Callable, List, NamedTuple, Optional, Union  # pylint: disable=unused-import
+from typing import (  # pylint: disable=unused-import
+    Any,
+    Callable,
+    List,
+    NamedTuple,
+    Optional,
+    Union,
+    cast,
+    overload,
+)
 
 import numpy as np
+import numpy.typing as npt
 import PIL
 import pydantic
 from pydantic import BaseModel, FilePath
@@ -142,7 +152,7 @@ def wrap_loaded_network(network: Network) -> NetworkInterface:
         new_shape = (1, *data.shape)
         return RGBInt8ImageType(np.reshape(data, new_shape))
 
-    def convert_network_output_to_image(network_output: np.ndarray) -> RGBInt8ImageType:
+    def convert_network_output_to_image(network_output: npt.NDArray[Any]) -> RGBInt8ImageType:
         """
         Takes the raw output from an inference and converts it to a more usable image type.
         :param network_output: Raw output from network.
@@ -158,8 +168,8 @@ def wrap_loaded_network(network: Network) -> NetworkInterface:
         """
         # Verified by hand that this cast is valid.
         return RGBInt8ImageType(
-            network.run(
-                reshape_input_for_network(data),
+            network.run(  # type: ignore[arg-type]
+                reshape_input_for_network(data),  # type: ignore[arg-type]
                 None,
                 truncation_psi=1.2,
                 output_transform=dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True),
@@ -177,6 +187,14 @@ def wrap_loaded_network(network: Network) -> NetworkInterface:
             network.components.synthesis.run(reshape_input_for_network(data), **network_kwargs)
         )
 
+    @overload
+    def create_image_generic(data: SingleVector) -> RGBInt8ImageType:
+        ...
+
+    @overload
+    def create_image_generic(data: SingleMatrix) -> RGBInt8ImageType:
+        ...
+
     def create_image_generic(data: Union[SingleVector, SingleMatrix]) -> RGBInt8ImageType:
         """
         Checks the data to determine its type, then passes it to the corresponding function.
@@ -186,10 +204,10 @@ def wrap_loaded_network(network: Network) -> NetworkInterface:
         """
         if is_vector(data):
             LOGGER.info(f"Generic -> Vector, shape: {data.shape}")
-            return create_image_vector(data)
+            return create_image_vector(cast(SingleVector, data))
         else:
             LOGGER.info(f"Generic -> matrix, shape: {data.shape}")
-            return create_image_matrix(data)
+            return create_image_matrix(cast(SingleMatrix, data))
 
     return NetworkInterface(
         create_image_vector=lambda data: convert_network_output_to_image(create_image_vector(data)),
@@ -316,7 +334,8 @@ def create_network_interface_process(
         :return: The resulting image.
         """
         input_queue.put(_NetworkInput(is_a_vector, data))
-        return RGBInt8ImageType(output_queue.get())
+        # Cast is okay here because we know it must be an image
+        return cast(RGBInt8ImageType, output_queue.get())
 
     def stop_function() -> None:
         """

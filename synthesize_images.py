@@ -6,7 +6,7 @@ import itertools
 from functools import partial
 from itertools import count
 from pathlib import Path
-from typing import Callable, Iterator, List, NamedTuple, Optional
+from typing import Callable, Iterator, List, NamedTuple, Optional, cast
 
 import click
 import numpy as np
@@ -234,10 +234,13 @@ def create_images(
     while True:
         # Random noise vector.
         # Since we're only making 1 vector we can treat it as a `SingleVector`.
-        vector: SingleVector = gaussian_data(
-            vector_length=vector_length,
-            num_vectors=1,
-            random_state=random_state,
+        vector = cast(
+            SingleVector,
+            gaussian_data(
+                vector_length=vector_length,
+                num_vectors=1,
+                random_state=random_state,
+            ),
         )
 
         image = image_function(vector)

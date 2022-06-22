@@ -9,14 +9,14 @@ import shutil
 from pathlib import Path
 from queue import Queue
 from tempfile import NamedTemporaryFile
-from typing import Iterator, List, NamedTuple, Tuple, TypeVar
+from typing import Any, Iterator, List, NamedTuple, Tuple
 
 import h5py
 import numpy as np
 from sentinels import NOTHING
 from typing_extensions import Protocol
 
-IterationItem = TypeVar("IterationItem")
+from gance.image_sources.image_sources_common import RGBInt8ImageType
 
 
 class SerializeItem(Protocol):
@@ -24,7 +24,7 @@ class SerializeItem(Protocol):
     Describes a function that writes a given item out to disk.
     """
 
-    def __call__(self, path: Path, item: IterationItem) -> None:
+    def __call__(self, path: Path, item: Any) -> None:
         """
         :param path: Path to write the serialized object to on disk.
         :param item: Object to serialize.
@@ -37,7 +37,7 @@ class DeSerializeItem(Protocol):
     Describes a function that loads an item from disk back into memory.
     """
 
-    def __call__(self, path: Path) -> IterationItem:
+    def __call__(self, path: Path) -> Any:
         """
         :param path: Path to the object on disk.
         :return: Item loaded back into memory.
@@ -53,7 +53,7 @@ class Serializer(NamedTuple):
     deserialize: DeSerializeItem
 
 
-def serialize_pickle(path: Path, item: IterationItem) -> None:
+def serialize_pickle(path: Path, item: Any) -> None:
     """
     Writes an item to disk using the built-in pickle module.
     :param path: Path to write the serialized object to on disk.
@@ -65,7 +65,7 @@ def serialize_pickle(path: Path, item: IterationItem) -> None:
         pickle.dump(item, p)
 
 
-def deserialize_pickle(path: Path) -> IterationItem:
+def deserialize_pickle(path: Path) -> Any:
     """
     Loads a pickled item from disk using the built-in pickle module.
     :param path: Path to the object on disk.
@@ -73,8 +73,7 @@ def deserialize_pickle(path: Path) -> IterationItem:
     """
 
     with open(str(path), "rb") as p:
-        output: IterationItem = pickle.load(p)
-        return output
+        return pickle.load(p)
 
 
 PICKLE_SERIALIZER = Serializer(serialize=serialize_pickle, deserialize=deserialize_pickle)
@@ -82,7 +81,7 @@ PICKLE_SERIALIZER = Serializer(serialize=serialize_pickle, deserialize=deseriali
 HDF5_DATASET_NAME = "item_dataset"
 
 
-def serialize_hdf5(path: Path, item: np.ndarray) -> None:
+def serialize_hdf5(path: Path, item: RGBInt8ImageType) -> None:
     """
     Writes an item to disk using hdf5, a format for storing data arrays on disk.
     :param path: Path to write the serialized object to on disk.
@@ -101,7 +100,7 @@ def serialize_hdf5(path: Path, item: np.ndarray) -> None:
         )
 
 
-def deserialize_hdf5(path: Path) -> np.ndarray:
+def deserialize_hdf5(path: Path) -> RGBInt8ImageType:
     """
     Loads an item to disk using hdf5, a format for storing data arrays on disk.
     :param path: Path to the object on disk.
@@ -109,13 +108,13 @@ def deserialize_hdf5(path: Path) -> np.ndarray:
     """
 
     with h5py.File(name=str(path), mode="r") as f:
-        return np.array(f[HDF5_DATASET_NAME])
+        return RGBInt8ImageType(np.array(f[HDF5_DATASET_NAME]))
 
 
 HDF5_SERIALIZER = Serializer(serialize=serialize_hdf5, deserialize=deserialize_hdf5)
 
 
-def load_queue_items(queue: "Queue[Path]", deserialize: DeSerializeItem) -> Iterator[IterationItem]:
+def load_queue_items(queue: "Queue[Path]", deserialize: DeSerializeItem) -> Iterator[Any]:
     """
     Iterate over the items in a queue.
     Load the objects on disk back into memory and yield them.
@@ -126,16 +125,16 @@ def load_queue_items(queue: "Queue[Path]", deserialize: DeSerializeItem) -> Iter
     """
 
     for path in iter(queue.get, NOTHING):
-        output: IterationItem = deserialize(path)
+        output: Any = deserialize(path)
         path.unlink()
         yield output
 
 
 def iterator_on_disk(
-    iterator: Iterator[IterationItem],
+    iterator: Iterator[Any],
     copies: int,
     serializer: Serializer = PICKLE_SERIALIZER,
-) -> Tuple[Iterator[IterationItem], ...]:
+) -> Tuple[Iterator[Any], ...]:
     """
     Caches the results from an input iterator onto disk rather than into memory for re-iteration
     later. Kind of like `itertools.tee`, but instead of going into memory with the copies, the
@@ -156,7 +155,7 @@ def iterator_on_disk(
 
     path_queues: List["Queue[Path]"] = [Queue() for _ in range(copies)]
 
-    def forward_iterator() -> Iterator[IterationItem]:
+    def forward_iterator() -> Iterator[Any]:
         """
         Works through the input iterator, and as new times are produced, saves
         them to disk, and fills the queues with their locations.

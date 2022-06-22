@@ -5,10 +5,11 @@ associated with that frame.
 
 import zlib
 from multiprocessing import Pool
-from typing import List
+from typing import Any, List
 
 import librosa
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from scipy.interpolate import UnivariateSpline
 from scipy.ndimage import maximum_filter1d
@@ -21,7 +22,7 @@ from gance.vector_sources.vector_types import ConcatenatedVectors, SingleVector
 
 def _compute_raw_rms(
     time_series_audio_vectors: ConcatenatedVectors, vector_length: int
-) -> np.ndarray:
+) -> npt.NDArray[np.float32]:
     """
     Helper function. This produces output in the expected shape.
     Where one frame's worth of audio (in the video) is reduced to a single RMS value.
@@ -30,9 +31,12 @@ def _compute_raw_rms(
     in the output video.
     :return: The RMS values.
     """
-    return librosa.feature.rms(
+
+    output: npt.NDArray[np.float32] = librosa.feature.rms(
         y=time_series_audio_vectors, frame_length=vector_length, center=False
     )[0]
+
+    return output
 
 
 def reduce_vector_rms_rolling_max(
@@ -186,7 +190,7 @@ def quantize_results_layers(
         output_range=(0, len(network_indices) - 1),
     )
 
-    quantized = np.rint(scaled_into_index_range).astype(int)
+    quantized = np.rint(scaled_into_index_range).astype(int)  # type: ignore[call-overload]
 
     return ResultLayers(
         result=DataLabel(quantized, f"{results_layers.result.label} Scaled, Quantized"),
@@ -194,7 +198,7 @@ def quantize_results_layers(
     )
 
 
-def _derive_data(data: np.ndarray, order: int) -> np.ndarray:
+def _derive_data(data: npt.NDArray[Any], order: int) -> npt.NDArray[Any]:
     """
     Take a given order derivative of the input data.
     Note: `np.nan` values within the input are converted to zero before taking the derivative.
@@ -202,9 +206,10 @@ def _derive_data(data: np.ndarray, order: int) -> np.ndarray:
     :return: derivative as an array, same length as input array.
     """
 
-    data = np.nan_to_num(data)
+    data = np.nan_to_num(data)  # type: ignore[no-untyped-call]
     x_axis = np.arange(len(data))
-    return UnivariateSpline(x=x_axis, y=data).derivative(n=order)(x_axis)
+    output: npt.NDArray[Any] = UnivariateSpline(x=x_axis, y=data).derivative(n=order)(x_axis)
+    return output
 
 
 def derive_results_layers(results_layers: ResultLayers, order: int) -> ResultLayers:
@@ -258,7 +263,7 @@ def rolling_sum_results_layers(results_layers: ResultLayers, window_length: int)
     )
 
 
-def track_length_filter(bool_tracks: pd.Series, track_length: int) -> np.ndarray:
+def track_length_filter(bool_tracks: pd.Series, track_length: int) -> List[bool]:
     """
     For a list of booleans, reject periods of true that are less than the given length.
     :param bool_tracks: INCLUSIVE!
@@ -271,4 +276,4 @@ def track_length_filter(bool_tracks: pd.Series, track_length: int) -> np.ndarray
     df["track_length"] = df.track_number.groupby(df.track_number).transform(len)
     df["output_mask"] = (df.bool_tracks == 1) & (df.track_length >= track_length)
 
-    return df.output_mask.tolist()
+    return list(df.output_mask.tolist())

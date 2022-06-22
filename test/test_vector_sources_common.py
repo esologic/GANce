@@ -4,7 +4,7 @@ Each test here will probably have some crossover with other functions.
 This is good for coverage but bad for side-effects.
 """
 
-from typing import Tuple
+from typing import Tuple, cast
 
 import numpy as np
 import pytest
@@ -31,7 +31,9 @@ def test_scale_vectors_to_length(
 
     len_original = original_vector_length * num_original_vectors
 
-    unscaled = np.sin(np.linspace(start=0, stop=len_original - 1, num=len_original))
+    unscaled = cast(
+        ConcatenatedVectors, np.sin(np.linspace(start=0, stop=len_original - 1, num=len_original))
+    )
 
     scaled = vector_sources_common.scale_vectors_to_length_resample(
         data=unscaled,
@@ -43,7 +45,7 @@ def test_scale_vectors_to_length(
         start=0,
         stop=(output_vector_length * num_original_vectors),
         step=output_vector_length / original_vector_length,
-    ).astype(np.int)
+    )
 
     at_points = np.array(
         [

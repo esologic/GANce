@@ -2,9 +2,10 @@
 Test of the reduction primitives and underlying functions.
 """
 
-from typing import List
+from typing import Any, List
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import pytest
 
@@ -148,7 +149,7 @@ def test_threshold_track_filter(
         ),
     ],
 )
-def test__derive_data_constant_result(data: np.array, expected_value: float) -> None:
+def test__derive_data_constant_result(data: npt.NDArray[Any], expected_value: float) -> None:
     """
     Input some curves with constant slopes to make sure the derivation function works as expected.
     Also validate that the none inputs are correctly converted.

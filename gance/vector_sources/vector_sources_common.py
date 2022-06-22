@@ -9,9 +9,10 @@ but linspace is more literal.
 
 import logging
 import multiprocessing
-from typing import Callable, Iterable, Iterator, Tuple, Union, overload
+from typing import Any, Callable, Iterable, Tuple, Union, overload
 
 import numpy as np
+import numpy.typing as npt
 from scipy import interpolate
 from scipy.interpolate import interp1d
 from scipy.signal import resample, savgol_filter
@@ -30,7 +31,7 @@ from gance.vector_sources.vector_types import (
 LOGGER = logging.getLogger(__name__)
 
 
-def pad_array(array: np.ndarray, size: int) -> np.ndarray:
+def pad_array(array: npt.NDArray[Any], size: int) -> npt.NDArray[Any]:
     """
     Pads an array with zeros to the end to a given length.
     :param array: The array to pad.
@@ -38,11 +39,13 @@ def pad_array(array: np.ndarray, size: int) -> np.ndarray:
     :return: The padded array.
     """
 
-    return np.pad(array, pad_width=(0, size - len(array)), mode="constant", constant_values=0)
+    return np.pad(  # type: ignore[no-untyped-call,no-any-return]
+        array, pad_width=(0, size - len(array)), mode="constant", constant_values=0
+    )
 
 
 def remap_values_into_range(
-    data: Iterator[Union[float, int]],
+    data: Union[npt.NDArray[Any], SingleVector, SingleMatrix],
     input_range: Tuple[Union[float, int], Union[float, int]],
     output_range: Tuple[Union[float, int], Union[float, int]],
 ) -> Iterable[float]:
@@ -96,9 +99,16 @@ def sub_vectors(
 
     if len(data.shape) >= 2:
         num_vectors = int(data.shape[-1] / vector_length)
-        return DividedMatrices(np.array(np.split(data, num_vectors, axis=-1)))
+        return DividedMatrices(
+            np.array(np.split(data, num_vectors, axis=-1))  # type: ignore[no-untyped-call]
+        )
     else:
         return DividedVectors(np.reshape(data, (-1, vector_length)))
+
+
+@overload
+def underlying_length(data: npt.NDArray[Any]) -> int:
+    ...
 
 
 @overload
@@ -122,7 +132,9 @@ def underlying_length(data: ConcatenatedMatrices) -> int:
 
 
 def underlying_length(
-    data: Union[SingleVector, SingleMatrix, ConcatenatedVectors, ConcatenatedMatrices]
+    data: Union[
+        npt.NDArray[Any], SingleVector, SingleMatrix, ConcatenatedVectors, ConcatenatedMatrices
+    ]
 ) -> int:
     """
     Decides what type is on the input, then calculates the vector length accordingly.
@@ -179,7 +191,7 @@ def smooth_each_vector(
     :return: The smoothed vectors back in the original shape.
     """
     return ConcatenatedVectors(
-        np.concatenate(
+        np.concatenate(  # type: ignore[no-untyped-call]
             [
                 smooth_vector(vector, window_length=window_length, polyorder=polyorder)
                 for vector in sub_vectors(data, vector_length)
@@ -201,7 +213,7 @@ def _scale_vectors_with_function(
     :return: Scaled vectors as an array of vectors.
     """
     return ConcatenatedVectors(
-        np.concatenate(
+        np.concatenate(  # type: ignore[no-untyped-call]
             [scale_function(vector) for vector in sub_vectors(data, original_vector_length)],
             axis=None,
         )
@@ -292,7 +304,7 @@ def interpolate_to_vector_count(
 
     by_vector = np.array(scaled_points_over_time).swapaxes(1, 0)
 
-    return ConcatenatedVectors(np.concatenate(by_vector))
+    return ConcatenatedVectors(np.concatenate(by_vector))  # type: ignore[no-untyped-call]
 
 
 def duplicate_to_vector_count(
@@ -342,7 +354,7 @@ def duplicate_to_vector_count(
 
     by_vector = np.array(scaled_points_over_time).swapaxes(1, 0)
 
-    return ConcatenatedVectors(np.concatenate(by_vector))
+    return ConcatenatedVectors(np.concatenate(by_vector))  # type: ignore[no-untyped-call]
 
 
 def promote_to_matrix_duplicate(
@@ -362,11 +374,13 @@ def promote_to_matrix_duplicate(
     if dimensions != 1:
         raise ValueError("Undefined behavior!")
 
-    return ConcatenatedMatrices(np.tile(data, (target_depth, dimensions)))
+    return ConcatenatedMatrices(
+        np.tile(data, (target_depth, dimensions))  # type: ignore[no-untyped-call]
+    )
 
 
 @overload
-def demote_to_vector_select(data: SingleMatrix, index_to_take: int = 0) -> SingleMatrix:
+def demote_to_vector_select(data: SingleMatrix, index_to_take: int = 0) -> ConcatenatedVectors:
     ...
 
 
@@ -379,7 +393,7 @@ def demote_to_vector_select(
 
 def demote_to_vector_select(
     data: Union[SingleMatrix, ConcatenatedMatrices], index_to_take: int = 0
-) -> Union[SingleMatrix, ConcatenatedMatrices]:
+) -> ConcatenatedVectors:
     """
     Will be used to take a 1 dimensional vector and promote it to a shape that it can be
     input into full depth network.
@@ -393,14 +407,14 @@ def demote_to_vector_select(
 
 @overload
 def rotate_vectors_over_time(
-    data: ConcatenatedVectors, vector_length: int, roll_values: np.ndarray
+    data: ConcatenatedVectors, vector_length: int, roll_values: SingleVector
 ) -> ConcatenatedVectors:
     ...
 
 
 @overload
 def rotate_vectors_over_time(
-    data: ConcatenatedMatrices, vector_length: int, roll_values: np.ndarray
+    data: ConcatenatedMatrices, vector_length: int, roll_values: SingleVector
 ) -> ConcatenatedMatrices:
     ...
 
@@ -408,8 +422,8 @@ def rotate_vectors_over_time(
 def rotate_vectors_over_time(
     data: Union[ConcatenatedVectors, ConcatenatedMatrices],
     vector_length: int,
-    roll_values: np.ndarray,
-) -> np.ndarray:
+    roll_values: SingleVector,
+) -> Union[ConcatenatedVectors, ConcatenatedMatrices]:
     """
     Spin vectors along their x axis.
     Note: There's a demo function for this, makes understanding it much easier.
@@ -425,7 +439,7 @@ def rotate_vectors_over_time(
         np.roll(sub_vector, roll_value * -1)
         for sub_vector, roll_value in zip(split, roll_per_vector)
     ]
-    return np.concatenate(rolled)
+    return np.concatenate(rolled)  # type: ignore[no-untyped-call,no-any-return]
 
 
 def interpolate_between_vectors(

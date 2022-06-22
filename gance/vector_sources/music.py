@@ -8,13 +8,14 @@ from pathlib import Path
 from typing import List, NamedTuple, Optional, Union, overload
 
 import numpy as np
+import numpy.typing as npt
 import resampy
 from scipy.io import wavfile
 
 from gance.logger_common import LOGGER
 from gance.vector_sources.vector_sources_common import pad_array, remap_values_into_range
 
-WavDataType = Union["np.ndarray[np.int16]", "np.ndarray[np.float32]", "np.ndarray[np.int16]"]
+WavDataType = Union[npt.NDArray[np.int16], npt.NDArray[np.float32]]
 
 
 class WavFileProperties(NamedTuple):
@@ -106,7 +107,7 @@ def read_wavs_scale_for_video(  # pylint: disable=too-many-locals
         raise ValueError("Multiple sample rates for input audio files is unsupported.")
 
     input_wav = WavFileProperties(
-        wav_data=np.concatenate(
+        wav_data=np.concatenate(  # type: ignore[no-untyped-call]
             [
                 input_wav.wav_data.mean(axis=1)
                 if len(input_wav.wav_data.shape) > 1
@@ -133,7 +134,7 @@ def read_wavs_scale_for_video(  # pylint: disable=too-many-locals
     elif target_num_vectors is not None:
         original_num_vectors = num_wav_samples / vector_length
         ratio = target_num_vectors / original_num_vectors
-        scaled_sample_rate = float(input_wav.sample_rate) * ratio
+        scaled_sample_rate = int(float(input_wav.sample_rate) * ratio)
         LOGGER.debug(
             f"Original Num Vectors={original_num_vectors}, "
             f"Ratio={ratio}, "

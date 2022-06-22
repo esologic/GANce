@@ -4,15 +4,16 @@ Interesting vectors can be reused with other networks.
 """
 import itertools
 from pathlib import Path
+from typing import Iterator, cast
 
 import click
 import numpy as np
 from more_itertools import consume
 
 from gance.assets import PRODUCTION_NETWORK_PATH
-from gance.gance_types import ImageSourceType
 from gance.image_sources import video_common
 from gance.network_interface import fast_synthesizer
+from gance.vector_sources.vector_sources_common import SingleVector
 
 
 @click.group()
@@ -64,14 +65,14 @@ def random(network: str, num_gpus: int, fullscreen: bool) -> None:
     :return: None
     """
 
-    def input_source() -> ImageSourceType:
+    def input_source() -> Iterator[SingleVector]:
         """
         Create an never-ending input source.
         :return: Unlimited randomized vectors.
         """
 
         while True:
-            yield np.random.rand(512)
+            yield cast(SingleVector, np.random.rand(512))
 
     with fast_synthesizer.fast_synthesizer(
         data_source=input_source(),

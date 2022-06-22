@@ -4,7 +4,7 @@ Test functions for some of the more complicated image pipelines.
 
 import functools
 from test.assets import SAMPLE_BATCH_1_NETWORK_PATH, SAMPLE_BATCH_2_NETWORK_PATH, WAV_CLAPS_PATH
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, cast
 
 import pytest
 
@@ -17,7 +17,7 @@ from gance.gance_types import OptionalImageSourceType, RGBInt8ImageType
 from gance.image_sources import image_sources_common
 from gance.network_interface.network_functions import MultiNetwork
 from gance.vector_sources.music import read_wavs_scale_for_video
-from gance.vector_sources.vector_sources_common import sub_vectors
+from gance.vector_sources.vector_sources_common import ConcatenatedVectors, sub_vectors
 
 
 @functools.lru_cache(maxsize=100)
@@ -32,11 +32,14 @@ def load_vis_data(
     :return: To eventually feed into model.
     """
 
-    time_series_audio_vectors = read_wavs_scale_for_video(
-        wavs=[WAV_CLAPS_PATH],
-        vector_length=vector_length,
-        frames_per_second=fps,
-    ).wav_data
+    time_series_audio_vectors = cast(
+        ConcatenatedVectors,
+        read_wavs_scale_for_video(
+            wavs=[WAV_CLAPS_PATH],
+            vector_length=vector_length,
+            frames_per_second=fps,
+        ).wav_data,
+    )
 
     return alpha_blend_vectors_max_rms_power_audio(
         alpha=0.5,  # Param doesn't matter for test.
@@ -104,7 +107,6 @@ def get_network_output(
         )
 
 
-@pytest.mark.skip
 @pytest.mark.gpu
 @pytest.mark.parametrize(
     "network_enabled",

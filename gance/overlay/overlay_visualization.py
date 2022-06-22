@@ -4,10 +4,11 @@ is going on during an overlay computation.
 """
 
 import itertools
-from typing import Iterator, List, NamedTuple, Optional, Tuple, cast
+from typing import Any, Iterator, List, NamedTuple, Optional, Tuple, cast
 
 import more_itertools
 import numpy as np
+import numpy.typing as npt
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 
@@ -59,7 +60,7 @@ class YValues(NamedTuple):
 
 def _setup_axis(
     axis: Axes,
-    x_values: np.ndarray,
+    x_values: npt.NDArray[Any],
     y_values: List[YValues],
     title: str,
     horizontal_line_location: Optional[float],

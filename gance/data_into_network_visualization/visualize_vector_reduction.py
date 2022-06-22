@@ -3,7 +3,7 @@ Functions to visualize the vector reduction process.
 """
 import itertools
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 import more_itertools
 import numpy as np
@@ -21,6 +21,7 @@ from gance.logger_common import LOGGER
 from gance.vector_sources import vector_reduction
 from gance.vector_sources.music import read_wavs_scale_for_video
 from gance.vector_sources.vector_reduction import ResultLayers
+from gance.vector_sources.vector_sources_common import ConcatenatedVectors
 
 
 def visualize_reducer_output(audio_path: Path, reducer: VectorsReducer) -> None:
@@ -36,7 +37,9 @@ def visualize_reducer_output(audio_path: Path, reducer: VectorsReducer) -> None:
     ).wav_data
 
     reduced = vector_reduction.quantize_results_layers(
-        results_layers=reducer(time_series_audio_vectors=audio, vector_length=vector_length),
+        results_layers=reducer(
+            time_series_audio_vectors=cast(ConcatenatedVectors, audio), vector_length=vector_length
+        ),
         network_indices=list(range(30)),
     )
 

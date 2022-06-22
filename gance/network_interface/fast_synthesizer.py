@@ -4,12 +4,17 @@ throughput.
 
 Some very _very_ weird code here, using the global. This is the canonical way to pre-load an
 expensive multiprocessing operation though if you can believe it or not.
+
+Semaphore typing technique brought to you by:
+https://github.com/python/typeshed/issues/4266#issuecomment-832770270
 """
+
 import logging
 import multiprocessing
 from contextlib import contextmanager
 from functools import partial
 from multiprocessing import Queue, Semaphore
+from multiprocessing.synchronize import Semaphore as SemaphoreType
 from pathlib import Path
 from typing import Iterator, Optional, Union, overload
 
@@ -25,7 +30,7 @@ from gance.vector_sources.vector_sources_common import SingleMatrix, SingleVecto
 _network_interface: Optional[NetworkInterface] = None
 
 # Used to make sure items are produced at the rate they're consumed in the slow-consumer case.
-_output_control_semaphore: Optional[Semaphore] = None
+_output_control_semaphore: Optional[SemaphoreType] = None
 
 
 @overload
@@ -63,7 +68,7 @@ def synthesize_frame(
 
 
 def initializer(
-    network_path: Path, id_queue: "Queue[int]", output_control_semaphore: Semaphore
+    network_path: Path, id_queue: "Queue[int]", output_control_semaphore: SemaphoreType
 ) -> None:
     """
     Called before data can be fed into the map function, let's us load the network as a global.
@@ -123,7 +128,7 @@ def fast_synthesizer(
     for item in range(num_gpus):
         queue.put(item)
 
-    output_control_semaphore: Optional[Semaphore] = Semaphore() if slow_consumer else None
+    output_control_semaphore: Optional[SemaphoreType] = Semaphore() if slow_consumer else None
 
     # Really important here that `processes` always matches the GPU count.
     # Note to future self: do not increase this number to try and go faster.

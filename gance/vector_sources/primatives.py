@@ -2,9 +2,10 @@
 Functions to generate vector arrays of primative shapes. Lines, sweeps, noise etc.
 """
 
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, cast
 
 import numpy as np
+import numpy.typing as npt
 import scipy
 
 from gance.data_into_network_visualization.vectors_to_image import (
@@ -65,7 +66,10 @@ def gaussian_data(
     if random_state is None:
         random_state = np.random.RandomState(DEFAULT_RANDOM_SEED)  # pylint: disable=no-member
 
-    all_latents = random_state.randn(num_vectors, 1, vector_length).astype(np.float32)
+    all_latents = cast(
+        npt.NDArray[np.float32],
+        random_state.randn(num_vectors, 1, vector_length).astype(np.float32),
+    )
     all_latents = scipy.ndimage.gaussian_filter(
         input=all_latents, sigma=(sigmas.across_vectors, 0, sigmas.within_vectors), mode="wrap"
     )
@@ -111,7 +115,7 @@ def square_wave_sweep_horizontal(
     """
 
     return ConcatenatedVectors(
-        np.concatenate(
+        np.concatenate(  # type: ignore[no-untyped-call]
             [
                 single_square_wave_vector(
                     rising_edge_x=value,
@@ -147,7 +151,7 @@ def square_wave_sweep_vertical(
     """
 
     return ConcatenatedVectors(
-        np.concatenate(
+        np.concatenate(  # type: ignore[no-untyped-call]
             [
                 single_square_wave_vector(
                     y_offset=y_offset,
@@ -185,7 +189,7 @@ def vertical_sweep_demo() -> None:
 
     sin_vector = single_sine_wave_vector(vector_length, y_amplitude=1)
 
-    data = np.concatenate(
+    data = np.concatenate(  # type: ignore[no-untyped-call]
         [
             [
                 vector_point + sin_point if vector_point != 0 else 0

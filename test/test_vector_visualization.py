@@ -3,10 +3,12 @@ Unit tests for the visualization module
 """
 
 import datetime
-from typing import Iterator
+import typing
+from typing import Any, Iterator
 
 import more_itertools
 import numpy as np
+import numpy.typing as npt
 import pytest
 
 import gance.vector_sources.music
@@ -14,7 +16,7 @@ import gance.vector_sources.primatives
 from gance.data_into_network_visualization.vectors_3d import _reshape_vectors_for_3d_plotting
 
 
-def reshape_using_chunks(data: np.ndarray, chunk_width: int) -> np.ndarray:
+def reshape_using_chunks(data: npt.NDArray[Any], chunk_width: int) -> npt.NDArray[Any]:
     """
     This is the nieve approach.
     Uses a sampler to split the data into chunks, then manually re-assemble those chunks into a
@@ -25,17 +27,18 @@ def reshape_using_chunks(data: np.ndarray, chunk_width: int) -> np.ndarray:
     :return: The reshaped data.
     """
 
+    @typing.no_type_check
     def create_sampler(
-        data: np.ndarray, samples_per_chunk: int, reshape: bool = True
-    ) -> Iterator[np.ndarray]:
+        to_chunk: npt.NDArray[Any], samples_per_chunk: int, reshape: bool = True
+    ) -> Iterator[npt.NDArray[Any]]:
         """
         Create the iterator for the data.
-        :param data:  The wav data to turn into chunks.
+        :param to_chunk: The wav data to turn into chunks.
         :param samples_per_chunk: Data points per sub list (chunk).
         :param reshape: Should be True when feeding into network.
         :return: Yield `data` in chunks.
         """
-        for c in more_itertools.chunked(data, n=samples_per_chunk):
+        for c in more_itertools.chunked(to_chunk, n=samples_per_chunk):
             yield np.reshape(np.array(c), (1, len(c))) if reshape else c
 
     sampler = create_sampler(data, chunk_width, False)
