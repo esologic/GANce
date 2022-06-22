@@ -6,6 +6,7 @@ Based on : https://www.oreilly.com/library/view/elegant-scipy/9781491922927/ch04
 from typing import Optional, Tuple
 
 import numpy as np
+import numpy.typing as npt
 from skimage import util
 from sklearn.preprocessing import minmax_scale
 
@@ -18,7 +19,7 @@ from gance.vector_sources.vector_types import ConcatenatedVectors
 
 
 def reshape_spectrogram_to_vectors(
-    spectrogram_data: "np.ndarray[np.float32]",
+    spectrogram_data: npt.NDArray[np.float32],
     vector_length: int,
     amplitude_range: Optional[Tuple[int, int]] = None,
 ) -> ConcatenatedVectors:
@@ -48,7 +49,7 @@ def reshape_spectrogram_to_vectors(
 
 def compute_spectrogram(
     data: ConcatenatedVectors, num_frequency_bins: int, truncate: bool = True
-) -> np.ndarray:
+) -> npt.NDArray[np.float32]:
     """
     Create a spectrogram of a given array.
     :param data: The data to compute the spectrogram of. Needs to be "mono" having a 1-D shape.
@@ -67,10 +68,10 @@ def compute_spectrogram(
 
     m = num_frequency_bins - 1 * 2
     slices = util.view_as_windows(data, window_shape=(m,), step=num_frequency_bins)
-    win = np.hanning(m + 1)[:-1]
+    win = np.hanning(m + 1)[:-1]  # type: ignore[no-untyped-call]
     slices = slices * win
     slices = slices.T
-    fft = np.fft.fft(slices, axis=0)
+    fft = np.fft.fft(slices, axis=0)  # type: ignore[no-untyped-call]
 
     if truncate:
         spectrum = fft[: (m // 2)]
@@ -78,8 +79,8 @@ def compute_spectrogram(
         spectrum = fft
 
     s = np.abs(spectrum)
-    s = 20 * np.log10(s / np.max(s))
-    return s
+    output: npt.NDArray[np.float32] = 20 * np.log10(s / np.max(s))  # type: ignore[no-untyped-call]
+    return output
 
 
 def compute_spectrogram_smooth_scale(

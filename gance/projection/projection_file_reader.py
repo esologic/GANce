@@ -5,10 +5,11 @@ Read a projection file back into memory
 import itertools
 from pathlib import Path
 from types import TracebackType
-from typing import Iterator, Optional, Type, Union, cast
+from typing import Any, Iterator, Optional, Type, Union, cast
 
 import h5py
 import numpy as np
+import numpy.typing as npt
 from h5py._hl.dataset import Dataset  # pylint: disable=protected-access
 from h5py._hl.group import Group  # pylint: disable=protected-access
 
@@ -33,9 +34,7 @@ from gance.projection.projector_file_writer import (
 from gance.vector_sources.vector_types import ConcatenatedMatrices, MatricesLabel, SingleMatrix
 
 
-def _double_iter(
-    group: Group, inner_matrix: bool
-) -> Iterator[Iterator[Union[np.ndarray, np.ndarray]]]:
+def _double_iter(group: Group, inner_matrix: bool) -> Iterator[Iterator[npt.NDArray[Any]]]:
     """
     Helper function.
     :param group: Group to search
@@ -91,9 +90,9 @@ def _datasets_in_group(
         :param dataset: To process.
         :return: As a numpy array.
         """
-        as_numpy_array: Union[RGBInt8ImageType, CompleteLatentsType] = np.array(dataset)
+        as_numpy_array = np.array(dataset)
         if inner_matrix:
-            return complete_latents_to_matrix(as_numpy_array)
+            return complete_latents_to_matrix(cast(CompleteLatentsType, as_numpy_array))
         return RGBInt8ImageType(as_numpy_array)
 
     yield from (dataset_for_output(dataset) for dataset in _types_in_group(group, Dataset))
@@ -278,7 +277,11 @@ def _iterator_of_single_matrix_to_matrices_label(
         raise StopIteration(f"Iterator labeled: {label} was empty!") from e
 
     return MatricesLabel(
-        data=ConcatenatedMatrices(np.concatenate([first_matrix] + list(iterator), axis=-1)),
+        data=ConcatenatedMatrices(
+            np.concatenate(  # type: ignore[no-untyped-call]
+                [first_matrix] + list(iterator), axis=-1
+            )
+        ),
         vector_length=first_matrix.shape[-1],
         label=label,
     )

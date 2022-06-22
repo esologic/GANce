@@ -6,6 +6,7 @@ import collections
 import datetime
 import itertools
 import multiprocessing
+import typing
 from pathlib import Path
 from typing import Iterator
 
@@ -20,6 +21,7 @@ from gance.network_interface import network_functions
 from gance.vector_sources.vector_sources_common import SingleVector
 
 
+@typing.no_type_check
 def create_many_images(gpu: int) -> None:
     """
 
@@ -39,6 +41,7 @@ def create_many_images(gpu: int) -> None:
         interface.create_image_vector(data=vector)
 
 
+@typing.no_type_check
 def main_multi() -> None:
     """
 
@@ -52,13 +55,14 @@ def main_multi() -> None:
     p2.start()
 
 
+@typing.no_type_check
 def main_gpu() -> None:
     """
 
     :return:
     """
 
-    queue = collections.deque(maxlen=50)  # type: ignore
+    queue = collections.deque(maxlen=50)
 
     with gance.network_interface.fast_synthesizer.fast_synthesizer(
         data_source=itertools.repeat(np.zeros(shape=(512,))),
@@ -77,6 +81,7 @@ def main_gpu() -> None:
     print("further out here")
 
 
+@typing.no_type_check
 def main() -> None:
     """
 
@@ -124,8 +129,10 @@ def main() -> None:
 
     for index, _ in enumerate(
         zip(
-            video_common.display_frame_forward(spectrogram_images, window_name="Spectrogram"),
-            video_common.display_frame_forward(
+            video_common.display_frame_forward_opencv(
+                spectrogram_images, window_name="Spectrogram"
+            ),
+            video_common.display_frame_forward_opencv(
                 concatenated_images, window_name="Concatenated Data"
             ),
         )

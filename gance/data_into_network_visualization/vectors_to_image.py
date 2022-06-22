@@ -5,9 +5,10 @@ Functions around visualizing sets of vectors, resulting in images.
 from contextlib import _GeneratorContextManager  # pylint: disable=unused-import
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple, Union
+from typing import Any, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
+import numpy.typing as npt
 from cv2 import cv2
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
@@ -150,10 +151,10 @@ class SingleVectorViz(Protocol):
 
     def __call__(
         self,
-        x_values: np.ndarray,
+        x_values: npt.NDArray[Any],
         y_values: Union[SingleVector, SingleMatrix],
         new_title: Optional[str] = None,
-    ) -> "_GeneratorContextManager[np.ndarray]":
+    ) -> "_GeneratorContextManager[npt.NDArray[Any]]":
         """
         :param x_values: x points
         :param y_values: y points -- This is okay to be of shape (Any, Any)! So you can put a
@@ -194,7 +195,9 @@ def vector_visualizer(
 
     @contextmanager
     def make_visualization(
-        x_values: np.ndarray, y_values: np.ndarray, new_title: Optional[str] = None
+        x_values: npt.NDArray[Any],
+        y_values: npt.NDArray[Any],
+        new_title: Optional[str] = None,
     ) -> Iterator[RGBInt8ImageType]:
         """
         Creates the image for the given x,y.
@@ -211,7 +214,7 @@ def vector_visualizer(
 
         lines = [
             axis.scatter(x_values, sub_vector, color=color)
-            for sub_vector, color in zip(
+            for sub_vector, color in zip(  # type: ignore[call-overload]
                 plotting_y,
                 infinite_colors(),
             )

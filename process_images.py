@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import List, Optional
 
 import click
-import cv2
 import PIL
+from cv2 import cv2
 from PIL import Image
 
 from gance.logger_common import LOGGER

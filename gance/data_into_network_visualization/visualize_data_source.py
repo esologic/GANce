@@ -39,7 +39,7 @@ def visualizer_initializer(output_width: int, output_height: int) -> None:
 
 
 def _create_frame(
-    x_values: np.ndarray,
+    x_values: SingleVector,
     title_prefix: str,
     index_data: Tuple[int, Union[SingleVector, SingleMatrix]],
 ) -> Tuple[Union[SingleVector, SingleMatrix], RGBInt8ImageType]:
@@ -97,7 +97,7 @@ def visualize_data_source(
     first, s = iterator_common.first_item_from_iterator(source)
 
     # only need to create this once.
-    x_values = np.arange(underlying_length(cast(np.ndarray, first)))
+    x_values: SingleVector = np.arange(underlying_length(cast(SingleVector, first)))
 
     def create_output() -> Iterator[Tuple[Union[SingleVector, SingleMatrix], RGBInt8ImageType]]:
         """

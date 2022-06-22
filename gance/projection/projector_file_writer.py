@@ -139,7 +139,7 @@ class ProjectionAttributes:  # pylint: disable=too-many-instance-attributes
     # The noise images themselves have to be flattened because they are inconsistently shaped.
     # This records their shapes so they can be rebuilt.
     # THIS SAYS `np.float` BUT THE ONLY ACCEPTABLE VALUE HERE IS `np.nan`!!
-    noises_shapes: Union[NoisesShapesType, np.float64]
+    noises_shapes: Union[NoisesShapesType, float]
 
     # If latent histories are going to be present in the projection file.
     latents_histories_enabled: bool
@@ -808,7 +808,9 @@ def _flatten_noises(noises: List[NoisesType]) -> FlattenedNoisesType:
     :param noises: Noises to flatten.
     :return: Flattened noises.
     """
-    return FlattenedNoisesType(np.concatenate([noise.flatten() for noise in noises]))
+    return FlattenedNoisesType(
+        np.concatenate([noise.flatten() for noise in noises])  # type: ignore[no-untyped-call]
+    )
 
 
 def _create_dataset_wrapper(

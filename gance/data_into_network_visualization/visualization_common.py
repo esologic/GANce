@@ -2,9 +2,10 @@
 Common types, constants, functions used in visualization, to avoid cyclic imports.
 """
 import itertools
-from typing import Iterator, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, Iterator, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
+import numpy.typing as npt
 import PIL
 from cv2 import cv2
 from matplotlib import colors as mcolors
@@ -15,6 +16,7 @@ from typing_extensions import Protocol
 
 from gance.gance_types import RGBInt8ImageType
 from gance.vector_sources.vector_types import (
+    ConcatenatedVectors,
     MatricesLabel,
     SingleMatrix,
     SingleVector,
@@ -24,7 +26,7 @@ from gance.vector_sources.vector_types import (
 STANDARD_MATPLOTLIB_SIDE_LENGTH_FIGSIZE = 10
 STANDARD_MATPLOTLIB_DPI = 100
 
-DataLabelDataType = Union[np.ndarray, SingleVector, SingleMatrix]
+DataLabelDataType = Union[npt.NDArray[Any], SingleVector, SingleMatrix]
 
 
 class DataLabel(NamedTuple):
@@ -52,7 +54,9 @@ class VectorsReducer(Protocol):  # pylint: disable=too-few-public-methods
     Commonly defines the shape of functions to reduce pieces of audio into a single value.
     """
 
-    def __call__(self, time_series_audio_vectors: np.ndarray, vector_length: int) -> ResultLayers:
+    def __call__(
+        self, time_series_audio_vectors: ConcatenatedVectors, vector_length: int
+    ) -> ResultLayers:
         """
         Given an array of time series audio vectors delineated by vector_length,
         return a list of values that are representative of each subsequent vector in the input.
@@ -109,7 +113,7 @@ class FrameInput(NamedTuple):
 
     # Holds a number of `network_index` values before and after `frame_index`.
     # Consumed by data visualization to show the history of the network index for any given frame.
-    surrounding_network_indices: np.ndarray
+    surrounding_network_indices: npt.NDArray[np.int8]
 
     # Exactly like in `VisualizationInput`, but in the same range of indices as
     # `surrounding_network_indices`, so you can see the same context.

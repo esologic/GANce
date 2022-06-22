@@ -403,7 +403,7 @@ def resize_image(
     Uses, `cv2.INTER_CUBIC`, which is visually good-looking but somewhat slow.
     May want to be able to pass this in.
     :param image: To scale.
-    :param resolution: Ouput resolution.
+    :param resolution: Output resolution.
     :param delete: If true, `del` will be used on `image` to force it's memory to be released.
     :return: Scaled image.
     """
@@ -412,10 +412,10 @@ def resize_image(
         image, (resolution.height, resolution.width), interpolation=cv2.INTER_CUBIC
     )
 
-    # The image in `source` has now been 'consumed', and can't be used again.
-    # We delete this frame here to avoid memory leaks.
-    # Not really sure if this is needed, but it shouldn't cause harm.
     if delete:
+        # The image has now been 'consumed', and can't be used again.
+        # We delete this frame here to avoid memory leaks.
+        # Not really sure if this is needed, but it shouldn't cause harm.
         del image
 
     # The scaled image.
@@ -464,7 +464,7 @@ def scale_square_source_duplicate(
     )
 
 
-def display_frame_forward(
+def display_frame_forward_opencv(
     source: ImageSourceType,
     window_name: str = _DEFAULT_WINDOW_NAME,
     display_resolution: Optional[ImageResolution] = None,
@@ -473,17 +473,17 @@ def display_frame_forward(
     """
     Displays the the images in `source`, and forwards the image so they can be consumed again.
     Uses an openCV `imshow` to reveal the image.
-    TODO: better docs.
     :param source: To display.
     :param window_name: Name of the window.
     :param display_resolution: Change the input frames to this resolution before displaying. Doesn't
     modify the output frames.
+    :param full_screen: If True, images will be displayed fullscreen, windowed if otherwise.
     :return: Forwarded iterator, `source`.
     """
 
     cv2.namedWindow(
         window_name,
-        cv2.WINDOW_GUI_NORMAL | cv2.WINDOW_FULLSCREEN if full_screen else cv2.WINDOW_AUTOSIZE,
+        cv2.WINDOW_GUI_NORMAL if full_screen else cv2.WINDOW_AUTOSIZE,
     )
 
     if full_screen:
