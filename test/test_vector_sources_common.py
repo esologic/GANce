@@ -49,7 +49,7 @@ def test_scale_vectors_to_length(
 
     at_points = np.array(
         [
-            scaled[scaled_value_index]  # pylint:disable=unsubscriptable-object
+            scaled[int(scaled_value_index)]  # pylint:disable=unsubscriptable-object
             for scaled_value_index in indexer
         ]
     )
