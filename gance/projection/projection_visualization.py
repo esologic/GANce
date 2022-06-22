@@ -5,9 +5,10 @@ WIP module for looking at projection files and doing some analysis.
 import itertools
 import os
 from pathlib import Path
-from typing import List, NamedTuple, Optional, Tuple, Union
+from typing import Any, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
+import numpy.typing as npt
 from cv2 import cv2
 from matplotlib import colors as mcolors
 from matplotlib import pyplot as plt
@@ -34,7 +35,9 @@ from gance.vector_sources.vector_sources_common import sub_vectors
 from gance.vector_sources.vector_types import MatricesLabel, SingleMatrix
 
 
-def _spline_to_points(splines: List[UnivariateSpline], x_values: np.ndarray) -> List[List[float]]:
+def _spline_to_points(
+    splines: List[UnivariateSpline], x_values: npt.NDArray[Any]
+) -> List[List[float]]:
     """
     Helper function to enumerate the values in a list of splines.
     :param splines: Splines to process.
@@ -170,7 +173,7 @@ def visualize_projection_convergence(  # pylint: disable=too-many-locals
         (False, True, True),
     ):
 
-        all_points = np.concatenate(lines)
+        all_points = np.concatenate(lines)  # type: ignore[no-untyped-call]
 
         if compute_limits:
             mean = all_points.mean()
@@ -186,7 +189,9 @@ def visualize_projection_convergence(  # pylint: disable=too-many-locals
         axis.set_title(title)
 
         # Might want to label the lines here which is why I'm keeping the `frame_index` around.
-        for line, frame_color in zip(lines, itertools.cycle(list(mcolors.XKCD_COLORS.keys()))):
+        for line, frame_color in zip(  # type: ignore[call-overload]
+            lines, itertools.cycle(list(mcolors.XKCD_COLORS.keys()))
+        ):
             axis.plot(line, color=frame_color, alpha=0.5)
 
         for lines_description in lines_descriptions:

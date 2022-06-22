@@ -12,27 +12,28 @@ Pylint does not mix well with NewTypes. So, in the `.pylintrc` for this project,
 are manual overrides to ignore `no-member` errors for this class.
 """
 
-from typing import NamedTuple, NewType, Union
+from typing import Any, NamedTuple, NewType, Union
 
 import numpy as np  # pylint: disable=unused-import
+import numpy.typing as npt
 
 # dimensions are (Any,)
-SingleVector = NewType("SingleVector", "np.ndarray[np.float32]")  # type: ignore
+SingleVector = NewType("SingleVector", npt.NDArray[np.float32])
 
 # dimensions are (Any,)
-ConcatenatedVectors = NewType("ConcatenatedVectors", "np.ndarray[np.float32]")  # type: ignore
+ConcatenatedVectors = NewType("ConcatenatedVectors", npt.NDArray[np.float32])
 
 # dimensions are (Any, Any)
-DividedVectors = NewType("DividedVectors", "np.ndarray[np.float32]")  # type: ignore
+DividedVectors = NewType("DividedVectors", npt.NDArray[np.float32])
 
 # dimensions are (Any, Any)
-SingleMatrix = NewType("SingleMatrix", "np.ndarray[np.float32]")  # type: ignore
+SingleMatrix = NewType("SingleMatrix", npt.NDArray[np.float32])
 
 # dimensions are (Any, Any)
-ConcatenatedMatrices = NewType("ConcatenatedMatrices", "np.ndarray[np.float32]")  # type: ignore
+ConcatenatedMatrices = NewType("ConcatenatedMatrices", npt.NDArray[np.float32])
 
 # dimensions are (Any, Any, Any)
-DividedMatrices = NewType("DividedMatrices", "np.ndarray[np.float32]")  # type: ignore
+DividedMatrices = NewType("DividedMatrices", npt.NDArray[np.float32])
 
 
 class VectorsLabel(NamedTuple):
@@ -40,7 +41,7 @@ class VectorsLabel(NamedTuple):
     Intermediate type, used to link a vector array to the name of it for visualization.
     """
 
-    data: ConcatenatedVectors  # PRetty much everywhere this means concatenated version
+    data: ConcatenatedVectors  # Pretty much everywhere this means concatenated version
     vector_length: int
     label: str
 
@@ -55,7 +56,7 @@ class MatricesLabel(NamedTuple):
     label: str
 
 
-def is_vector(data: Union[SingleVector, SingleMatrix, np.ndarray]) -> bool:
+def is_vector(data: Union[SingleVector, SingleMatrix, npt.NDArray[Any]]) -> bool:
     """
     Check the shape of a given array to figure out if it's a vector or not.
     :param data: Array to evaluate.

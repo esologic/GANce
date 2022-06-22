@@ -4,9 +4,10 @@ These are basically transformations of time series audio vectors into things lik
 Functions themselves match a standard format so they can be used interchangeably.
 """
 
-from typing import List, Tuple
+from typing import Any, List, Tuple, cast
 
 import numpy as np
+import numpy.typing as npt
 from sklearn.preprocessing import minmax_scale
 from typing_extensions import Protocol
 
@@ -25,6 +26,7 @@ from gance.vector_sources.vector_types import (
     ConcatenatedMatrices,
     ConcatenatedVectors,
     MatricesLabel,
+    SingleVector,
     VectorsLabel,
 )
 
@@ -36,7 +38,7 @@ class CreateVisualizationInput(Protocol):  # pylint: disable=too-few-public-meth
 
     def __call__(
         self: "CreateVisualizationInput",
-        time_series_audio_vectors: np.ndarray,
+        time_series_audio_vectors: npt.NDArray[Any],
         vector_length: int,
         network_indices: List[int],
     ) -> VisualizationInput:
@@ -83,7 +85,7 @@ def _create_spectrogram(
             data=vector_sources_common.rotate_vectors_over_time(
                 data=spectrogram,
                 vector_length=vector_length,
-                roll_values=roll_values.result.data,
+                roll_values=cast(SingleVector, roll_values.result.data),
             ),
             vector_length=vector_length,
         )
@@ -95,7 +97,7 @@ def alpha_blend_vectors_max_rms_power_audio(
     alpha: float,
     fft_roll_enabled: bool,
     fft_amplitude_range: Tuple[int, int],
-    time_series_audio_vectors: np.ndarray,
+    time_series_audio_vectors: ConcatenatedVectors,
     vector_length: int,
     network_indices: List[int],
 ) -> VisualizationInput:
@@ -238,7 +240,7 @@ def alpha_blend_projection_file(  # pylint: disable=too-many-locals
         blend_depth,
     )
 
-    combined = np.concatenate(
+    combined = np.concatenate(  # type: ignore[no-untyped-call]
         (alpha_blended, projected_vectors[blend_depth:18])  # pylint: disable=unsubscriptable-object
     )
 

@@ -4,6 +4,7 @@ Known, working usages some of the visualization functions.
 import tempfile
 from pathlib import Path
 from time import time
+from typing import cast
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -100,9 +101,12 @@ def data_visualizations_single_frame() -> None:
     fig = visualization_common.standard_matplotlib_figure()
 
     data = alpha_blend_vectors_max_rms_power_audio(
-        time_series_audio_vectors=read_wavs_scale_for_video(
-            wavs=[WAV_CLAPS_PATH], vector_length=vector_length, frames_per_second=60.0
-        ).wav_data,
+        time_series_audio_vectors=cast(
+            ConcatenatedVectors,
+            read_wavs_scale_for_video(
+                wavs=[WAV_CLAPS_PATH], vector_length=vector_length, frames_per_second=60.0
+            ).wav_data,
+        ),
         vector_length=vector_length,
         network_indices=list(np.arange(20)),
         alpha=0.5,
@@ -140,9 +144,12 @@ def demo_rotation() -> None:
 
     vector_length = 512
 
-    time_series_audio_vectors = read_wavs_scale_for_video(
-        wavs=[WAV_CLAPS_PATH], vector_length=vector_length, frames_per_second=60.0
-    ).wav_data
+    time_series_audio_vectors = cast(
+        ConcatenatedVectors,
+        read_wavs_scale_for_video(
+            wavs=[WAV_CLAPS_PATH], vector_length=vector_length, frames_per_second=60.0
+        ).wav_data,
+    )
 
     spectrogram = compute_spectrogram_smooth_scale(
         data=time_series_audio_vectors,
@@ -151,7 +158,9 @@ def demo_rotation() -> None:
     )
 
     rotated = rotate_vectors_over_time(
-        data=spectrogram, vector_length=vector_length, roll_values=np.full((1000,), 10)
+        data=spectrogram,
+        vector_length=vector_length,
+        roll_values=cast(SingleVector, np.full((1000,), 10)),
     )
 
     labeled_rotated = VectorsLabel(data=rotated, vector_length=512, label="Rotated")
@@ -236,7 +245,7 @@ def blog_post_media() -> None:
         y_range=y_range,
     )
 
-    random_noise = np.random.rand(network_interface.expected_vector_length) * 10
+    random_noise = cast(SingleVector, np.random.rand(network_interface.expected_vector_length) * 10)
 
     network_visualization.single_vector_single_network_visualization(
         vector=random_noise,
@@ -315,11 +324,14 @@ def blog_post_media() -> None:
 
         network_visualization.vectors_single_network_visualization(
             vectors_label=VectorsLabel(
-                data=music.read_wavs_scale_for_video(
-                    wavs=[assets.NOVA_SNIPPET_PATH],
-                    vector_length=network_interface.expected_vector_length,
-                    frames_per_second=60.0,
-                ).wav_data,
+                data=cast(
+                    ConcatenatedVectors,
+                    music.read_wavs_scale_for_video(
+                        wavs=[assets.NOVA_SNIPPET_PATH],
+                        vector_length=network_interface.expected_vector_length,
+                        frames_per_second=60.0,
+                    ).wav_data,
+                ),
                 vector_length=network_interface.expected_vector_length,
                 label="Audio Directly Into Network",
             ),

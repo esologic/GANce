@@ -37,7 +37,7 @@ with the ip of your development environment. With this completed, and with the p
 environment activated (meaning ansible is installed) run:
 
 ```bash
-ansible-playbook install_nvidia_docker.yml -i hosts.yml
+ansible-playbook create_gance_environment.yml -i hosts.yml
 ```
 
 Now, you should be able to create docker containers that can use the GPU. To standup a development

@@ -1,0 +1,12 @@
+---
+- name: Create GANce Environment
+  hosts: all
+  become: true
+  tasks:
+    - name: Install NVIDIA Docker 2
+      import_tasks: install_nvidia_docker.yml
+    - name: Disable Automatic Display Locking
+      ansible.builtin.command: "{{ item }}"
+      with_items:
+        - "gsettings set org.gnome.desktop.session idle-delay 0"
+        - "gsettings set org.gnome.desktop.screensaver lock-enabled false"

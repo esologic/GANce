@@ -3,13 +3,16 @@ Functionality for plotting vectors on 3D axes.
 """
 
 import numpy as np
+import numpy.typing as npt
 from matplotlib.axes import Axes
 from mpl_toolkits.mplot3d.art3d import Path3DCollection, Poly3DCollection
 
 from gance.vector_sources.vector_types import ConcatenatedVectors, VectorsLabel
 
 
-def _reshape_vectors_for_3d_plotting(data: ConcatenatedVectors, vector_length: int) -> np.ndarray:
+def _reshape_vectors_for_3d_plotting(
+    data: ConcatenatedVectors, vector_length: int
+) -> npt.NDArray[np.float32]:
     """
     Take list of input data, and reshape it into a list of points for plotting.
     These points can be described with:
@@ -22,7 +25,7 @@ def _reshape_vectors_for_3d_plotting(data: ConcatenatedVectors, vector_length: i
     """
 
     num_ys = len(data) // vector_length
-    x = np.tile(np.arange(vector_length), num_ys)
+    x = np.tile(np.arange(vector_length), num_ys)  # type: ignore[no-untyped-call]
     y = np.repeat(np.arange(num_ys), vector_length)
     output = np.stack([x, y, data], axis=1)
 
@@ -83,7 +86,9 @@ def draw_plane_at_y_point(
     :return: The plane object. You can run .remove() on this to remove it from an axis.
     """
 
-    z, x = np.meshgrid(np.arange(z_min, z_max), np.arange(0, vector_width))
+    z, x = np.meshgrid(  # type: ignore[no-untyped-call]
+        np.arange(z_min, z_max), np.arange(0, vector_width)
+    )
     y = (0 * x) + y_value
     return ax_3d.plot_surface(x, y, z, linewidth=0, alpha=0.5, color="r")
 

@@ -6,9 +6,10 @@ import itertools
 import logging
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Iterator, List, NamedTuple, Optional, Tuple, Union, cast
+from typing import Any, Iterator, List, NamedTuple, Optional, Tuple, Union, cast
 
 import numpy as np
+import numpy.typing as npt
 import PIL
 from cv2 import cv2
 from matplotlib import pyplot as plt
@@ -45,6 +46,7 @@ from gance.vector_sources.vector_sources_common import (
 )
 from gance.vector_sources.vector_types import (
     ConcatenatedVectors,
+    SingleMatrix,
     SingleVector,
     VectorsLabel,
     is_vector,
@@ -132,12 +134,13 @@ def _configure_axes(  # pylint: disable=too-many-locals
 
         if enable_3d:
             axis_3d = fig.add_subplot(gs[0:num_rows, column_halfway:num_columns], projection="3d")
+            to_plot = cast(VectorsLabel, visualization_input.combined)
             plot_vectors_3d(
                 axis_3d,
                 vectors_label=VectorsLabel(
-                    data=visualization_input.combined.data,
+                    data=to_plot.data,
                     vector_length=vector_length,
-                    label=visualization_input.combined.label,
+                    label=to_plot.label,
                 ),
             )
     else:
@@ -306,7 +309,11 @@ def _write_data_to_axes(
         if not data_is_vector:
             LOGGER.debug("Plot is a lie! Plotting a matrix as a vector!")
 
-        y_values = data_label.data if data_is_vector else demote_to_vector_select(data_label.data)
+        y_values = (
+            data_label.data
+            if data_is_vector
+            else demote_to_vector_select(cast(SingleMatrix, data_label.data))
+        )
 
         return [
             ax.scatter(
@@ -690,7 +697,7 @@ def vector_synthesis(  # pylint: disable=too-many-locals # <------- pain
     )
 
 
-def _y_bounds(data: np.ndarray, y_range: Optional[Tuple[int, int]] = None) -> Tuple[int, int]:
+def _y_bounds(data: npt.NDArray[Any], y_range: Optional[Tuple[int, int]] = None) -> Tuple[int, int]:
     """
     Process UI input into the set of Y bounds that should be used.
     :param data: Will be considered if no range is given.

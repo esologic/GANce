@@ -6,6 +6,7 @@ import collections
 import datetime
 import itertools
 import multiprocessing
+import typing
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +15,7 @@ import gance.network_interface.fast_synthesizer
 from gance.network_interface import network_functions
 
 
+@typing.no_type_check
 def create_many_images(gpu: int) -> None:
     """
 
@@ -33,6 +35,7 @@ def create_many_images(gpu: int) -> None:
         interface.create_image_vector(data=vector)
 
 
+@typing.no_type_check
 def main_multi() -> None:
     """
 
@@ -46,13 +49,14 @@ def main_multi() -> None:
     p2.start()
 
 
+@typing.no_type_check
 def main() -> None:
     """
 
     :return:
     """
 
-    queue = collections.deque(maxlen=50)  # type: ignore
+    queue = collections.deque(maxlen=50)
 
     with gance.network_interface.fast_synthesizer.fast_synthesizer(
         data_source=itertools.repeat(np.zeros(shape=(512,))),
