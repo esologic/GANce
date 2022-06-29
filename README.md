@@ -1,10 +1,21 @@
 # GANce - gance 
 
-![Sample network output](./gance_sample.png)
+![Sample network output](./docs_assets/gance_sample.png)
 
 Maps music and video into the latent space of StyleGAN (mostly focused on StyleGAN2) networks.
 
 See [esologic.com/gance](https://www.esologic.com/gance) for more information.
+
+## Demo
+
+The following is the music video for 'buzzz' by 
+[Won Pound](https://wonpound.bandcamp.com/) from his self-titled album _Won Pound_ released by 
+[Minaret Records](https://www.minaretrecords.com/):
+
+![Sample network output](./docs_assets/buzzz.mp4)
+
+Note that this has been compressed down to 100mb, a 4k version of the full-length album video is 
+available on YouTube here: https://youtu.be/qc573jxXgII
 
 ## Usage
 
