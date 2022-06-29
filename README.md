@@ -15,7 +15,10 @@ The following is the music video for 'buzzz' by
 ![Sample network output](./docs_assets/buzzz.mp4)
 
 Note that this has been compressed down to 100mb, a 4k version of the full-length album video is 
-available on YouTube here: https://youtu.be/qc573jxXgII
+available on YouTube here: 
+
+
+[![Watch the video](https://img.youtube.com/vi/qc573jxXgII/default.jpg)](https://youtu.be/qc573jxXgII)
 
 ## Usage
 
