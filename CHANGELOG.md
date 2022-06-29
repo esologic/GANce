@@ -1,6 +1,6 @@
 # Changelog
 
-0.22.0 - (2022-05-??)
+0.22.0 - (2022-06-29)
 ------------------
 
 * Added new param `--debug-side-length` to `music_into_network.py` commands to control the vertical
