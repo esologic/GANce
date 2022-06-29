@@ -12,7 +12,7 @@ The following is the music video for 'buzzz' by
 [Won Pound](https://wonpound.bandcamp.com/) from his self-titled album _Won Pound_ released by 
 [Minaret Records](https://www.minaretrecords.com/):
 
-![Sample network output](./docs_assets/buzzz.mp4)
+https://www.esologic.com/wp-content/uploads/2022/03/buzzz_debug.mp4.webm
 
 Note that this has been compressed down to 100mb, a 4k version of the full-length album video is 
 available on YouTube here: 
