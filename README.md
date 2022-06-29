@@ -8,17 +8,15 @@ See [esologic.com/gance](https://www.esologic.com/gance) for more information.
 
 ## Demo
 
-The following is the music video for 'buzzz' by 
+The following is a compressed snippet from the music video for 'buzzz' by 
 [Won Pound](https://wonpound.bandcamp.com/) from his self-titled album _Won Pound_ released by 
 [Minaret Records](https://www.minaretrecords.com/):
 
-https://www.esologic.com/wp-content/uploads/2022/03/buzzz_debug.mp4.webm
+https://user-images.githubusercontent.com/3516293/176499620-8605cc84-02e9-4906-96f9-6c20f9faa795.mp4
 
 Note that this has been compressed down to 100mb, a 4k version of the full-length album video is 
 available on YouTube here: 
 
-
-[![Watch the video](https://img.youtube.com/vi/qc573jxXgII/default.jpg)](https://youtu.be/qc573jxXgII)
 
 ## Usage
 
