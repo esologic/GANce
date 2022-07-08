@@ -1,4 +1,4 @@
-# GANce - gance 
+# GANce - `gance` 
 
 ![Sample network output](./docs_assets/gance_sample.png)
 
@@ -17,11 +17,11 @@ https://user-images.githubusercontent.com/3516293/176499620-8605cc84-02e9-4906-9
 
 Because of GitHub's video size limitations, this clip has been compressed. The complete, 
 album-length music video for _Won Pound_ is available in 4k on YouTube 
-here: https://youtu.be/qc573jxXgII. The 'buzzz' section of the video starts 
-here: https://youtu.be/qc573jxXgII?t=1079
+[here](https://youtu.be/qc573jxXgII). The 'buzzz' section of the video starts 
+[here](https://youtu.be/qc573jxXgII?t=1079).
 
-The video was entirely synthesized with GANce, here's the example command that created 
-[NOVA](https://youtu.be/1ced1KxJRl4):
+The video was entirely synthesized with GANce, here's the command to produce
+[NOVA](https://youtu.be/1ced1KxJRl4), for example:
 
 ```bash
 python music_into_networks.py projection-file-blend \
@@ -83,7 +83,7 @@ There's also a bin script to do this:
 ## Developer Guide
 
 The following is documentation for developers that would like to contribute
-to GANCe.
+to GANce.
 
 ### Type System Limitations
 
