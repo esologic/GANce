@@ -1,6 +1,6 @@
 # Changelog
 
-0.22.0 - (2022-05-??)
+0.22.0 - (2022-06-29)
 ------------------
 
 * Added new param `--debug-side-length` to `music_into_network.py` commands to control the vertical
@@ -77,7 +77,7 @@ offending library right before use, rather than on loading.
 
 * Breaking up project and renaming it `GANce` for publication on GitHub.
 * Added a number of examples for a blog post explaining this 
-project [here](https://www.esologic.com/gance/).
+project [here](https://www.esologic.com/introducing-gance/).
 
 
 0.16.1 - (2021-10-28)

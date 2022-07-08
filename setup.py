@@ -16,7 +16,7 @@ def prod_dependencies() -> List[str]:
 
 setup(
     name="gance",
-    version="0.21.0",
+    version="0.22.0",
     description="Maps music and video into the latent space of StyleGAN networks.",
     author="Devon Bray",
     author_email="dev@esologic.com",

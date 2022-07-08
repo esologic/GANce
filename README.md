@@ -1,10 +1,49 @@
-# GANce - gance 
+# GANce - `gance` 
 
-![Sample network output](./gance_sample.png)
+![Sample network output](./docs_assets/gance_sample.png)
 
 Maps music and video into the latent space of StyleGAN (mostly focused on StyleGAN2) networks.
 
-See [esologic.com/gance](https://www.esologic.com/gance) for more information.
+See [esologic.com/gance](https://www.esologic.com/gance) for the development story, 
+hardware configuration, future plans etc.
+
+## Demo
+
+The following is a snippet from the music video for 'buzzz' by 
+[Won Pound](https://wonpound.bandcamp.com/) from his self-titled album _Won Pound_ released by 
+[Minaret Records](https://www.minaretrecords.com/):
+
+https://user-images.githubusercontent.com/3516293/176499620-8605cc84-02e9-4906-96f9-6c20f9faa795.mp4
+
+Because of GitHub's video size limitations, this clip has been compressed. The complete, 
+album-length music video for _Won Pound_ is available in 4k on YouTube 
+[here](https://youtu.be/qc573jxXgII). The 'buzzz' section of the video starts 
+[here](https://youtu.be/qc573jxXgII?t=1079).
+
+The video was entirely synthesized with GANce, here's the command to produce
+[NOVA](https://youtu.be/1ced1KxJRl4), for example:
+
+```bash
+python music_into_networks.py projection-file-blend \
+  --wav './gance/assets/audio/masters/15 - NOVA (end 2) (pass 2).wav' \
+  --output-path ./nova.mp4 \
+  --debug-path ./nova_debug.mp4 \
+  --debug-side-length 1000 \
+  --debug-window 200 \
+  --run-config ./nova_config.json \
+  --log log.txt \
+  --projection-file-path ./gance/assets/projection_files/resumed_prod_nova_3-1.hdf5 \
+  --networks-json ./prod_networks.json \
+  --output-fps 60 \
+  --output-side-length 2160 \
+  --alpha 0.25 \
+  --fft-roll-enabled \
+  --fft-amplitude-range -5 5 \
+  --blend-depth 12 \
+  --phash-distance 25 \
+  --bbox-distance 50 \
+  --track-length 5
+```
 
 ## Usage
 
@@ -44,7 +83,7 @@ There's also a bin script to do this:
 ## Developer Guide
 
 The following is documentation for developers that would like to contribute
-to GANCe.
+to GANce.
 
 ### Type System Limitations
 
@@ -72,9 +111,6 @@ Read more here: https://github.com/python/mypy/issues/6701
 
 We could resolve this if we take the time to verify that it's okay to upgrade the `numpy` version.
 
-### Pycharm Note
-
-Make sure you mark `gance` and `./test` as source roots!
 
 ### Testing
 
